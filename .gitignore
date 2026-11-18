@@ -1,0 +1,36 @@
+# ROM e dados extraídos ficam fora do controle de versão (DESIGN §3).
+# A pasta inteira é ignorada, não a extensão: *.md é extensão de ROM de Mega Drive.
+roms/
+assets/
+
+# Gerados por tools/split.py (dados extraídos da ROM)
+disasm/data/
+
+# Builds e artefatos
+build/
+out/
+*.o
+*.obj
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node (não usado pelo projeto)
+node_modules/
+
+# Ferramentas externas baixadas localmente
+tools/vendor/
+
+# Projetos de referência: ferramentas externas, não fazem parte do repo (DESIGN §5.1)
+ares/
+segagenesisrecomp/
+StreetsOfRageProject/
+sonic3air-*/
+RGen-*/
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp

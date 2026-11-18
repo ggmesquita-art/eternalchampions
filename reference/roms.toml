@@ -1,0 +1,28 @@
+# reference/roms.toml — identidade da ROM de referência (DESIGN §4)
+# Fixada em 2026-11-18. Qualquer mudança de arquivo aqui exige revisão do hash.
+
+[reference]
+title    = "Eternal Champions"
+platform = "Sega Genesis / Mega Drive"
+region   = "USA"
+serial   = "GM MK-1145"        # do header: "GM MK-1145 -0060J6L"
+date     = "1993.OCT"          # do header: "(C)SEGA 1993.OCT"
+
+[file]
+path      = "roms/eternal_champions_us.gen"
+size      = 3145728            # 24 Mbit
+sha256    = "6d8bdaf8c994d9f718c8f991900c58cdf1af84e030524b57f6dda263cc4ea247"
+sha1      = "5e978217c10b679a42d7d2966a4ccb77e1715962"
+md5       = "bde8b2396241aa27463ca875e604b8d3"
+crc32     = "48F1A42E"
+
+[header]
+# Validação estrutural do dump
+header_checksum = "3630"       # soma de palavras 0x200..fim, bate com 0x18E
+reset_ssp       = "01000000"
+reset_pc        = "00000200"   # código começa em $200
+
+[revision]
+# Preencher com o resultado da conferência No-Intro (Fase 0.3)
+no_intro_name = ""             # ex.: "Eternal Champions (USA) (Rev A)"
+confirmed     = false
