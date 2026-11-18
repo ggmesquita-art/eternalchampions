@@ -6,6 +6,9 @@ assets/
 # Gerados por tools/split.py (dados extraídos da ROM)
 disasm/data/
 
+# Evidence do REA (contém conteúdo derivado da ROM — fora do versionamento)
+reference/rea/
+
 # Builds e artefatos
 build/
 out/
