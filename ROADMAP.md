@@ -10,7 +10,7 @@
 
 ### 0.1 Identidade da ROM de referência
 
-Arquivo: `ROM/eternal_champions_us.gen` (3.145.728 bytes = 24 Mbit, confirma §4 do DESIGN).
+Arquivo: `roms/eternal_champions_us.gen` (3.145.728 bytes = 24 Mbit, confirma §4 do DESIGN).
 
 | Campo | Valor |
 |---|---|
@@ -42,6 +42,22 @@ Arquivo: `ROM/eternal_champions_us.gen` (3.145.728 bytes = 24 Mbit, confirma §4
 | Genesis Plus GX (core libretro) | Referência do harness (§8) | ❌ não instalado |
 | Exodus / debugger MAME | Active disassembly (§6.2) | ❌ não instalado (opcional; ares cobre parte) |
 | Musashi (núcleo 68k) | Fallback (§7.2) — desnecessário se adotarmos o runner do Genesis Recomp (§8.3) | ❌ |
+
+## 0.4 Progresso da Fase 0 (2026-11-18)
+
+- [x] `git init` + `.gitignore` (`roms/`, `assets/`, `disasm/data/`, ferramentas externas)
+- [x] `reference/roms.toml` com todos os hashes + validação de header (checksum `$3630` bate)
+- [x] `tools/split.py` — gera `disasm/main.asm` (64 vetores `dc.l` + `incbin`)
+- [x] `tools/verify.py` — monta com `vasmm68k_mot` e compara byte a byte → **idêntico** ✓
+- [x] vasm 1.9d compilado em `tools/vendor/vasm/` (espelho GitHub; site oficial fora do ar)
+- [x] Ghidra 12.2 + JDK 21.0.13 em `tools/vendor/` (para o REA, §7)
+- [x] Config do REA no `opencode.json` atualizada (`GHIDRA_INSTALL_DIR` + `JAVA_HOME` 21) — **exige reiniciar a sessão/opencode para valer**
+- [x] Primeiro commit: `ea6b14c` (repo leve, sem as ferramentas externas)
+- [ ] Conferência da revisão No-Intro (DAT-o-MATIC bloqueia sem aceitar termos no navegador)
+- [ ] M0.5 — teste de boot em ares: build bloqueado sem `libgtk-3-dev`/`libsdl2-dev` (sem sudo). Opções: pedir senha do sudo para `apt install`, ou compilar só o núcleo (`md.cpp` inclui m32x/SH2 → arrastaria qon; adiado)
+- [ ] CI de hash (GitHub Actions ou hook local)
+
+**Descobertas da Fase 1 já registradas:** Reset `$000200`, VBlank `$0006B6`, IRQ2 `$0006E2`, demais exceções `$0006DE`; HBlank aponta para `$00FF0000` (desabilitado no boot — anotar no disasm).
 
 ---
 
