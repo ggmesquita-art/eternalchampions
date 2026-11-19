@@ -58,7 +58,9 @@ Arquivo: `roms/eternal_champions_us.gen` (3.145.728 bytes = 24 Mbit, confirma §
 
 **Descobertas da Fase 1 já registradas:** Reset `$000200`, VBlank `$0006B6`, IRQ2 `$0006E2`, demais exceções `$0006DE`; HBlank aponta para `$00FF0000` (desabilitado no boot — anotar no disasm).
 
-**Fase 1 em andamento (2026-11-18, tarde):** regiões `$000200`–`$0002F9` (reset/init de hardware: TMSS, registros VDP, stub do Z80) e `$0006B6`–`$00083B` (VBlank, espera de quadro com handshake Z80, aquisição/liberação de barramento, upload do driver de som, ring buffer) **convertidas em asm real** (`disasm/code/boot.asm`, `disasm/code/irq.asm`), com `verify.py` **byte a byte idêntico** ✓. Confirmações: programa do Z80 em `$000A80` (0x1886 bytes → driver de som próprio, §18.2), protocolo busreq/reset em `0xA11100`/`0xA11200`, contadores de quadro em `$FFFFFD72/76` (hipótese).
+**Fase 1 em andamento (2026-11-18, tarde):** regiões `$000200`–`$0002F9` (reset/init de hardware: TMSS, registros VDP, stub do Z80), `$0006B6`–`$00083B` (VBlank, espera de quadro com handshake Z80, aquisição/liberação de barramento, upload do driver de som, ring buffer) **convertidas em asm real** (`disasm/code/boot.asm`, `disasm/code/irq.asm`), com `verify.py` **byte a byte idêntico** ✓. Confirmações: programa do Z80 em `$000A80` (0x1886 bytes → driver de som próprio, §18.2), protocolo busreq/reset em `0xA11100`/`0xA11200`, contadores de quadro em `$FFFFFD72/76` (hipótese).
+
+**Fase 1 (noite):** tela de boot/trava de região (`$2FA–$6B5`), interface de comandos do Z80 (`$83C–$8A7`), entrada do main + laço externo (`$2230–$25FD`) e sombra VDP (`$2786–$27B3`) convertidas — tudo com hash idêntico. Esqueleto do jogo mapeado via REA (267 pseudocódigos exportados): `Main_Entry → Main_OuterLoop → FUN_0000fcde → Main_FrameLoop ($FD24)` com 7 subsistemas por flag, handshake Z80 dentro do laço, alocador em `$D4CC`, câmera/tilemap em `$C836–C83A` (`Map_GetTileAddr $1032A`). Ver `docs/main_loop.md`.
 
 ---
 
