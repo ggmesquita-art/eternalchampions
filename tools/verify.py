@@ -58,8 +58,10 @@ def main() -> int:
         out_bin = pathlib.Path(tf.name)
 
     # incbin em main.asm é relativo ao diretório do fonte: rodar com cwd=disasm/
+    # -no-opt: o hash é a lei (DESIGN §2.1) — proíbe o vasm de "otimizar"
+    # instruções (ex.: asl #1 → add), o que mudaria os bytes.
     proc = subprocess.run(
-        [str(vasm), "-Fbin", "-o", str(out_bin), "main.asm"],
+        [str(vasm), "-no-opt", "-Fbin", "-o", str(out_bin), "main.asm"],
         cwd=root / "disasm",
         capture_output=True, text=True,
     )
