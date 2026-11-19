@@ -50,17 +50,25 @@ Estado dos subsistemas em runtime confirmado: bits 0–6 de `$FD69` ligados →
 `DC4E`/`F6A0`/`D7E4`/`E684`/`10AA8` rodando. `$9B32` continua 0 após 600
 quadros (o sync de quadro do laço só ativa quando vira ≠ 0 — confirmar quando).
 
-### Mapa de estados (trace do ares_cli, 1200 quadros)
+### Mapa de estados (trace do ares_cli, 1200–2400 quadros)
 
 | Momento | Estado |
 |---|---|
 | boot | 0 → **7 (título)** no quadro 23 |
 | sem input | 7 → **13** (~attract/demo) |
 | Start no quadro 600 | 7 → 0 (transição) → **9 (menu)** no quadro 644 |
+| Start no menu (950) | 9 → **1** (setup de jogo: cria objetos, espera Start, config de pads) |
 
 Handlers: `State_HandlerTable[$27B4]` (40 offsets relativos). Estado 7 →
 `$2EF2`, estado 9 → `$3256` (menu: `$9CCA==5 → jmp $200` = reset), estado 0 →
-`$2804` (`rts`). `$FD68` = flag "estado mudou" ($FFFF a cada dispatch).
+`$2804` (`rts`), estado 1 → `$2806` (convertido por completo: loop por quadro,
+cria objetos `$B8/$41/$AB`, espera `Start` em `$FD61` bit7, termina em `rts`).
+`$FD68` = flag "estado mudou" ($FFFF a cada dispatch).
+
+**Em aberto:** no ares_cli o estado 1 não progride (a transição deve vir de um
+subsistema — o array de tarefas de `$D7E4` — que depende de detecção de pad
+`$9CB0` ou de timing fino; investigar). A lógica do menu vive nos subsistemas
+(`$F32C`/`$F47A` criam os objetos do menu).
 
 ## Fluxo de um quadro (FUN_0000fd24)
 
