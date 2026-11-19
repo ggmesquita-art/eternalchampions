@@ -25,6 +25,30 @@ Main_OuterLoop ($255E) ◄──────────────────
 **A6** = ponteiro global usado como sombra de registros/comandos do VDP
 (escritas em (A6) e (A6+4) em `$2786`, `$22A0` e no VBlank via `$D6A0`).
 
+## Validação dinâmica (ares_cli, 2026-11-18)
+
+Driver headless do núcleo do ares (`tools/vendor/ares_cli/`): roda N quadros e
+despeja a RAM de trabalho. Primeiro dump (600 quadros) confirmou:
+
+| Hipótese | Resultado |
+|---|---|
+| `$FEF8` contador de boots | = 1 ✓ |
+| `$FEFE` = 4 no fim do boot | = 4 ✓ |
+| `$FEFC` = $14 modificado no modo 9 | = $74 ($14\|$30\|$40) ✓ |
+| `$FD70` contador do laço principal | = 526 em 600 quadros ✓ |
+| `$FD72` contador de VBlank (long) | = 552 em 600 quadros ✓ |
+| `$FD76` flag de VBlank | = 0 (o jogo zera a cada quadro — é a flag do §7.3!) ✓ |
+| `$FD64` estado do jogo | = 7 (tela de título) ✓ |
+| `$FD69` flags de subsistemas | = $7F (todos ligados, bit7 off) ✓ |
+| `$FD6A` lock do barramento Z80 | = 0 (protocolo balanceado) ✓ |
+| `$9CCA` = $FFFF no boot | = $FFFF ✓ |
+| `$9CC0` = $B no boot | = $B ✓ |
+| `$C838/$C836` câmera | ativos ($12/$00) ✓ |
+
+Estado dos subsistemas em runtime confirmado: bits 0–6 de `$FD69` ligados →
+`DC4E`/`F6A0`/`D7E4`/`E684`/`10AA8` rodando. `$9B32` continua 0 após 600
+quadros (o sync de quadro do laço só ativa quando vira ≠ 0 — confirmar quando).
+
 ## Fluxo de um quadro (FUN_0000fd24)
 
 ```
