@@ -84,16 +84,23 @@ A transição 9→13 é um **timer de attract** (acontece sem input nenhum).
 **A divergência real é só com input no estado 9**: ares + Start@950 →
 **9→1** (quadro 983); GPGX + Start@950 → Start **ignorado**, 9→13 via
 attract. Mecanismo (handler do estado 9, $3256): o loop de espera tem DOIS
-caminhos de saída — (a) `$FD55`/`$FD57` bit7 (bit15 da BORDA do pad) →
+caminhos de saída — (a) `$FD55`/`$FD57` bit7 (bit 7 = `$0080` da BORDA do
+pad; FD55 é o byte BAIXO da palavra FD54) →
 retorna sem mudar `$9CB6` → tabela de modos avança → **estado 1**; (b)
 `$FD61` bit7 (tarefa de input do escalonador) → `$9CCA++` → `$9CB6=$D` →
 **estado 13**. Os dois emuladores emulam pad de 6 botões (header "J6";
 GPGX: `rominfo.peripherals&2`→PAD6B; ares: FightingPad), então a diferença
 está no **protocolo de 6 botões** (ares é instantâneo, GPGX modela a
-latência por ciclos do MK-1653-50) — os bits do pad lidos pelo jogo
-diferem. Conclusão mantida: **GPGX = referência dinâmica**; portar o
+latência por ciclos do MK-1653-50 — 172 ciclos na troca de TH, contra o
+polling rápido do Sub_CA80) — os bits do pad lidos pelo jogo diferem:
+**verificado em dump: ares + Start → `$0080` (bit 7, o bit de "confirmar"
+do menu); GPGX + Start → `$0008` (bit 3, não dispara o caminho A)**.
+Conclusão mantida: **GPGX = referência dinâmica**; portar o
 protocolo do `gamepad.c` para o ares ou tratar o ares só como fonte do
-P2/N2.
+P2/N2. ⚠️ Questão em aberto: qual dos dois bate com o hardware real — o
+jogo espera o bit 7 como "confirmar" e funciona em console real; se o
+GPGX estiver conservador demais na latência, a leitura real pode ser a do
+ares. Referendar com um terceiro emulador (BlastEm/Exodus) ou hardware.
 
 ### Handler do estado 9 (menu-init, $3256 — decodificado, 2026-11-18)
 
@@ -105,7 +112,7 @@ Fluxo decodificado (ainda não convertido para asm):
 3. `tst.w $9CCA`; negativo → som ($093C) + `$9CCA=5`. Espera `$9B62≠0`,
    roda 15 quadros.
 4. **Loop de espera** ($33F8): clr `$FD76`, roda 0 quadros, testa:
-   - `$FD55` bit7 / `$FD57` bit7 (bit15 da borda do pad) → **saída A**
+   - `$FD55` bit7 / `$FD57` bit7 (bit 7 = `$0080` da borda do pad) → **saída A**
      ($3488): limpa flags, `rts` — `$9CB6` fica 0 → tabela de modos de
      boot avança (09→01) → **estado 1** (caminho que o ares toma)
    - `$FD61` bit7 (tarefa de input) → **saída B**: `$9CCA++`, `$9CCC=2`,
@@ -153,7 +160,7 @@ Sub_CA80 ($CA80)          lê a porta crua (TH toggling, detecção de 6 botões
     → FD58/FD5A (estado), FD54/FD56 (bordas), FD50/FD52 (anterior)
       → Tarefa de input ($1FF00, sob o escalonador cooperativo):
           jsr $DB28 (entra no escalonador)
-          btst #7, FD55 / FD57   ; bit 15 das BORDAS (botão recém-pressionado)
+          btst #7, FD55 / FD57   ; bit 7 ($0080) das BORDAS (botão recém-pressionado)
           → seta $FD61 bit7 ("confirmar/lutar") ou bits 7+4 ("cancelar")
           → bset #2,($74,a5); jmp $DC10 (cede a vez)
         → loop do menu ($382A) vê $FD61 bit7 → sai → $9CB6=1 → boot mode retry

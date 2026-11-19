@@ -41,6 +41,8 @@ auto nall::main(Arguments arguments) -> void {
   bool trace = false;
   struct Press { s64 frame; string button; };
   std::vector<Press> presses;
+  struct Dump { s64 frame; string path; };
+  std::vector<Dump> dumps;
   while(arguments.size()) {
     auto arg = arguments.take();
     if(arg == "--trace") { trace = true; continue; }
@@ -57,6 +59,18 @@ auto nall::main(Arguments arguments) -> void {
         btn = "Start";
       }
       presses.push_back({f, btn});
+      continue;
+    }
+    if(arg == "--dump") {
+      if(arguments.size() < 1) break;
+      string spec = arguments.take();
+      s64 f = 0;
+      string path;
+      if(auto pos = spec.find(":")) {
+        f = strtoull(string{spec.data(), (u32)pos()}.data(), nullptr, 0);
+        path = string{spec.data() + pos() + 1};
+      }
+      if(f >= 0 && path.size()) dumps.push_back({f, path});
       continue;
     }
     break;
@@ -142,6 +156,23 @@ auto nall::main(Arguments arguments) -> void {
       n16 fd70 = bus.read(0xFF, 0x00, 0xFFFD70);
       print(i, " st=", hex(fd64, 4L), " in=", hex(fd60, 4L),
             " fc=", hex(fd70, 4L), "\n");
+    }
+    for(auto& d : dumps) {
+      if((s64)i == d.frame) {
+        auto& bus = ares::MegaDrive::bus;
+        static u8 ram[0x10000];
+        for(u32 addr = 0; addr < 0x10000; addr += 2) {
+          n16 word = bus.read(0xFF, 0x00, 0xFF0000 + addr);
+          ram[addr + 0] = word >> 8;
+          ram[addr + 1] = word & 0xFF;
+        }
+        FILE* f = fopen(d.path.data(), "wb");
+        if(f) {
+          fwrite(ram, 1, 0x10000, f);
+          fclose(f);
+          print("dump@", i, " → ", d.path, "\n");
+        }
+      }
     }
   }
   for(auto& p : presses) setButton(p.button, false);
