@@ -1,0 +1,148 @@
+{
+  "_meta": {
+    "workflow": "remaster_sdxl_consistent",
+    "workflow_version": "1.0",
+    "description": "Consistent SDXL style-conditioned character/background remaster using Canny ControlNet + IP-Adapter Plus ViT-H + fixed seed",
+    "model": "90sCartoonXL_v09Alpha.SDXL.safetensors",
+    "controlnet": "controlnet-canny-sdxl.safetensors",
+    "ipadapter": "ip-adapter-plus_sdxl_vit-h.safetensors",
+    "clip_vision": "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
+    "default_seed": 19931211,
+    "scale": 4
+  },
+  "prompt": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "90sCartoonXL_v09Alpha.SDXL.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": "__INPUT_IMAGE__"
+      }
+    },
+    "3": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": "__REF_IMAGE__"
+      }
+    },
+    "4": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "90s arcade fighting game HD hand-painted sprite art, crisp ink outlines, clean shading, faithful silhouette, high contrast",
+        "clip": ["1", 1]
+      }
+    },
+    "5": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "blurry, photorealistic 3d render, extra limbs, distorted anatomy, watermark, text, noise, background clutter",
+        "clip": ["1", 1]
+      }
+    },
+    "6": {
+      "class_type": "ControlNetLoader",
+      "inputs": {
+        "control_net_name": "controlnet-canny-sdxl.safetensors"
+      }
+    },
+    "7": {
+      "class_type": "CannyEdgePreprocessor",
+      "inputs": {
+        "image": ["2", 0],
+        "low_threshold": 80,
+        "high_threshold": 180,
+        "resolution": 1024
+      }
+    },
+    "8": {
+      "class_type": "ControlNetApplyAdvanced",
+      "inputs": {
+        "positive": ["4", 0],
+        "negative": ["5", 0],
+        "control_net": ["6", 0],
+        "image": ["7", 0],
+        "strength": 0.85,
+        "start_percent": 0.0,
+        "end_percent": 0.9,
+        "vae": ["1", 2]
+      }
+    },
+    "9": {
+      "class_type": "CLIPVisionLoader",
+      "inputs": {
+        "clip_name": "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors"
+      }
+    },
+    "10": {
+      "class_type": "IPAdapterModelLoader",
+      "inputs": {
+        "ipadapter_file": "ip-adapter-plus_sdxl_vit-h.safetensors"
+      }
+    },
+    "11": {
+      "class_type": "IPAdapterAdvanced",
+      "inputs": {
+        "model": ["1", 0],
+        "ipadapter": ["10", 0],
+        "image": ["3", 0],
+        "clip_vision": ["9", 0],
+        "weight": 0.75,
+        "weight_type": "linear",
+        "combine_embeds": "concat",
+        "start_at": 0.0,
+        "end_at": 1.0,
+        "embeds_scaling": "V only"
+      }
+    },
+    "12": {
+      "class_type": "ImageScale",
+      "inputs": {
+        "image": ["2", 0],
+        "upscale_method": "nearest-exact",
+        "width": 1024,
+        "height": 1024,
+        "crop": "disabled"
+      }
+    },
+    "13": {
+      "class_type": "VAEEncode",
+      "inputs": {
+        "pixels": ["12", 0],
+        "vae": ["1", 2]
+      }
+    },
+    "14": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": ["11", 0],
+        "seed": 19931211,
+        "steps": 24,
+        "cfg": 6.5,
+        "sampler_name": "dpmpp_2m",
+        "scheduler": "karras",
+        "positive": ["8", 0],
+        "negative": ["8", 1],
+        "latent_image": ["13", 0],
+        "denoise": 0.45
+      }
+    },
+    "15": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": ["14", 0],
+        "vae": ["1", 2]
+      }
+    },
+    "16": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "__OUTPUT_PREFIX__",
+        "images": ["15", 0]
+      }
+    }
+  }
+}

@@ -9,9 +9,9 @@
 // quadro (bitmask hex de 12 botões, bits = RETRO_DEVICE_ID_JOYPAD_*):
 //   rom <sha256hex>
 //   frames <N>
-//   <mask0>
-//   <mask1>
-//   ... (N linhas)
+//   <mask0> [<mask0_p2>]
+//   <mask1> [<mask1_p2>]
+//   ... (N linhas; 2ª coluna opcional = pad 2, ausente => 0)
 //   seed <N>        ; opcional (RNG do harness)
 
 #define _GNU_SOURCE
@@ -65,6 +65,7 @@ typedef struct {
 } retro_variable_;
 
 static int16_t g_buttons = 0;
+static int16_t g_buttons2 = 0; /* pad 2 (.ecm 2ª coluna) */
 
 /* ---- SHA-256 compacto (verifica o hash da ROM no .ecm) -------------------- */
 typedef struct { uint32_t h[8]; uint64_t len; uint8_t buf[64]; int n; } sha256_ctx;
@@ -143,6 +144,7 @@ static void sha256_final(sha256_ctx *c, uint8_t out[32]) {
 static int16_t input_state(unsigned port, unsigned device, unsigned index, unsigned id) {
   (void)device; (void)index;
   if(port == 0 && id < 12 && (g_buttons & (1 << id))) return 1;
+  if(port == 1 && id < 12 && (g_buttons2 & (1 << id))) return 1;
   return 0;
 }
 
@@ -255,6 +257,7 @@ int main(int argc, char **argv) {
   int movieMode = 0;
   long movieFrames = 0;
   uint16_t *movieMasks = NULL;
+  uint16_t *movieMasks2 = NULL;
   long movieN = 0, movieCap = 0;
   {
     const char *moviePath = NULL;
@@ -293,10 +296,16 @@ int main(int argc, char **argv) {
           char *endp = NULL;
           long mask = strtol(s, &endp, 16);
           if(endp == s) { fprintf(stderr, "ecm: linha inválida: %s", s); fclose(mf); return 1; }
+          char *endp2 = NULL;
+          long mask2 = strtol(endp, &endp2, 16);
+          if(endp2 == endp) mask2 = 0; /* sem 2ª coluna: pad 2 solto */
           if(movieN == movieCap) {
             movieCap = movieCap ? movieCap * 2 : 4096;
             movieMasks = (uint16_t*)realloc(movieMasks, movieCap * sizeof(uint16_t));
+            movieMasks2 = (uint16_t*)realloc(movieMasks2, movieCap * sizeof(uint16_t));
+            if(!movieMasks || !movieMasks2) { fprintf(stderr, "ecm: sem memória\n"); fclose(mf); return 1; }
           }
+          movieMasks2[movieN] = (uint16_t)mask2;
           movieMasks[movieN++] = (uint16_t)mask;
         }
       }
@@ -340,8 +349,9 @@ int main(int argc, char **argv) {
   uint8_t *ramlive = NULL;
   for(long i = 0; i < frames; i++) {
     g_buttons = 0;
+    g_buttons2 = 0;
     if(movieMode) {
-      if(i < movieN) g_buttons = movieMasks[i];
+      if(i < movieN) { g_buttons = movieMasks[i]; g_buttons2 = movieMasks2[i]; }
     } else {
       for(int s = 0; s < nstarts; s++)
         if(i >= startAt[s] && i < startAt[s] + 20) g_buttons = 1 << 3; /* START */

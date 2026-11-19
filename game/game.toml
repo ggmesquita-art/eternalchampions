@@ -1,0 +1,117 @@
+# game/game.toml — Eternal Champions (SEGA, 1993) USA NTSC, 3 MB (24 Mbit).
+# Configuração do recompilador GenesisRecomp alimentada pelos metadados da Fase 1.
+
+[game]
+output_prefix = "ec"
+jump_table_autodiscovery = true
+code_addrs_file = "ec_code_addrs.txt"
+discovery_files = ["ec_discovery.toml"]
+
+[ram_layout]
+game_mode      = 0xFFFD64
+vint_runcount  = 0xFFFD74
+vint_routine   = 0x000000
+plc_pending    = 0x000000
+initial_ssp    = 0x01000000
+vbla_stack     = 0x01000000
+intr_stack     = 0x01000000
+player_object  = 0xFFAB86
+level_modes    = [17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+
+[functions]
+extra = [0x000200, 0x0006B6, 0x0006DE, 0x0006E2, 0x002230, 0x00FD24, 0x00FE1E]
+late_extra = []
+blacklist = []
+
+# Hooks opt-in (--unlock-boss) para Eternal Champion + 4 variantes jogaveis
+[[widescreen_site]]
+addr = 0x030F1E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x030F48
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x030F7E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x030F90
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x030F9E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x03104E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x02E270
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x02E574
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x02E2DA
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x043C12
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x043C5A
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x043C76
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x043CDC
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x043F4C
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x044204
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x044218
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x044246
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x04425A
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01816A
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x0444D0
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x04453C
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01F19A
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01F7A4
+kind = "game_hook"

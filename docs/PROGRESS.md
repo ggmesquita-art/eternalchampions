@@ -29,7 +29,8 @@ Princípios (DESIGN §2.1, §6.3):
 | `tools/verify.py` | Monta + compara hash (vasm `-no-opt` + sha256) |
 | `tools/disasm.py` | Listagem capstone de qualquer região da ROM |
 | `tools/analyze_cluster.py` | Analisa pseudocódigo exportado pelo REA |
-| `disasm/symbols/labels.toml` | 102 labels (76 confirmed, 28 hypothesis) |
+| `disasm/symbols/labels.toml` | 243 labels (155 confirmed, 88 hypothesis) |
+| `disasm/symbols/ram_map.toml` | 72 entradas de RAM (65 confirmed, 7 hypothesis), incluindo lutadores P1/P2 |
 | `tools/vendor/vasm/` | vasm 1.9d compilado localmente |
 | `tools/vendor/ares_cli/` | Driver headless do ares (input/trace/dump) |
 | `tools/vendor/gpgx_runner/` | Loader libretro do GPGX + filmes `.ecm` |
@@ -37,7 +38,7 @@ Princípios (DESIGN §2.1, §6.3):
 
 ## 3. Estado da conversão (Fase 1)
 
-Regiões **convertidas para asm e hash-verificadas** (~7,6 KB de código):
+Regiões **convertidas para asm e hash-verificadas** (`364,5 KB` / `373.204` bytes de código/tabelas em `main.asm`; 100% dos blocos de código 68000 alcançáveis):
 
 | Região | Arquivo | Conteúdo |
 |---|---|---|
@@ -47,22 +48,43 @@ Regiões **convertidas para asm e hash-verificadas** (~7,6 KB de código):
 | `$00083C–$0008A7` | `code/z80_cmd.asm` | Interface de comandos para o Z80 |
 | `$0008A8–$000A7F` | `code/sound_cmd.asm` | Camada de comandos de som |
 | `$002230–$0025FD` | `code/main_entry.asm` | Entrada do main, clear de RAM, modos de boot (07→09→01→FF), laço externo |
+| `$002600–$002785` | `code/main_subs.asm` | `Main_InitDefaults`, `Main_CheckPause` (Start / 3 socos / 3 chutes), `Main_PauseLoop` |
 | `$002786–$0027B3` | `code/vdp_init.asm` | Sombra de registros VDP |
 | `$0027B4–$002803` | `code/state_table.asm` | Tabela de dispatch: 40 handlers (offsets relativos) |
-| `$002804–$002ADC` | `code/state_handlers1.asm` + `code/state1_handler2.asm` | Estados 0 (nulo) e 1 (init completo) |
+| `$002804–$002ADC` | `code/state_handlers1.asm` + `code/state1_handler2.asm` | Estados 0 (nulo) e 1 (init completo + menu principal) |
 | `$002ADC–$00313A` | `code/state_handlers2.asm` | Estados 2–7 (seleção de personagem, título) |
 | `$00313A–$00397F` | `code/state_handlers3.asm` | Estados 8–13 (menu-init, menu principal) |
+| `$003980–$004541` | `code/state_handlers4.asm` | Estados 14–16 (setup/cenas, 3 TileAnims, tela pré-luta) |
+| `$004542–$00C09D` | `code/state_handlers5.asm`..`code/state_handlers13.asm` | **Handlers 17–39 completos**: arenas (`17`–`27`), finalização (`28`), cenas (`29`–`32`), `rts` (`33`–`39`) |
+| `$00C09E–$00CD73` | `code/util_combat_input.asm` | Setup de arena/saída (`$C0B2/$C288/$C578`), leitura/mapeamento de pads (`$C870/$CA80`), espera VBlank (`$CB42`), RNG (`$CB82`), cópias/VDP Reg 0 (`$CAD2/$CB18`) |
+| `$00CD74–$00DB13` | `code/util_alloc_vdp.asm` | Descompressor (`$D084`), `Mem_Alloc/Free` (`$D4CC/$D5A4`), `VBlank_VdpUpdate` (`$D6A0`), paletas (`$D710–$D7A8`), `Sub_StateMachine` (`$D7E4`) |
+| `$00DB14–$00E683` | `code/util_sched_obj.asm` | Escalonador cooperativo (`$DB14–$DC4E`), `Obj_Create` (`$DCEA`), alocação/liberação inline de tiles (`$E408/$E5FC/$E61E`), DMA (`$E648`) |
+| `$00E684–$00FD23` | `code/util_engine.asm` | Subsistema `$E684`, rotação 2D + `Math_SinCosTable` (`$F00C–$F16B`), fila DMA (`$F2B6`), camadas/Reg 11 (`$F32C–$F47A`), `$F6A0`, `Frame_RunN` (`$FCDE`) |
 | `$00FD24–$00FE1D` | `code/main_frameloop.asm` | Laço de 1 quadro: contador `$FD70`, leitura de pads, subsistemas, sync com o Z80 |
-| `$00FE1E–$00FFAB` | `code/state_dispatch.asm` | FrameRun, State_SetState, State_Dispatch, State_PostChange, init do sistema/câmera |
+| `$00FE1E–$00FFAB` | `code/state_dispatch.asm` | `FrameRun`, `State_SetState`, `State_Dispatch`, `State_PostChange`, `Sub_FF08`, `Camera_Init` |
+| `$00FFAC–$011ACD` | `code/engine_ext.asm` | Câmera/mapa (`$FFAC/$1032A`), texto/hex/dec (`$100C2–$10205`), `TileAnim_Register` (`$109EA`), `$10AA8`, stream HV-sync `$10B74` (tabela `$10C6E`), `$11414`, wave scroll (`$11800+`) |
+| `$011ACE–$016F31` | `code/obj_tasks1.asm` | Tarefas de objetos e subsistemas do motor (bloco 1) |
+| `$016F32–$016F73` | `code/task_title.asm` | Tarefa de confirmação da tela de título |
+| `$016F74–$0172E5` | `code/obj_tasks2.asm` | Auxiliares de animação/temporização de objetos (`Anim_SetFrameWait`/`Anim_Wait`) |
+| `$0172E6–$0172F9` | `code/pal_shadow.asm` | Cópia de paleta para buffer sombra (`$FFFF9BB0`) |
+| `$0172FA–$01FEFF` | `code/obj_tasks3.asm` | Tarefas de objetos, debug `Debug_PlayerEditScreen` (`$182A0`), `Fighter_AITableAlt` (`$1B1C2`) |
+| `$01FF00–$01FF4F` | `code/task_input.asm` | Tarefa cooperativa de input/heartbeat (`$FD61` bit4/bit7) |
+| `$01FF50–$026E49` | `code/obj_tasks4.asm` | Tarefas de cena e menu `Menu_ButtonConfig` (`$2644C`) |
+| `$028B12–$032193` | `code/menu_system.asm` | Sistema de menus, opções, torneio e motor `Menu_MainEngine` (`$312B8`) |
+| `$034B0A–$044001` | `code/ai_fighters1.asm`..`code/ai_fighters3.asm` | Lógica de IA de lutadores (`AI_Fighter0..9_Desc`) e 4 formas do chefe (`AI_Boss*`) |
+| `$044002–$05778F` | `code/fight_moves1.asm`..`code/fight_moves3.asm` | Máquinas de estado de golpes e física de luta |
+| `$057790–$05E8A3` | `code/combat_core.asm` | Núcleo de combate ativo (`Combat_MainLoop`..`Combat_FighterSync`), câmeras de luta |
+| `$2FCD1A–$2FF437` | `code/replay_system.asm` | Instant Replay, estatísticas e controle de torneio (`Replay_StateEntry` `$2FDCEE`, estados 29/32) |
 
-Regiões **ainda não convertidas** (incbin):
+Regiões **puramente de dados** (mantidas em `incbin` — `2.772.524` bytes / `2.707,5 KB`):
 
 | Região | Tamanho | O que é |
 |---|---|---|
-| `$000A80–$00222F` | 0x17B0 | Programa do Z80 (driver de som, 0x1886 bytes) + dados — por decisão, fica como bloco |
-| `$002600–$002785` | 0x186 | Sub-rotinas do laço externo (Sub_2600/2686/2718) |
-| `$003980–$00FD23` | 0xC3A4 (~50 KB) | **Handlers 14–39 + cluster de utilitários** (input, alocador, escalonador, VDP) |
-| `$00FFAC–fim` | ~3 MB | Tarefas do escalonador, dados, gráficos, áudio |
+| `$000A80–$00222F` | 0x17B0 (6.064 B) | Programa do Z80 (driver de som) + dados — por decisão, fica como bloco |
+| `$026E4A–$028B11` | 0x1CC8 (7.368 B) | Textos comprimidos de finais e créditos |
+| `$032194–$034B09` | 0x2976 (10.614 B) | Textos comprimidos das biografias dos lutadores |
+| `$05E8A4–$2FCD19` | 0x29E476 (2.745.462 B) | Gráficos, animações, `Obj_TableMaster` (`$06A522`), `Fight_AnimTableMaster` (`$07F65A`), áudio (0 `jsr`/`jmp` 68k) |
+| `$2FF438–$2FFFFF` | 0xBC8 (3.016 B) | Tabelas de dados finais / padding |
 
 ## 4. Ferramentas dinâmicas
 
@@ -115,11 +137,11 @@ boot (tabela $22DE: 07→09→01→FF) → laço externo
 | Est | End | Papel | Est | End | Papel |
 |---|---|---|---|---|---|
 | 0 | `$2804` | nulo (rts) | 13 | `$36B2` | **menu principal** |
-| 1 | `$2806` | init completo | 14–17 | `$3980`… | não convertidos |
-| 2 | `$2ADC` | seleção de personagem | 18 | `$56F0` | não convertido |
-| 3 | `$2E24` | vazio (rts) | 19–31 | `$5B06`… | não convertidos |
-| 4 | `$2E26` | alias do 10 | 32–39 | `$C08C`… | não convertidos |
-| 5 | `$2E2A` | init tilemap/câmera | | | |
+| 1 | `$2806` | init completo | 14–17 | `$3980`… | setup/cenas (14–16) e arena 17 (`state_handlers4–5`) |
+| 2 | `$2ADC` | seleção de personagem | 18 | `$56F0` | arena (`State2_CharTable`) |
+| 3 | `$2E24` | vazio (rts) | 19–27 | `$5B06`… | arenas (`State2_CharTable`, `state_handlers6–12`) |
+| 4 | `$2E26` | alias do 10 | 28–31 | `$B56C`… | transição (28), `$2FDCEE` (29), cenas/paletas (30–31) |
+| 5 | `$2E2A` | init tilemap/câmera | 32–39 | `$C08C`… | `$2FDCEE` (32), `rts` estados vazios (33–39) |
 | 6 | `$2EE8` | `$9352=1` → estado 18 | | | |
 | 7 | `$2EF2` | **título** (espera `$FD61` bit0) | | | |
 | 8 | `$313A` | arte + espera `$FD61` bit7 | | | |
@@ -170,30 +192,39 @@ alternativo, `$DB2E` = decrementa/retoma, `$DB4A` = dispatch round-robin,
 `$DC10` = volta ao escalonador. Tarefas no cluster `$FFAC+`/`$16000+`
 (ex.: input `$1FF00`, título `$16F32`).
 
-## 6. Investigação da divergência ares × GPGX
+### 5.6 Estrutura de lutador e estado da luta (`disasm/symbols/ram_map.toml`)
 
-Resumo da investigação (docs em `docs/main_loop.md`):
+Validado por dumps diferenciais de RAM no `gpgx_runner` durante luta ativa (Estado 17 via `Enter Contest`, frames 2150–2750):
 
-1. ⚠️ **Bug nosso corrigido**: a 1ª versão do runner usava
-   `JOYPAD_START=7` (= RIGHT no libretro) — comparações iniciais
-   inválidas. Com START real (id 3), refeito tudo.
-2. **Sem input**: máquina de estados **idêntica** nos dois emuladores
-   (defasagem ~44 quadros); 9→13 é timer de attract.
-3. **Com 2+ presses de Start** no estado 9: **concordam** (9→1 em 1033
-   vs 1034).
-4. **Com 1 press único**: ares → 9→1 (983); GPGX perde a borda →
-   9→13 (attract).
-5. No quadro do pressionar, a RAM é **idêntica** nos dois (FD54=$0080,
-   FD58=$0080); a diferença está na **oscilação intra-quadro** do
-   contador do FightingPad (ares, instantâneo) vs a estabilidade do
-   MK-1653-50 (GPGX, latência de 172 ciclos na troca de TH).
+- **Slots de lutador** (stride exacto `$0134` = 308 bytes): `Fighter_P2` em `$FFFFAA52–$AB85` (Slot 0 / CPU em 1P) e `Fighter_P1` em `$FFFFAB86–$ACB9` (Slot 1).
+- Campos confirmados em ambos (`base + offset`): `+$16` flags/facing, `+$2A..+$31` screen bounding box `(x1,y1,x2,y2)`, `+$40` ID (`$0003`), `+$42` PosX, `+$46` PosY (chão=`216`), `+$50/$54` VelX/VelY (`16.16`), `+$68` Health (`$0068` = 104 inicial; P1 caiu `$0068→$0066→$0057`), `+$6C` CharId (`$0182/$0183`), `+$7A` `TaskNode`, `+$7C` `OpponentPtr` (simétrico), `+$12A` `InputMode` (`$AB7C/$ACB0`).
+- Estado global da luta: `$FFFF9CB4` = timer do round em BCD (`$99→$97→$92→$87`), `$FFFF9774/$9776` = barras de vida espelhadas no HUD para P1/P2.
 
-**Decisão**: GPGX = referência dinâmica oficial (o `gpgx_runner` já é o
-esqueleto do harness §8). Ares fica para o P2/N2 — ou portar o
-`gamepad.c` do GPGX para ele.
+### 5.7 HBlank / Raster e Scroll (DESIGN §18.3)
 
-**Questão em aberto**: qual emulador bate com o hardware real (o jogo
-funciona em console real; referendar com BlastEm/Exodus).
+- **HBlank IRQ (Autovetor 4 → `$00FF0000`) não é utilizado na luta ativa**: no dump da luta, `$FF0000–$FF001F` permanece zerado, `Vdp_Reg0Shadow` (`$FFFFFEFE`) vale `$0004` (IE1 desligado) e `$FFFFC54C` (gate de H-Int em `$CAE6`) vale `$0000` (nenhum escritor ativo encontrado; `$CAEC` tem 0 callers). `Wram_CopyVerifyStub` (`$0117A6`, que referencia `$00FF0000`) também não possui callers na ROM.
+- **Efeitos por linha usam VDP Reg 11 (`$8B03` = H-Scroll per-line)**: os handlers das arenas chamam `$00F462` (`Vdp_Reg11HScrollMode` = `3`), confirmado no dump ativo (`$FFFFCCE0 = 3`, `$FFFFCCDE = 0`), alimentado por rotinas como `Bg_WaveScroll1/2/3` (`$11800`/`$11928`/`$11A82`). O renderer da Fase 4 não precisa de callback HBlank 68k por scanline — precisa apenas emular **H-Scroll per-line do VDP**.
+
+### 5.8 Tabelas mestras, IA dos lutadores e Replay/Estatísticas
+
+- **Tabela mestra de objetos (`$06A522`, `Obj_TableMaster`)**: 233 IDs (deslocamentos em word relativos a `$06A522`, descritores de 34 bytes cada) com ponteiros de tarefa/callback em `+$1A` e `+$1E` lidos por `Obj_Create` (`$DCEA`); descritores diretos em `$06C608/$06C62A/$06C64C` (`Combat_CameraTask1..3` `$05B25E/$05B618/$05B6B2`).
+- **IA dos lutadores e chefes**: tabelas `Fighter_AITableMain` (`$00C14C`), `Fighter_AITableAlt` (`$01B1C2`) e `State7_StagePtrTable` (`$0030D6`, 9 formas demo) apontam para descritores de 6 longwords (`AI_Fighter0..9_Desc` `$0354A6..$041C06`, além das 4 formas de Eternal Champion `AI_BossDragon..Tiger_Desc` `$0428E6..$043866`). Os 3 primeiros ponteiros indexam tabelas Close/Mid/Far com contador `dbra` (`n + 1` entradas de 8 bytes, ponteiro de ação em `+4`) e os 3 últimos são callbacks diretos.
+- **API completa do escalonador e banco superior (`$2FCD1A–$2FF437`)**: além de `$DB0E`/`$DB14`/`$DB4E`/`$DB8E`/`$DB96`/`$DBCA`/`$DBFE`, o motor de objetos e lutadores também usa `$DBAC`, `$DBF0`, `$DBF6`, `$DBFC` (argumento de código em `d0`) e transições em `replay_system.asm` (`$2FCD1A–$2FF437`, incluindo `Replay_StateEntry` `$2FDCEE` chamado pelos estados 29 e 32, buffer de `$3A00` bytes em `Replay_AllocBuffer` `$2FCD56` e HUD em `Replay_DrawHud` `$2FE2A4`). Varredura estática em toda a ROM de 3 MB confirmou zero instruções `jsr`/`jmp` em `$05E8A4–$2FCD19`.
+
+## 6. Investigação e arbitragem da divergência ares × GPGX (BlastEm 1.0.0)
+
+Resumo da investigação ([docs/main_loop.md](docs/main_loop.md)):
+
+1. ⚠️ **Bug inicial corrigido no runner**: a 1ª versão usava `JOYPAD_START=7` (= RIGHT no libretro) — comparações iniciais inválidas. Com START real (`id 3`), refeito tudo.
+2. **Alinhamento errado no teste de 19/nov (frame absoluto vs fase do Estado 9)**:
+   - `Start@950` absoluto caía em **`State9 + 306`** no `ares` (`9@644`), já dentro de `State9_WaitLoop` (`$33FE`), saindo em `9→1` (`983`, após `33` quadros de fade em `$3492`/`$D750`).
+   - O mesmo `950` caía em **`State9 + 262`** no `GPGX` (`9@688`), durante a espera fixa `jsr $FCDE(15)` logo após `$9B62 != 0` (`948`), consumindo a borda `$FD54=$0080` antes do loop de espera `$33FE`.
+3. **Arbitragem final em 4 vias (`BlastEm 1.0.0 -g -d` × `GPGX` × `ares` × `Native`)**:
+   - **Sem input:** todos coincidem dentro do Estado `9` (`$9B62 != 0` em `$FD70=182` / `vbl=188..191`, attract `9→13` em `$FD70=814` / `vbl=822..827`).
+   - **B1 (`State9 + 262`)** e **C1 (`State9 + 112 / +212`)**: **todos os 4** vão para **`9→13`** (`$9376=$0101` em BlastEm/GPGX/Native).
+   - **B2 (`State9 + 306`)**, **B3 (`WaitB62 + 40`)** e **C2 (`WaitB62 + 30 / +100`)**: **todos os 4** vão para **`9→1`** com 1 press único em `33–35` quadros (`vbl=253..272`).
+
+**Conclusão:** não existe divergência de protocolo de 6 botões entre `ares`, `GPGX`, `BlastEm 1.0.0` e `Native`. **GPGX** segue como referência dinâmica oficial do harness (com `ares` / `BlastEm 1.0.0` validados).
 
 ## 7. Convenções de conversão (vasm)
 
@@ -210,23 +241,57 @@ funciona em console real; referendar com BlastEm/Exodus).
 
 ## 8. Questões em aberto
 
-1. **Pad real**: ares (instantâneo) ou GPGX (latência de 172 ciclos)
-   bate com o MK-1653-50 real no polling rápido do Sub_CA80?
-   → BlastEm/Exodus como terceiro árbitro
-2. Por que a saída A do estado 9 no ares dispara ~16–33 quadros depois
-   do pressionar (borda espúria intra-quadro) — confirmar com tracing
-   intra-quadro
+1. **Pad real (RESOLVIDO em 2026-11-19 via BlastEm 1.0.0):** arbitragem de 4 vias (`BlastEm 1.0.0`, `GPGX`, `ares`, `Native`) provou comportamento 100% idêntico quando alinhados ao Estado `9`/`WaitB62` (`B1`/`C1` → `9→13`; `B2`/`B3`/`C2` → `9→1`); `$9376=$0101` confirmado no BlastEm 1.0.0.
+2. **(Resolvido)** O atraso de `~33–35` quadros após Start em `State9_WaitLoop` é o fade de saída de `State9_ExitShared` (`$3492` / `$D750`), observado igualmente nos 4 backends (não uma borda espúria).
 3. Semântica completa de `$FD61` bit5/bit6 (attract/reset) e do ciclo
    de attract do Sub_246E
 4. Revisão No-Intro da ROM (site bloqueia sem aceitar termos)
 5. CI de hash (hook local ou GitHub Actions)
 
-## 9. Próximos passos
+## 9. Fases 2–5: Recompilação Nativa, Harness, Widescreen e Extrator (2026-11-19)
 
-1. Converter `$3980–$C0A0`: handlers 14–39 (paralelizável com subagentes)
-2. Converter `$C0A0–$FD23`: cluster de utilitários (input/alocador/
-   escalonador) — com REA
-3. Converter `$2600–$2785` e a região de tarefas (`$FFAC+` — `$16000+`)
-4. Settle a questão do pad (BlastEm)
-5. Fechar o M1 (saída: disassembly completo + labels) e iniciar a
-   Fase 2 com o Genesis Recomp
+### 9.1 Recompilação estática (`M2`) — `build/native/EternalChampionsRecomp`
+
+- **Gerador de configuração** (`tools/recomp/gen_recomp_config.py`): exporta `68.700` inícios de instrução 68000 em `game/ec_code_addrs.txt` e `game/ec_discovery.toml` (`extra=315`, `late_extra=7395`, `inline_conts=209`, `yield_conts=5672`, 15+ tabelas `abs`/`bra_s`/`bra_w`/`pcrel16` incluindo VM HV-sync `$010BFE`/`$010C6E`, `YIELD_APIS` com `$DB0E`/`$DB2E`/`$17192`/`$17196`/`$171AE` e 5 regiões de dados protegidas).
+- **Correções estruturais de runtime/codegen:**
+  - Propagação de desempilhamento de corrotinas (`_entry_split_sp_popped`) adicionada em `segagenesisrecomp/external/m68k-recomp-core/profiles/genesis/code_generator.c` (`MN_RTS`, `pops_return_unconditionally` e retorno de `MN_JSR`), evitando queda prematura de retorno após `$00DB0E`/`$00DB2E`/`$00DB4A`.
+  - Chamada explícita de `ec_on_post_reset()` garantida na primeira entrada de `ec_call_entry_point()` em `game/ec_spec.c` (habilita `PAD_6BUTTON` nas duas portas — corrigindo `$FF9376/$FF9377` de `00/00` para `01/01` idêntico ao GPGX — e carrega `EC_HD_MANIFEST`) e corrigida no próprio runner em `segagenesisrecomp/runner/main.c:3227` (`on_post_reset()` chamado após `glue_init()`, com `s_boot_init_done` tornando `ec_on_post_reset()` idempotente em `game/ec_spec.c`).
+  - Ciclo de instruções do interpretador unificado em `segagenesisrecomp/runner/m68k_interp.c` + `segagenesisrecomp/cmake/GenesisRecompRunner.cmake`: removido estimador local defasado (`MN_DBcc=12` vs `10`, escrita `-(An)` `10/6` vs `8/4`, bug de `dst_ea`) e ligado `common/m68k_timing.c` para usar `(int)m68k_68000_nominal_cycles(ins)` em `interp_account_cycles()`, igual ao `code_generator.c:1810` (eliminou drift de 1 VBlank no quadro 8 e inversão de `btst.b #$1,($FFFFFD71).w`).
+- **Artefato gerado:** `build/native/EternalChampionsRecomp` (`17.103.584` B, build Release com `GENESIS_NATIVE_IPO=OFF`, zero erros). Smoke de 600 quadros headless (`SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software`) alcança Estado `7` (`$FD70=532`, `$FD72=552`), grava `boot_600.{ram,vram}` e `title.png` (`320x224`).
+
+### 9.2 Harness determinístico `.ecm` (`M3`) — `harness/ec_harness.py`
+
+- **Autodeterminismo nativo (Camada 2, 13/13 filmes):** `0/65536` bytes divergentes em WRAM e PNG SHA-256 idênticos (`aac9990bc9be` em `01_attract_boot.ecm`, `f88e69dfec7d` em `02_title_to_fight.ecm`) com **zero** misses de execução (`floor_unsafe=0`, `dispatch_misses=0`, `interior_label_misses=0`, `floor_coverage=0`) nos 13 filmes.
+- **Equivalência da recompilação estática (Camada 1 — `Recomp` × `GENESIS_FORCE_INTERP=1`, `01`..`12`):** `12/12` com **`gameplay_match=True`**, **`png_eq=True`** (PNG pixel a pixel idêntico), **`pad=0x0101/0x0101`**, contador VBlank **`$FD72` exato em 12/12** (`75`, `1891`, `2416`, `2410`, `2422`, `2400`, `2403`, `2408`, `2401`, `2419`, `2415`, `1904`) e **`65.534/65.536` bytes idênticos** em todos os 12 filmes (`13_boss_sanctuary_s18.ecm` N/A por hook C `EC_DIAG_BOSS_SANCTUARY=1`). Os únicos `2/65536` B divergentes em todos os 12 filmes são `$FFC8B7` (`0xA0 != 0x4C`) e `$FFC8BB`, LSBs mortos do cursor de boot de `Sub_10B74`/`Sub_10BFE` (`$FFC8B6` `VramStream_VramCur` + `$FFC8B8` `VramStream_Ptr`), deixados após o `move.w #$0, ($FFFF9CA2).w` de `Sub_10C60` em `disasm/code/engine_ext.asm:1065-1156`.
+- **Comparação com `gpgx_runner` (Camada 2, `byte-swapped-16bit` desfeito via `i^1`):**
+  - Sondagem pré-RNG (`f=1..75`) mostrou `0` diffs em `f=1..2`, apenas `10`–`24` B de pacing LZ em `f=10, 30, 70` e `vbl=26` / `$FEFA=0x5BDB` idênticos em `f=75`, quando `Math_RandomRange` (`$CB82`) lê `$00C00008` (HV-counter) e diverge no sorteio de `$9CBE` (`3` Jetta vs `0` Shadow), causando também defasagem entre `BlastEm 1.0.0`, `GPGX` e `ares`.
+  - `01_attract_boot.ecm` (1.000 q): ambos atingem Estado `9` (`menu-init`); diff final `729/65536` bytes.
+  - `02_title_to_fight.ecm` (2.900 q): ambos percorrem Estado `7 → 9 → 1 → 16 → 17` com telemetria P1/P2 (HP, coordenadas `102 (273,216) / 104 (232,216)` e timer `$0092`) idêntica até o quadro `2600` (`diff=599/65536` em `2600`; `2195/65536` em `2900`, `P1 HP=78` vs `76` no GPGX e timer BCD `$0082` idêntico). Em `01`..`12`, acordo exato em `$FD64`, `pad_cfg=0x0101` e IDs P1/P2 (diff residual `640`–`2.216/65536` B por leitura HV em `$CB82`). Relatório completo em [docs/frame_data/fight_probe_summary.md](frame_data/fight_probe_summary.md) e decisão/trade-offs sobre manter `gvdp_read_hv_counter` (`genesis_vdp.c:467`) intocado em [docs/phase-3.md](phase-3.md).
+
+### 9.3 Renderer `GameVideo`, Widescreen 16:9 e Modo C (`M4`–`M6`) — `docs/widescreen.md`
+
+- `game/ec_video.c` implementa Modo A padrão (`320x224`) e `--widescreen` opt-in estendendo Planos A/B com `GVDP` VRAM, `Vdp_Reg11` per-line H-scroll (`$8B03`), `VSRAM` V-scroll e CRAM nos estados de arena e treino (`14`, `15` e `17..27`), mantendo pillarbox preto puro fora de arena.
+- Medição completa em `--widescreen 16:9` (`398x224`) nas 12 capturas de arena (`S14`, `S17`, `S18`–`S27`) + Title (`S7` pillarbox): margens ativas preenchidas em todas (`6.074`–`8.619` de `8.736` px por lado) e **`0/65536` bytes divergentes na WRAM** frente a `320x224`.
+
+### 9.4 Extrator, Pipeline ComfyUI HD (`M7`) e Destilação Neural B+ (`N1`–`N2`)
+
+- **Suíte completa `01`..`13` (`tools/harness/gen_roster_movies.py` + `harness/ec_harness.py`):** cobre todos os **9 lutadores jogáveis** (Shadow, RAX, Blade, Jetta, Slash, Trident, Xavier, Midknight, Larcen), **Eternal Champion** (Estado `18`, opt-in `EC_DIAG_BOSS_SANCTUARY=1`) e todas as **11 arenas + Holo-Trainer** (`Estados 14, 17, 18..27`) com `det=0/65536`, `png_eq=True`, `(0,0,0,0)` misses em todos os 13 filmes e acordo de estado/lutadores vs `gpgx_runner` em `01`..`12`.
+- **Extrator (`tools/extract/extract_assets.py`):** catálogo deduplicado por SHA-256 em `assets/catalog/` com **`6.135` entradas** (`410` sprites, `5.698` tiles, `27` planos) e mapas de índice em `assets/catalog/indices/`.
+- **Pipeline ComfyUI HD (`pipeline/workflows/`, `tools/pipeline/comfy_upscale.py`, `tools/pipeline/review_viewer.py`):** workflows versionados (`upscale_4x_pixelart.json` via `4x_IllustrationJaNai_V1_DAT2_190k.pth` e `remaster_sdxl_consistent.json` via `90sCartoonXL_v09Alpha.SDXL.safetensors` + ControlNet Canny + IP-Adapter Plus ViT-H) executados contra ComfyUI `v0.45.4` (`RTX 5060 Ti`): **`437/437` assets HD 4× gerados e APROVADOS (`M7.1`–`M7.2`)** — **`27/27` planos** + **`410/410` sprites** (`100%` dos planos e sprites catalogados, `min_iou=0,972973`, **`approved_count=437`**, `generated_count=0`, `rejected_count=0`; os `5.698` tiles `8×8` ficam em `extracted` sem upscale isolado para evitar costuras nas bordas). Galeria atualizada em `assets/review/index.html` com suporte a curadoria interativa + player em loop via `tools/pipeline/review_viewer.py --serve`.
+- **Destilação B+ (`neural/train_espcn.py` — `N1`), Export ONNX (`neural/export_onnx.py` — `N2`) & Retreino nos `437` pares aprovados (`M7.2`):**
+  - `ECStudentESPCN4x` (`82.344` parâmetros): inicialmente treinado no bootstrap de `107` pares (`PSNR=23,273 dB`, `SSIM=0,8869`, `AlphaIoU=0,9996`), e **retreinado em `60` épocas × `48` steps sobre todos os `437` pares aprovados** (`371` treino / `66` validação = `80` crops): **`PSNR=22,45 dB`**, **`SSIM=0,8805`**, **`AlphaIoU=0,9971`**, checkpoint em `assets/models/ec_bplus_espcn4x.pt` e latência PyTorch CUDA `320×224 → 1280×896` **`fp16 p50=1,1871 ms / p99=1,4109 ms`** (dentro da meta `≤ 2,0 ms` de `§11.4`; `fp32 p50=2,097 ms`).
+  - Export ONNX (`N2`) reexecutado sobre o modelo final de `437` pares via [neural/export_onnx.py](neural/export_onnx.py): `assets/models/ec_bplus_espcn4x.onnx` (`opset 17`, `332.523` B, `18` nós, arquivo único sem `.onnx.data`, `sha256=61a6d163c868...`) + pack `ECBP` v1 em `assets/models/ec_bplus_espcn4x_weights.bin` (`329.408` B, `crc32=0x6c2bd111`, round-trip `max_diff=0.0`). Paridade PyTorch FP32 ↔ ONNX Runtime validada com `det_max_err=0.0` em `320×224` (`max_abs_err=7.15e-07`, `PSNR=144,266 dB`), widescreen `398×224 → 1592×896` (`max_abs_err=7.75e-07`, `PSNR=144,247 dB`) e captura real `assets/captures/fight_320.png` → `assets/captures/fight_bplus_onnx_1280.png` (`max_abs_err=5.07e-07`, `PSNR=149,215 dB`, `SSIM=1.0`; vs PyTorch CUDA FP16: `max_abs_err=8.80e-04`, `PSNR=77,242 dB`). Metadados gravados em `pipeline/manifest.json` preservando `approved_count=437`.
+  - Diagnóstico de backends e integração `P3` (`N3` — [neural/infer/ec_bplus_gl.h](../neural/infer/ec_bplus_gl.h), [neural/infer/ec_bplus_gl.c](../neural/infer/ec_bplus_gl.c), [game/ec_video.c](../game/ec_video.c), [game/ec_spec.c](../game/ec_spec.c), [segagenesisrecomp/runner/game_video.h](../segagenesisrecomp/runner/game_video.h), [segagenesisrecomp/runner/main.c](../segagenesisrecomp/runner/main.c)): `onnxruntime-gpu 1.32.0` do `.venv` exige CUDA `13.*` (`libcublasLt.so.13`/`libcudart.so.13`, incompatível com CUDA `12.6`/`12.8` do ambiente, sem `onnxruntime_c_api.h`). Optou-se pelo backend sem dependências (`§11.5`) via **OpenGL 4.3+ Compute Shaders + PixelShuffle 4×** carregando `ec_bplus_espcn4x_weights.bin` (`EC_NEURAL_BPLUS=1` / `--neural-bplus`, opt-in). Revalidado com o modelo final de `437` pares na **`RTX 5060 Ti`** (`OpenGL 4.6`, `GALLIUM_DRIVER=d3d12`):
+    - **Paridade GPU OpenGL vs ONNX:** `320×224 → 1280×896` (quadro `600`): `max_abs=1/255`, **`PSNR=78,522 dB`**, **`SSIM=0,999999`**; widescreen `16:9` `398×224 → 1592×896` (Arena S17 quadro `2400`): `max_abs=1/255`, **`PSNR=62,523 dB`**, **`SSIM=0,999881`**.
+    - **Neutralidade WRAM:** `0/65536` bytes divergentes entre B+ ON e OFF; fallbacks headless (`--benchmark`), guarda `llvmpipe` e orçamento (`--bplus-budget-ms 0.001`: `10` quadros + `15` fallbacks) aprovados com `exit 0`.
+    - **Latência WSL2 Mesa D3D12:** async `GL_TIME_ELAPSED` `320×224` `p50=5,6767 ms / p99=9,7828 ms` (`sync=1`: `p50=7,0952 ms`, widescreen `p50=8,1396 ms`; referência PyTorch CUDA FP16 nativa `p50=1,1871 ms / p99=1,4109 ms` — medição OpenGL `≤ 2 ms` a revalidar em Windows nativo conforme `ROADMAP.md §11.5`). Ver detalhes em [docs/phase-4.md](phase-4.md).
+- **Teste headless de `EC_HD_MANIFEST=pipeline/manifest.json` e `--hd-manifest pipeline/manifest.json` (`--benchmark 120`):** carga confirmada com **`6135 entradas (437 approved, fallback=Modo A/B)`**, exit `0` em ambos.
+
+## 10. Estado de Pendências e Bloqueios Reais
+
+1. **BlastEm (`1.0.0`, `/usr/local/bin/blastem`) — Arbitragem `M1` CONCLUÍDA**: controlado via PTY debugger (`-g -d`), detecta `6-button gamepad` nos dois ports (`$9376=$0101`) e concorda em 100% dos cenários (`A`, `B1`, `B2`, `B3`, `C1`, `C2`) com `GPGX`, `ares` e `Native`. O `gpgx_runner` segue como referência automatizada em lote do harness.
+2. **Paridade determinística `M3` CONCLUÍDA (critério de 2 camadas)**: **Camada 1** (`Recomp` × `GENESIS_FORCE_INTERP=1`): `16/16` (`01`..`12`, `14`..`17`) com `gameplay_match=True`, `png_eq=True`, `pad=0x0101` e **`65.536/65.536` B idênticos** com o jogo `100%` recompilado (o resultado anterior, `65.534/65.536` em `12/12`, contava com partes do jogo interpretadas pelo floor — ver item 5). **Camada 2** (`Native` × `GPGX`): `13/13` autodeterminismo `0/65536` + `0` misses e `12/12` acordo em `$FD64`/`pad`/elenco P1-P2 (diff residual `640`–`2.216` B por leitura ao vivo do contador HV em `$CB82`); `gvdp_read_hv_counter` (`genesis_vdp.c:467`) mantido intocado por decisão documentada em [docs/phase-3.md](phase-3.md).
+3. **Export ONNX (`N2`) e Runtime B+ `P3` (`N3`) — CONCLUÍDOS**: `ec_bplus_espcn4x.onnx` (`332.523` B, `opset 17`) e `ec_bplus_espcn4x_weights.bin` (`329.408` B, `ECBP` v1) validados via `neural/export_onnx.py` (`det=0.0`, `PSNR≥144,48 dB`), e backend OpenGL 4.3+ Compute Shaders integrado em `neural/infer/ec_bplus_gl.{h,c}` + `game/ec_video.c` + `segagenesisrecomp/runner/{game_video.h,main.c}` (`PSNR=78,603 dB` / `SSIM=0,999998` em `1280×896`, `PSNR=62,973 dB` em widescreen `1592×896`, `0/65536` WRAM diff, `p50=5,3423 ms` no WSL2 Mesa D3D12 — revalidar `≤ 2 ms` OpenGL em Windows nativo conforme `ROADMAP.md §11.5`).
+4. **Curadoria HD (`M7.2`) e modos extras (`M7.3`) — CONCLUÍDOS**: todos os **`437/437` assets (`27/27` planos + `410/410` sprites, `min_iou=0,972973`)** foram revisados/aprovados (`approved_count=437`, carga `EC_HD_MANIFEST` e retreino `ECStudentESPCN4x` + re-export `ONNX`/`ECBP` `crc32=0x6c2bd111` validados; `5.698` tiles `8×8` mantidos em `extracted` sem upscale isolado). `M7.3`: `.ecm` ganhou 2ª coluna opcional (pad 2) em `gpgx_runner`/`ec_harness.py`/`gen_roster_movies.py` e a suíte passou a `17` movies — `14_2p_vs_rax_vs_blade_s24` (2P VS, Background fixo via Options), `15_tournament_roundabout_jetta_vs_xavier_s27` (Round-A-Bout, `Tournament_Type=$9424=3`; arena sorteada pelo RNG HV, no GPGX basta estado de luta) e `16_2p_vs_match_end_s24_to_s1` (KO no round final → `WINS COMPETITION` → Estado `1`). Overkill mapeado (`$5E4B6` → `$269E4` → handler por arena, flag `Fight_OverkillActive` `$9C7C`) e confirmado pelo movie `17_2p_vs_overkill_trident_s24` (Estado `24`, `$9C7C=1`, HP `104/0` em nativo, interpretador e GPGX); ver [docs/phase-5.md](phase-5.md).
+5. **Correção da recompilação (2026-11-19, descoberta no `M7.3`)**: o nativo **travava em todo fim de partida** (Estado `21`/`24` congelado após `WINS COMPETITION`; GPGX e interpretador voltam ao Estado `1`). Causas e correções: (a) `19` tabelas `jmp (pc,Dn.w)` + `bra.w` sem cobertura (ex.: slot 8 `$024CEC` de `Sub_024C98`) → declaradas em `BRA_JUMP_TABLES`; (b) heurística ASCII de `is_valid_code_start` descartava slots `bra` e alvos de task reais (`$E8AE`, `$C5D0`, `$05E2FE`) → slots de tabela e ponteiros de `jsr` a APIs de task isentos; (c) callbacks `$36(a0)` de objetos (`$2479E`…), ponteiros em `$968E` (`$3533E`/`$3547C`) e listas `bra.w` dos descritores de menu (`$2DA54`, `$2D918`, `$2DBE8`…) viraram sementes; (d) o gerador cobrava os ciclos de `jsr`/`bsr` **após** o retorno do callee (interpretador e 68000 cobram antes) → `segagenesisrecomp/external/m68k-recomp-core/profiles/genesis/code_generator.c` agora cobra antes da chamada. **Achado importante:** a antiga "Camada 1 `12/12`" era em parte artefato — a task `$24C98` do attract entrava pelo floor Tier-3 e o laço principal, escalonador, IRQ e menus rodavam **interpretados** (`4.111` PCs, `1.062` fps). Agora o jogo roda `100%` recompilado (`1.449` fps, `--exec-coverage-out` vazio) com `0/65536` B contra `GENESIS_FORCE_INTERP=1` em `16/16` movies e `0` misses em `17/17`. O Duff's device `$05E242` virou switch interno (`INTERIOR_UNRESOLVED = 0`), mas não é exercitado pela suíte; resíduo de temporização caracterizado em `f1143` (sem efeito em WRAM) documentado em [docs/phase-3.md](phase-3.md) §5.
+6. **Expansão Sega CD (`M8`) — ADIADA por decisão de escopo**: `roms/` já contém `Eternal Champions - Challenge from the Dark Side (U).chd` e o pack completo de BIOS Sega CD (US/EU/JP, incluindo `us_scd1_9210.bin`, `eu_mcd1_9210.bin` e `jp_mcd1_9112.bin`); retomada apenas após concluir os marcos do cartucho Genesis (`M4`–`M7`, `N2`–`N3`).

@@ -1,0 +1,41 @@
+#ifndef EC_BPLUS_GL_H
+#define EC_BPLUS_GL_H
+
+#include <stddef.h>
+#include <stdint.h>
+#include <SDL2/SDL.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct EcBplusGl EcBplusGl;
+
+typedef struct EcBplusMetrics {
+    uint64_t frames;
+    uint64_t fallback_frames;
+    uint64_t timed_samples;
+    double   last_gpu_ms;
+    double   p50_gpu_ms;
+    double   p99_gpu_ms;
+    double   mean_gpu_ms;
+    unsigned input_width, input_height;
+    unsigned output_width, output_height;
+    unsigned scale;
+    int      time_elapsed_available;
+} EcBplusMetrics;
+
+EcBplusGl   *ec_bplus_gl_create(SDL_Renderer *renderer, SDL_Texture *activation,
+                                const char *weights_path, double budget_ms);
+void         ec_bplus_gl_destroy(EcBplusGl *ctx);
+/* Runs 4x ECStudentESPCN4x on GPU and returns borrowed SDL_Texture* (ARGB8888 target),
+ * or NULL on fallback (invalid state, budget overrun, or unavailable GL 4.3+). */
+SDL_Texture *ec_bplus_gl_process(EcBplusGl *ctx, const uint32_t *argb,
+                                 int width, int height, int stride_px);
+int          ec_bplus_gl_readback(EcBplusGl *ctx, void *argb, size_t pitch_bytes);
+void         ec_bplus_gl_metrics(const EcBplusGl *ctx, EcBplusMetrics *out);
+
+#ifdef __cplusplus
+}
+#endif
+#endif /* EC_BPLUS_GL_H */

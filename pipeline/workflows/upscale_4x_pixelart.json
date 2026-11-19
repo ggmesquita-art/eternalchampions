@@ -1,0 +1,37 @@
+{
+  "_meta": {
+    "workflow": "upscale_4x_pixelart",
+    "workflow_version": "1.0",
+    "description": "Zero-hallucination 4x pixel-art / illustration upscale via 4x_IllustrationJaNai_V1_DAT2_190k.pth",
+    "model": "4x_IllustrationJaNai_V1_DAT2_190k.pth",
+    "scale": 4
+  },
+  "prompt": {
+    "1": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": "__INPUT_IMAGE__"
+      }
+    },
+    "2": {
+      "class_type": "UpscaleModelLoader",
+      "inputs": {
+        "model_name": "4x_IllustrationJaNai_V1_DAT2_190k.pth"
+      }
+    },
+    "3": {
+      "class_type": "ImageUpscaleWithModel",
+      "inputs": {
+        "upscale_model": ["2", 0],
+        "image": ["1", 0]
+      }
+    },
+    "4": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "__OUTPUT_PREFIX__",
+        "images": ["3", 0]
+      }
+    }
+  }
+}

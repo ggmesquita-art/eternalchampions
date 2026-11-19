@@ -88,29 +88,32 @@ bit7 (bit `$0080` da BORDA do pad) → saída compartilhada **$3492** (limpa
 (b) `$FD61` bit7 (heartbeat da tarefa de input) → `$9CCA++` → `$9CB6=2/$D`
 → **estado 13**.
 
-Experimentos (19/nov):
+Experimentos iniciais (19/nov — frame absoluto sem alinhamento de Estado 9):
 
 | Cenário | ares | GPGX |
 |---|---|---|
 | sem input | 9→13 (1538) | 9→13 (1582) |
 | **1 press** Start@950 | **9→1 (983)** | **9→13 (1582, press perdido)** |
-| **2+ presses** (800+900…) | **9→1 (1033)** | **9→1 (1034)** ✓✓ |
+| **2+ presses** (800+900+1000) | **9→1 (1033)** | **9→1 (1034)** ✓✓ |
 
-**Com 2+ presses os emuladores CONCORDAM** (9→1 com 1 quadro de diferença).
-A divergência é estreita: um press ÚNICO — o ares captura a borda e sai
-pelo caminho A; o GPGX perde e o menu cai no attract. Curiosidade
-(trace quadro a quadro): no ares a saída A dispara ~16–33 quadros DEPOIS
-do pressionar, com `$FD54`=0 nas fronteiras de quadro — a borda deve
-aparecer/desaparecer DENTRO do quadro (o loop roda muitas iterações por
-quadro; o contador do FightingPad oscila e gera borda espúria numa fase).
-No GPGX (MK-1653-50 com latência de 172 ciclos) as leituras são estáveis
-→ sem borda espúria → 1 press único não basta. Verificado em dump: no
-quadro do pressionar os dois emuladores têm RAM **idêntica** (FD50=0,
-FD54=$0080, FD58=$0080, 9CCA=5).
+**Arbitragem fechada com BlastEm 1.0.0 (`-g -d`), GPGX, ares e Native (2026-11-19):**
 
-⚠️ Questão em aberto: qual dos dois bate com o hardware real (referendar
-com BlastEm/Exodus ou console). Conclusão mantida: **GPGX = referência
-dinâmica** do harness; ares como fonte do P2/N2 (ou portar o `gamepad.c`).
+Medição com pontos alinhados pela entrada no Estado `9` (`$FD64=9`) e pelo fim de `State9_WaitB62` (`$9B62 != 0` @ `$FD70=182`, `vbl=188..191`) **eliminou a aparente divergência**: os **4 backends concordam 100%** em todos os cenários relativos e todos reportam `0x0101` em `$9376` (6 botões em ambos os ports, exceto `0x0001` no `ares_cli` por configurar Control Pad no Port 2).
+
+| Cenário (alinhado ao Estado 9) | BlastEm 1.0.0 | GPGX | ares | Native (`EternalChampionsRecomp`) |
+|---|---|---|---|---|
+| **A — Sem input** (`9` / `$9B62!=0` / `9→13`) | `695` (`vbl=2`) / `955` (`vbl=191`) / **`13@1595`** (`vbl=827`) | `688` (`vbl=2`) / `948` (`vbl=191`) / **`13@1582`** (`vbl=825`) | `644` (`vbl=1`) / `905` (`vbl=191`) / **`13@1538`** (`vbl=824`) | `856` (`vbl=2`) / `1113` (`vbl=188`) / **`13@1747`** (`vbl=822`) |
+| **B1 — 1 press `State9 + 262`** (equiv. GPGX `@950`, dentro de `FCDE(15)`) | press `@957` (`main=185`, `fd54=$80`) → **`9→13`** (`1592`) | press `@950` (`main=185`) → **`9→13`** (`1582`) | press `@906` (`main=184`) → **`9→13`** (`1538`) | press `@1118` (`main=188`, `fd54=$80`) → **`9→13`** (`1747`) |
+| **B2 — 1 press `State9 + 306`** (equiv. ares `@950`, em `State9_WaitLoop`) | press `@1001` (`main=229`) → **`9→1`** (`1036`, `vbl=271`) | press `@994` (`main=229`) → **`9→1`** (`1028`, `vbl=271`) | press `@950` (`main=228`) → **`9→1`** (`983`, `vbl=269`) | press `@1162` (`main=232`) → **`9→1`** (`1197`, `vbl=272`) |
+| **B3 — 1 press `WaitB62 + 40`** (em `State9_WaitLoop`) | press `@995` (`main=223`) → **`9→1`** (`1030`, `vbl=265`) | press `@988` (`main=223`) → **`9→1`** (`1022`, `vbl=265`) | press `@945` (`main=223`) → **`9→1`** (`978`, `vbl=264`) | press `@1153` (`main=223`) → **`9→1`** (`1188`, `vbl=263`) |
+| **C1 — 2 presses `State9 + 112 / +212`** (`800+900`, antes de `WaitLoop`) | press `@807,907` → **`9→13`** (`1602`) | press `@800,900` → **`9→13`** (`1582`) | press `@756,856` → **`9→13`** (`1538`) | press `@968,1068` → **`9→13`** (`1747`) |
+| **C2 — 2 presses `WaitB62 + 30 / +100`** (sai já no 1º press) | press `@985` → **`9→1`** (`<1055`, `vbl<262`) | press `@978` → **`9→1`** (`1012`, `vbl=255`) | press `@935` → **`9→1`** (`968`, `vbl=254`) | press `@1143` → **`9→1`** (`1178`, `vbl=253`) |
+
+**Causa-raiz real confirmada:** não há bug nem divergência do handshake de 6 botões entre `ares`, `GPGX`, `BlastEm 1.0.0` e `Native`. A diferença no teste antigo (`Start@950` absoluto) veio de dois fatos somados:
+1. O Estado `7` (Title) avança até o Estado `9` em quadros absolutos distintos (`ares 644`, `GPGX 688`, `BlastEm 695` c/ TMSS, `Native 856`), mas **dentro do Estado `9`** todos os 4 executam em fase idêntica (`$9B62 != 0` em `$FD70=182`; attract `9→13` em `$FD70=814`).
+2. `State9_Handler` (`$33E6–$33FE`) só entra em `State9_WaitLoop` (`$33FE`) **após** `$9B62 != 0` (`State9 + ~260` quadros) **mais** os `15` quadros de `jsr $FCDE(15)`. Por isso `Start@950` absoluto já encontrava `State9_WaitLoop` no `ares` (`+306`), enquanto no `GPGX` (`+262`) caía **dentro da janela cega do `FCDE(15)`** (borda `$FD54=$0080` consumida antes do `btst #7,($FFFFFD55)`), e a transição `9→1` demora `~33–35` quadros após o press por causa do fade de `State9_ExitShared` (`$3492` / `$D750`), e não por "borda espúria tardia".
+
+**Conclusão:** `gpgx_runner`, `BlastEm 1.0.0`, `ares` e o runtime nativo possuem **comportamento idêntico** no fluxo de 1 press no Estado `9`; **GPGX** permanece como referência automatizada do harness e a questão de arbitragem do `M1` está encerrada.
 
 ### Handler do estado 9 (menu-init, $3256 — convertido, verificado)
 
