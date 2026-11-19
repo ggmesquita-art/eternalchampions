@@ -161,8 +161,18 @@ int main(int argc, char **argv) {
   for(int a = 5; a < argc; a++) if(strcmp(argv[a], "--trace") == 0) trace = 1;
   long startAt[8] = {-1,-1,-1,-1,-1,-1,-1,-1};
   int nstarts = 0;
-  for(int a = 5; a < argc && nstarts < 8; a++) {
+  long dumpAt[8] = {-1,-1,-1,-1,-1,-1,-1,-1};
+  int ndumps = 0;
+  char dumpPath[8][512];
+  for(int a = 5; a < argc && nstarts < 8 && ndumps < 8; a++) {
     if(strncmp(argv[a], "start@", 6) == 0) startAt[nstarts++] = atol(argv[a] + 6);
+    else if(strncmp(argv[a], "dump@", 5) == 0) {
+      char *comma = strchr(argv[a], ',');
+      dumpAt[ndumps] = atol(argv[a] + 5);
+      if(comma && ndumps < 8) { snprintf(dumpPath[ndumps], 512, "%s", comma + 1); }
+      else snprintf(dumpPath[ndumps], 512, "dump_%ld.bin", dumpAt[ndumps]);
+      ndumps++;
+    }
   }
 
   uint8_t *ramlive = NULL;
@@ -176,6 +186,17 @@ int main(int argc, char **argv) {
       if(ramlive) {
         unsigned st = ramlive[0xFD65] | (ramlive[0xFD64] << 8);
         printf("%ld st=%04x\n", i, st);
+      }
+    }
+    for(int d = 0; d < ndumps; d++) {
+      if(i == dumpAt[d]) {
+        if(!ramlive) ramlive = (uint8_t*)retro_get_memory_data_fn(RETRO_MEMORY_SYSTEM_RAM);
+        if(ramlive) {
+          FILE *f = fopen(dumpPath[d], "wb");
+          fwrite(ramlive, 1, 0x10000, f);
+          fclose(f);
+          fprintf(stderr, "dump@%ld salvo em %s\n", i, dumpPath[d]);
+        }
       }
     }
   }
