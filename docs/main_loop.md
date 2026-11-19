@@ -65,16 +65,6 @@ Handlers: `State_HandlerTable[$27B4]` (40 offsets relativos). Estado 7 →
 cria objetos `$B8/$41/$AB`, espera `Start` em `$FD61` bit7, termina em `rts`).
 `$FD68` = flag "estado mudou" ($FFFF a cada dispatch).
 
-**Em aberto:** no ares_cli o estado 1 não progride. Investigação: o loop do
-estado 1 espera `$FD61` bit 7 — flag setada pelas **tarefas de input do
-escalonador cooperativo** (`bset #7,($FD61)` em `$1FF26`, região não
-convertida) que rodam sob o `Main_OuterLoop` (`jsr DB14` = troca de tarefa).
-No fluxo do estado 1 (sequência de modos de boot), o `Main_OuterLoop` não
-está ativo — suspeita: ou o jogo real seta `FD61` por outro caminho
-(VBlank/interrupção), ou o cursor do menu caiu num item diferente (OPTIONS?).
-`Sub_C870` = rotina de input (lê `$A10003` via `$CA80` — protocolo de pad),
-chamada pelo laço principal quando estado≠7 e `$FD69` bit7 setado.
-
 **RESOLVIDO (comparação com Genesis Plus GX):** construí o loader libretro
 mínimo (`tools/vendor/gpgx_runner/`) e rodei o mesmo cenário na referência:
 GPGX **permanece no menu** após 1 Start e só transiciona (9→13) após vários —
@@ -84,7 +74,58 @@ ares é simplificado — sem a latência por ciclos do MK-1653-50 que o GPGX
 modela). Conclusão: usar o **GPGX como referência dinâmica** (o `gpgx_runner`
 já é o esqueleto do harness §8) e tratar o ares como fonte do P2/N2 (ou
 portar o protocolo de pad do GPGX para o ares). Sequência de referência:
-0→7 (24) → 9 (688) → 13 (1582, após Starts repetidos).
+0→7 (24) → 0 (686) → 9 (688) → 13 (1582, após Starts repetidos).
+
+### Handler do menu (estado 13, $36B2 — analisado por disassembly, 2026-11-18)
+
+Estrutura decodificada (ainda não convertido para asm — aguarda a vez):
+
+1. **Init pesado**: `jsr $F42A/$F47A` com **argumentos inline** (dc.w após o
+   jsr — convenção "args após a chamada"), cria objetos do fundo do menu,
+   `move.b #$1E,($30,a0)` / `move.w #$51,($2C,a0)` (campo/índice de sprite),
+   `jsr $F32C/$F446/$E408`, som.
+2. **Se estado 12** → pula direto para o fim do init. Senão: seta estado 7
+   (título), limpa `$9B30/$9B2E/$9B22/$AC96/$9352`, `jsr $C288`, configura
+   `$AC2A/$ABC8/$9C70/$AAF6/$AA94`, `jsr $05D9F6`, **seta estado 13**.
+3. **Loop de espera do menu** (`$382A`): `jsr $FCDE` (roda 0 quadros),
+   `clr.w $FD76`, sai quando: `$FD61` bit7 OU `$FD59` bit7 OU `$FD5B` bit7.
+   - `$FD61` bit7 = "iniciar luta" (setado pelas tarefas de input do
+     escalonador cooperativo, `$1FF26`)
+   - `$FD59`/`$FD5B` bit7 = bits altos do PadA_State/PadB_State (palavra em
+     FD58/FD5A) — setados indiretamente (tabelas de mapeamento do Sub_C870
+     em $9274/$92B4/$92A4 ou tarefas do escalonador; não há writer direto
+     na ROM baixa)
+4. **Saída**: `jsr $D7A8`, roda 1 quadro (`$FE1E`), `jsr $093C` (som), seta
+   `$9CB2=6` e `$9CB6=1` → volta ao executor de modos de boot (retry).
+5. **Sub-rotinas auxiliares**: `$3896` = espera com `$9CCA=1`/`$9CB6=9`;
+   `$38D6` = limpa `$9CBE/$9CBC/$9CCC/$9CB2/$9CCA/$9388`, seta `$9CB6=1`,
+   roda 1 quadro. Depois de `$391E`: **tabela de dados** até o estado 14
+   ($3980).
+
+**Hipótese sobre a divergência**: ares lê o pad sem a latência do
+MK-1653-50 → a detecção de 6 botões do Sub_CA80 (bits de contador) decide
+diferente → os bits altos (FD59/FD5B bit7) ficam setados com 1 Start → o
+loop do menu sai imediatamente com o modo errado. A confirmar quando a
+cadeia de input do escalonador ($1FF26, tarefas $16000–$26000) for
+convertida.
+
+### Cadeia de input → menu (decodificada, 2026-11-18)
+
+```
+Sub_CA80 ($CA80)          lê a porta crua (TH toggling, detecção de 6 botões)
+  → Sub_C870 ($C870)      mapeia p/ formato do jogo (tabelas $9274/$92B4/$92A4)
+    → FD58/FD5A (estado), FD54/FD56 (bordas), FD50/FD52 (anterior)
+      → Tarefa de input ($1FF00, sob o escalonador cooperativo):
+          jsr $DB28 (entra no escalonador)
+          btst #7, FD55 / FD57   ; bit 15 das BORDAS (botão recém-pressionado)
+          → seta $FD61 bit7 ("confirmar/lutar") ou bits 7+4 ("cancelar")
+          → bset #2,($74,a5); jmp $DC10 (cede a vez)
+        → loop do menu ($382A) vê $FD61 bit7 → sai → $9CB6=1 → boot mode retry
+```
+
+O menu também sai com `$FD59`/`$FD5B` bit7 (bits 15 do ESTADO dos pads) —
+caminho alternativo provavelmente usado quando o escalonador não roda
+(ex.: modo de boot).
 
 ## Fluxo de um quadro (FUN_0000fd24)
 
