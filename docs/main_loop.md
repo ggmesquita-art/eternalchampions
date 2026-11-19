@@ -27,8 +27,9 @@ Main_OuterLoop ($255E) ◄──────────────────
 
 ## Validação dinâmica (ares_cli, 2026-11-18)
 
-Driver headless do núcleo do ares (`tools/vendor/ares_cli/`): roda N quadros e
-despeja a RAM de trabalho. Primeiro dump (600 quadros) confirmou:
+Driver headless do núcleo do ares (`tools/vendor/ares_cli/`): roda N quadros,
+despeja a RAM de trabalho, aceita `--start <quadro>` (aperta Start) e
+`--trace` (log de estado por quadro). Primeiro dump (600 quadros) confirmou:
 
 | Hipótese | Resultado |
 |---|---|
@@ -48,6 +49,18 @@ despeja a RAM de trabalho. Primeiro dump (600 quadros) confirmou:
 Estado dos subsistemas em runtime confirmado: bits 0–6 de `$FD69` ligados →
 `DC4E`/`F6A0`/`D7E4`/`E684`/`10AA8` rodando. `$9B32` continua 0 após 600
 quadros (o sync de quadro do laço só ativa quando vira ≠ 0 — confirmar quando).
+
+### Mapa de estados (trace do ares_cli, 1200 quadros)
+
+| Momento | Estado |
+|---|---|
+| boot | 0 → **7 (título)** no quadro 23 |
+| sem input | 7 → **13** (~attract/demo) |
+| Start no quadro 600 | 7 → 0 (transição) → **9 (menu)** no quadro 644 |
+
+Handlers: `State_HandlerTable[$27B4]` (40 offsets relativos). Estado 7 →
+`$2EF2`, estado 9 → `$3256` (menu: `$9CCA==5 → jmp $200` = reset), estado 0 →
+`$2804` (`rts`). `$FD68` = flag "estado mudou" ($FFFF a cada dispatch).
 
 ## Fluxo de um quadro (FUN_0000fd24)
 
