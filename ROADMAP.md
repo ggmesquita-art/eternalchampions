@@ -64,6 +64,8 @@ Arquivo: `roms/eternal_champions_us.gen` (3.145.728 bytes = 24 Mbit, confirma §
 
 **Fase 1 (madrugada):** camada de comandos do som (`$8A8–$A7F`) convertida. **`tools/vendor/ares_cli/` compilado** — driver headless do núcleo do ares (Mega Drive): roda N quadros e despeja a RAM de trabalho. Primeiro dump (600 quadros) **confirmou 12 hipóteses** (contadores, estado=7 no título, flags de subsistema, lock do Z80 balanceado). Run de 2400 quadros: estado evoluiu 7→13, câmera ativa. Descoberta: **tabela de dispatch de estados em `$27B4`** (22+ handlers espalhados por `$50–$4A9C`) — a região que o Ghidra não mapeou (despacho indireto, risco §17).
 
+**Fase 1 (dia 2):** máquina de estados convertida (`state_table.asm` com 40 handlers, `state_dispatch.asm` com FrameRun/SetState/Dispatch/PostChange/init do sistema e da câmera, `state_handlers1.asm` + `state1_handler2.asm` com o estado 1 completo). **ares_cli com input programável** (`--press quadro:botão`, FightingPad de 6 botões) e `--trace` por quadro. Mapa dinâmico: boot→**7**(título)→Start→**9**(menu)→Start→**1**(setup). Estado 1 não progride no ares — depende da detecção de pad (`$9CB0`), suspeita de diferença no handshake de 6 botões do ares (comparar com Genesis Plus GX). Escritores de `$FD64`: menu→7/13, boot→7/9/1 (via State_SetState), `$2FE59C`→29, restore via `$9B66`.
+
 ---
 
 ## 1. Decisões estratégicas (gates)
