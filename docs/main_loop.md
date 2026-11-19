@@ -50,14 +50,15 @@ Estado dos subsistemas em runtime confirmado: bits 0–6 de `$FD69` ligados →
 `DC4E`/`F6A0`/`D7E4`/`E684`/`10AA8` rodando. `$9B32` continua 0 após 600
 quadros (o sync de quadro do laço só ativa quando vira ≠ 0 — confirmar quando).
 
-### Mapa de estados (trace do ares_cli, 1200–2400 quadros)
+### Mapa de estados (GPGX = referência; ares concorda sem input)
 
 | Momento | Estado |
 |---|---|
-| boot | 0 → **7 (título)** no quadro 23 |
-| sem input | 7 → **13** (~attract/demo) |
-| Start no quadro 600 | 7 → 0 (transição) → **9 (menu)** no quadro 644 |
-| Start no menu (950) | 9 → **1** (setup de jogo: cria objetos, espera Start, config de pads) |
+| boot | 0 → **7 (título)** (GPGX 24 / ares 23) |
+| sem input | 7 → 0 → **9 (menu-init)** (686/688; ares 642/644) |
+| sem input | 9 → **13** por TIMER de attract (1582; ares 1538) → 7 → 13 (ciclo) |
+| Start no título | idem (aceita o Start e vai para 9) |
+| Start no estado 9 | **diverge**: GPGX ignora (→13 por timer); ares → **1** (983) |
 
 Handlers: `State_HandlerTable[$27B4]` (40 offsets relativos). Estado 7 →
 `$2EF2`, estado 9 → `$3256` (menu: `$9CCA==5 → jmp $200` = reset), estado 0 →
@@ -66,15 +67,50 @@ cria objetos `$B8/$41/$AB`, espera `Start` em `$FD61` bit7, termina em `rts`).
 `$FD68` = flag "estado mudou" ($FFFF a cada dispatch).
 
 **RESOLVIDO (comparação com Genesis Plus GX):** construí o loader libretro
-mínimo (`tools/vendor/gpgx_runner/`) e rodei o mesmo cenário na referência:
-GPGX **permanece no menu** após 1 Start e só transiciona (9→13) após vários —
-enquanto o ares foi 9→1 (o caminho de **reset**: boot modes 9→1) com UM
-Start. **O ares diverge no input do menu** (o protocolo do FightingPad do
-ares é simplificado — sem a latência por ciclos do MK-1653-50 que o GPGX
-modela). Conclusão: usar o **GPGX como referência dinâmica** (o `gpgx_runner`
-já é o esqueleto do harness §8) e tratar o ares como fonte do P2/N2 (ou
-portar o protocolo de pad do GPGX para o ares). Sequência de referência:
-0→7 (24) → 0 (686) → 9 (688) → 13 (1582, após Starts repetidos).
+mínimo (`tools/vendor/gpgx_runner/`). ⚠️ **Bug corrigido no caminho**: a
+primeira versão do runner usava `RETRO_DEVICE_ID_JOYPAD_START=7` (=RIGHT no
+libretro.h do GPGX; o certo é 3) — as comparações iniciais eram inválidas.
+Com input correto, a **máquina de estados é idêntica nos dois emuladores
+SEM input** (ciclo de attract):
+
+| evento | ares (no-input) | GPGX (no-input) |
+|---|---|---|
+| 0→7 título | 23 | 24 |
+| 7→0→9 menu-init | 642/644 | 686/688 |
+| 9→13 (timeout de attract!) | 1538 | 1582 |
+| 13→7→13 (ciclo) | 1556/1558 | 1599/1601 |
+
+A transição 9→13 é um **timer de attract** (acontece sem input nenhum).
+**A divergência real é só com input no estado 9**: ares + Start@950 →
+**9→1** (quadro 983); GPGX + Start@950 → Start **ignorado**, 9→13 via
+attract. Mecanismo (handler do estado 9, $3256): o loop de espera tem DOIS
+caminhos de saída — (a) `$FD55`/`$FD57` bit7 (bit15 da BORDA do pad) →
+retorna sem mudar `$9CB6` → tabela de modos avança → **estado 1**; (b)
+`$FD61` bit7 (tarefa de input do escalonador) → `$9CCA++` → `$9CB6=$D` →
+**estado 13**. Os dois emuladores emulam pad de 6 botões (header "J6";
+GPGX: `rominfo.peripherals&2`→PAD6B; ares: FightingPad), então a diferença
+está no **protocolo de 6 botões** (ares é instantâneo, GPGX modela a
+latência por ciclos do MK-1653-50) — os bits do pad lidos pelo jogo
+diferem. Conclusão mantida: **GPGX = referência dinâmica**; portar o
+protocolo do `gamepad.c` para o ares ou tratar o ares só como fonte do
+P2/N2.
+
+### Handler do estado 9 (menu-init, $3256 — decodificado, 2026-11-18)
+
+Fluxo decodificado (ainda não convertido para asm):
+
+1. **`$9CCA==5` → `jmp $200`** (reset suave). `$9CCA=$FFFF` no boot.
+2. Desenha a arte do menu (9 sprites via `jsr $DCEA` com $84(a0)=índice,
+   objetos $46/$47, args inline para `$F47A`/`$E5FC`).
+3. `tst.w $9CCA`; negativo → som ($093C) + `$9CCA=5`. Espera `$9B62≠0`,
+   roda 15 quadros.
+4. **Loop de espera** ($33F8): clr `$FD76`, roda 0 quadros, testa:
+   - `$FD55` bit7 / `$FD57` bit7 (bit15 da borda do pad) → **saída A**
+     ($3488): limpa flags, `rts` — `$9CB6` fica 0 → tabela de modos de
+     boot avança (09→01) → **estado 1** (caminho que o ares toma)
+   - `$FD61` bit7 (tarefa de input) → **saída B**: `$9CCA++`, `$9CCC=2`,
+     `$9CB6=2` (ou `=$D` se `$9CCA==6`), roda 1 quadro, `rts` → **estado
+     13** (caminho do GPGX; no no-input o attract/timeout domina)
 
 ### Handler do menu (estado 13, $36B2 — analisado por disassembly, 2026-11-18)
 

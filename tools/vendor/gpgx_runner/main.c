@@ -29,7 +29,18 @@ static void crash(int sig, siginfo_t *si, void *ctx) {
 }
 
 #define RETRO_MEMORY_SYSTEM_RAM 2
-#define RETRO_DEVICE_ID_JOYPAD_START 7
+#define RETRO_DEVICE_ID_JOYPAD_B 0
+#define RETRO_DEVICE_ID_JOYPAD_Y 1
+#define RETRO_DEVICE_ID_JOYPAD_SELECT 2
+#define RETRO_DEVICE_ID_JOYPAD_START 3
+#define RETRO_DEVICE_ID_JOYPAD_UP 4
+#define RETRO_DEVICE_ID_JOYPAD_DOWN 5
+#define RETRO_DEVICE_ID_JOYPAD_LEFT 6
+#define RETRO_DEVICE_ID_JOYPAD_RIGHT 7
+#define RETRO_DEVICE_ID_JOYPAD_A 8
+#define RETRO_DEVICE_ID_JOYPAD_X 9
+#define RETRO_DEVICE_ID_JOYPAD_L 10
+#define RETRO_DEVICE_ID_JOYPAD_R 11
 #define RETRO_DEVICE_JOYPAD 1
 #define RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY 9
 #define RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY 31
@@ -43,11 +54,11 @@ typedef struct {
   const char *value;
 } retro_variable_;
 
-static int16_t g_start = 0;
+static int16_t g_buttons = 0;
 
 static int16_t input_state(unsigned port, unsigned device, unsigned index, unsigned id) {
   (void)device; (void)index;
-  if(port == 0 && id == RETRO_DEVICE_ID_JOYPAD_START) return g_start;
+  if(port == 0 && id < 12 && (g_buttons & (1 << id))) return 1;
   return 0;
 }
 
