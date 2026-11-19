@@ -62,6 +62,8 @@ Arquivo: `roms/eternal_champions_us.gen` (3.145.728 bytes = 24 Mbit, confirma §
 
 **Fase 1 (noite):** tela de boot/trava de região (`$2FA–$6B5`), interface de comandos do Z80 (`$83C–$8A7`), entrada do main + laço externo (`$2230–$25FD`) e sombra VDP (`$2786–$27B3`) convertidas — tudo com hash idêntico. Esqueleto do jogo mapeado via REA (267 pseudocódigos exportados): `Main_Entry → Main_OuterLoop → FUN_0000fcde → Main_FrameLoop ($FD24)` com 7 subsistemas por flag, handshake Z80 dentro do laço, alocador em `$D4CC`, câmera/tilemap em `$C836–C83A` (`Map_GetTileAddr $1032A`). Ver `docs/main_loop.md`.
 
+**Fase 1 (madrugada):** camada de comandos do som (`$8A8–$A7F`) convertida. **`tools/vendor/ares_cli/` compilado** — driver headless do núcleo do ares (Mega Drive): roda N quadros e despeja a RAM de trabalho. Primeiro dump (600 quadros) **confirmou 12 hipóteses** (contadores, estado=7 no título, flags de subsistema, lock do Z80 balanceado). Run de 2400 quadros: estado evoluiu 7→13, câmera ativa. Descoberta: **tabela de dispatch de estados em `$27B4`** (22+ handlers espalhados por `$50–$4A9C`) — a região que o Ghidra não mapeou (despacho indireto, risco §17).
+
 ---
 
 ## 1. Decisões estratégicas (gates)
