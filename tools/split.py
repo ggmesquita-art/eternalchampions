@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""tools/split.py — gera disasm/ a partir da ROM do usuário (DESIGN §6.1).
+"""tools/split.py — extrai da ROM do usuário os arquivos gerados do disasm.
 
-Estado M0: a tabela de vetores (0x000–0x1FF) vira 64 `dc.l` com labels,
-e o resto da ROM vira um único `incbin` (disasm/data/rest.bin).
-Conforme a Fase 1 avança, este script passa a recortar regiões menores
-e o asm de verdade substitui os incbins.
+Gera:
+  disasm/gen/vectors.asm — tabela de vetores ($000000–$0001FF) como 64 dc.l
+  disasm/data/rest.bin  — resto da ROM ($000200 em diante)
+
+NÃO toca em disasm/main.asm (escrito à mão) nem nos includes de disasm/code/.
+O layout de regiões convertidas x incbin vive no main.asm.
 
 Uso:
     python tools/split.py [--rom roms/eternal_champions_us.gen]
@@ -32,7 +34,7 @@ VECTOR_NAMES = {
     0x064: "Vector_IRQ1",
     0x068: "Vector_IRQ2",
     0x06C: "Vector_IRQ3",
-    0x070: "Vector_HBlank",      # IRQ4
+    0x070: "Vector_HBlank",      # IRQ4 — aponta para $FF0000 (desabilitado)
     0x074: "Vector_IRQ5",
     0x078: "Vector_VBlank",      # IRQ6
     0x07C: "Vector_IRQ7",
@@ -44,8 +46,6 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--rom", default="roms/eternal_champions_us.gen")
     ap.add_argument("--out", default="disasm")
-    ap.add_argument("--force", action="store_true",
-                    help="sobrescreve disasm/main.asm mesmo se já existir")
     args = ap.parse_args()
 
     root = pathlib.Path(__file__).resolve().parent.parent
@@ -61,19 +61,13 @@ def main() -> int:
         print("erro: ROM menor que a tabela de vetores", file=sys.stderr)
         return 1
 
+    gen_dir = out_dir / "gen"
     data_dir = out_dir / "data"
+    gen_dir.mkdir(parents=True, exist_ok=True)
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    main_asm = out_dir / "main.asm"
-    if main_asm.exists() and not args.force:
-        print(f"erro: {main_asm} já existe (use --force para regenerar)",
-              file=sys.stderr)
-        return 1
-
-    # 0x000–0x1FF: tabela de vetores como dc.l
     lines = []
-    lines.append("; disasm/main.asm — GERADO por tools/split.py. Não edite à mão;")
-    lines.append("; edite tools/split.py. Sintaxe vasm/mot (DESIGN §6.3).")
+    lines.append("; disasm/gen/vectors.asm — GERADO por tools/split.py. Não edite.")
     lines.append(f"; ROM de origem: {rom_path.name}")
     lines.append(f"; sha256: {hashlib.sha256(rom).hexdigest()}")
     lines.append("")
@@ -83,17 +77,12 @@ def main() -> int:
         val = int.from_bytes(rom[off:off + 4], "big")
         name = VECTOR_NAMES.get(off, f"Vector_{off:03X}")
         lines.append(f"{name}:\tdc.l\t${val:08X}\t; ${off:06X}")
-    lines.append("")
-    lines.append("\torg\t$000200")
-    lines.append('; ---- Resto da ROM (ainda não convertido) ----')
-    lines.append('\tincbin\t"data/rest.bin"')
 
+    (gen_dir / "vectors.asm").write_text("\n".join(lines) + "\n")
     (data_dir / "rest.bin").write_bytes(rom[0x200:])
-    main_asm.write_text("\n".join(lines) + "\n")
 
-    print(f"ok: {main_asm}")
+    print(f"ok: {gen_dir / 'vectors.asm'}")
     print(f"ok: {data_dir / 'rest.bin'} ({len(rom) - 0x200} bytes)")
-    print(f"ok: {len(lines) - 5} linhas geradas")
     return 0
 
 
