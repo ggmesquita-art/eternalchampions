@@ -6,21 +6,24 @@
 ## Entry points
 
 - `Main_Entry` (`$2230`): alvo do `jmp` no fim do boot. Seta a pilha (`0x1000000`),
-  chama `$2786`, zera ~27 KB de RAM em `$9378`, inicializa variáveis
-  ($FEFA=$B7B7, $9CC0=$B, $977C=7...) e despacha conforme `$FEF8` (contador de boot).
-- Cadeia de chamadas do laço (confirmada pelos callers do Ghidra):
+  inicializa a sombra VDP (`$2786`, tabela de 24 regs em (A6)), zera ~27 KB de
+  RAM em `$9378`, checa o contador de boots (`$FEF8`), roda a sequência de modos
+  da tabela `$22DE` (07→09→01→FF=reinicia) e faz a checagem de save RAM
+  (2 slots, portas `$A10003`/`$A10005`).
+- **Cadeia de chamadas do laço (confirmada pelo disasm):**
 
 ```
-Main_Entry ($2230) → ... → FUN_0000255e   ; laço externo: lê input, decide estado
-                              └→ FUN_0000db14()  ; ? leitura de controles
-                              └→ FUN_0000fcde()  ; roda N quadros
-                                   └→ FUN_0000cb42()
-                                   └→ Main_FrameLoop ($FD24)
+Main_Entry ($2230) ──► Sub_246E (modo 9) ──► init final ($24E0)
+   │                                          │ (flag $FD61 bit5 = attract)
+   ▼                                          ▼
+Main_OuterLoop ($255E) ◄─────────────────── Sub_246E_Attract (demo)
+   ├─ Main_InitStructs ($23F4): aloca 2 buffers de $12C0 via Mem_Alloc ($D4CC)
+   ├─ jsr $DB14 (input) → FUN_0000fcde (roda 1 quadro) → Main_FrameLoop ($FD24)
+   └─ dispatch por $FD61/$9CCA/$FD64 → $DAF8 / $E2B0 / $B56C
 ```
 
-`FUN_0000255e` testa `$FD64 < $1E` (estado < 30), `$FD60` (input?) e
-`$9CCA`/`$9C7E`/`$936C`/`$9670` — a máquina de estados de alto nível
-(título → menu → luta) provavelmente vive entre `$2230` e `$C000`.
+**A6** = ponteiro global usado como sombra de registros/comandos do VDP
+(escritas em (A6) e (A6+4) em `$2786`, `$22A0` e no VBlank via `$D6A0`).
 
 ## Fluxo de um quadro (FUN_0000fd24)
 
