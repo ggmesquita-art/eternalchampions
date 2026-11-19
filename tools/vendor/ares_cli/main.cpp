@@ -152,10 +152,14 @@ auto nall::main(Arguments arguments) -> void {
     if(trace) {
       auto& bus = ares::MegaDrive::bus;
       n16 fd64 = bus.read(0xFF, 0x00, 0xFFFD64);
-      n16 fd60 = bus.read(0xFF, 0x00, 0xFFFD60);
-      n16 fd70 = bus.read(0xFF, 0x00, 0xFFFD70);
-      print(i, " st=", hex(fd64, 4L), " in=", hex(fd60, 4L),
-            " fc=", hex(fd70, 4L), "\n");
+      n16 fd63 = bus.read(0xFF, 0x00, 0xFFFD63);
+      n16 fd54 = bus.read(0xFF, 0x00, 0xFFFD54);
+      n16 fd61 = bus.read(0xFF, 0x00, 0xFFFD61);
+      n16 cca  = bus.read(0xFF, 0x00, 0xFF9CCA);
+      n16 cb6  = bus.read(0xFF, 0x00, 0xFF9CB6);
+      print(i, " st=", hex(fd64, 4L), " mode=", hex(fd63, 4L),
+            " edge=", hex(fd54, 4L), " fd61=", hex(fd61, 4L),
+            " cca=", hex(cca, 4L), " cb6=", hex(cb6, 4L), "\n");
     }
     for(auto& d : dumps) {
       if((s64)i == d.frame) {
