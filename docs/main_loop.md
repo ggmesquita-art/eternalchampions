@@ -58,7 +58,7 @@ quadros (o sync de quadro do laço só ativa quando vira ≠ 0 — confirmar qua
 | sem input | 7 → 0 → **9 (menu-init)** (686/688; ares 642/644) |
 | sem input | 9 → **13** por TIMER de attract (1582; ares 1538) → 7 → 13 (ciclo) |
 | Start no título | idem (aceita o Start e vai para 9) |
-| Start no estado 9 | **diverge**: GPGX ignora (→13 por timer); ares → **1** (983) |
+| Start no estado 9 | **1 press único diverge**: GPGX perde (→13 por timer); ares → **1** (983). **2+ presses: concordam** (9→1 em 1033/1034) |
 
 Handlers: `State_HandlerTable[$27B4]` (40 offsets relativos). Estado 7 →
 `$2EF2`, estado 9 → `$3256` (menu: `$9CCA==5 → jmp $200` = reset), estado 0 →
@@ -81,43 +81,57 @@ SEM input** (ciclo de attract):
 | 13→7→13 (ciclo) | 1556/1558 | 1599/1601 |
 
 A transição 9→13 é um **timer de attract** (acontece sem input nenhum).
-**A divergência real é só com input no estado 9**: ares + Start@950 →
-**9→1** (quadro 983); GPGX + Start@950 → Start **ignorado**, 9→13 via
-attract. Mecanismo (handler do estado 9, $3256): o loop de espera tem DOIS
-caminhos de saída — (a) `$FD55`/`$FD57` bit7 (bit 7 = `$0080` da BORDA do
-pad; FD55 é o byte BAIXO da palavra FD54) →
-retorna sem mudar `$9CB6` → tabela de modos avança → **estado 1**; (b)
-`$FD61` bit7 (tarefa de input do escalonador) → `$9CCA++` → `$9CB6=$D` →
-**estado 13**. Os dois emuladores emulam pad de 6 botões (header "J6";
-GPGX: `rominfo.peripherals&2`→PAD6B; ares: FightingPad), então a diferença
-está no **protocolo de 6 botões** (ares é instantâneo, GPGX modela a
-latência por ciclos do MK-1653-50 — 172 ciclos na troca de TH, contra o
-polling rápido do Sub_CA80) — os bits do pad lidos pelo jogo diferem:
-**verificado em dump: ares + Start → `$0080` (bit 7, o bit de "confirmar"
-do menu); GPGX + Start → `$0008` (bit 3, não dispara o caminho A)**.
-Conclusão mantida: **GPGX = referência dinâmica**; portar o
-protocolo do `gamepad.c` para o ares ou tratar o ares só como fonte do
-P2/N2. ⚠️ Questão em aberto: qual dos dois bate com o hardware real — o
-jogo espera o bit 7 como "confirmar" e funciona em console real; se o
-GPGX estiver conservador demais na latência, a leitura real pode ser a do
-ares. Referendar com um terceiro emulador (BlastEm/Exodus) ou hardware.
+**Divergência com input no estado 9** (handler $3256 convertido e
+verificado): o loop de espera ($33FE) tem DOIS caminhos — (a) `$FD55`/`$FD57`
+bit7 (bit `$0080` da BORDA do pad) → saída compartilhada **$3492** (limpa
+`$9CCA` etc., rts com `$9CB6`=0 → tabela de modos avança → **estado 1**);
+(b) `$FD61` bit7 (heartbeat da tarefa de input) → `$9CCA++` → `$9CB6=2/$D`
+→ **estado 13**.
 
-### Handler do estado 9 (menu-init, $3256 — decodificado, 2026-11-18)
+Experimentos (19/nov):
 
-Fluxo decodificado (ainda não convertido para asm):
+| Cenário | ares | GPGX |
+|---|---|---|
+| sem input | 9→13 (1538) | 9→13 (1582) |
+| **1 press** Start@950 | **9→1 (983)** | **9→13 (1582, press perdido)** |
+| **2+ presses** (800+900…) | **9→1 (1033)** | **9→1 (1034)** ✓✓ |
+
+**Com 2+ presses os emuladores CONCORDAM** (9→1 com 1 quadro de diferença).
+A divergência é estreita: um press ÚNICO — o ares captura a borda e sai
+pelo caminho A; o GPGX perde e o menu cai no attract. Curiosidade
+(trace quadro a quadro): no ares a saída A dispara ~16–33 quadros DEPOIS
+do pressionar, com `$FD54`=0 nas fronteiras de quadro — a borda deve
+aparecer/desaparecer DENTRO do quadro (o loop roda muitas iterações por
+quadro; o contador do FightingPad oscila e gera borda espúria numa fase).
+No GPGX (MK-1653-50 com latência de 172 ciclos) as leituras são estáveis
+→ sem borda espúria → 1 press único não basta. Verificado em dump: no
+quadro do pressionar os dois emuladores têm RAM **idêntica** (FD50=0,
+FD54=$0080, FD58=$0080, 9CCA=5).
+
+⚠️ Questão em aberto: qual dos dois bate com o hardware real (referendar
+com BlastEm/Exodus ou console). Conclusão mantida: **GPGX = referência
+dinâmica** do harness; ares como fonte do P2/N2 (ou portar o `gamepad.c`).
+
+### Handler do estado 9 (menu-init, $3256 — convertido, verificado)
+
+Fluxo (code/state_handlers3.asm):
 
 1. **`$9CCA==5` → `jmp $200`** (reset suave). `$9CCA=$FFFF` no boot.
-2. Desenha a arte do menu (9 sprites via `jsr $DCEA` com $84(a0)=índice,
-   objetos $46/$47, args inline para `$F47A`/`$E5FC`).
-3. `tst.w $9CCA`; negativo → som ($093C) + `$9CCA=5`. Espera `$9B62≠0`,
-   roda 15 quadros.
-4. **Loop de espera** ($33F8): clr `$FD76`, roda 0 quadros, testa:
-   - `$FD55` bit7 / `$FD57` bit7 (bit 7 = `$0080` da borda do pad) → **saída A**
-     ($3488): limpa flags, `rts` — `$9CB6` fica 0 → tabela de modos de
-     boot avança (09→01) → **estado 1** (caminho que o ares toma)
-   - `$FD61` bit7 (tarefa de input) → **saída B**: `$9CCA++`, `$9CCC=2`,
-     `$9CB6=2` (ou `=$D` se `$9CCA==6`), roda 1 quadro, `rts` → **estado
-     13** (caminho do GPGX; no no-input o attract/timeout domina)
+2. Desenha a arte do menu (sprites $A9/$AA/$AB/$41 via `jsr $DCEA` com
+   `$84(a0)`=índice, objetos $46/$47, args inline para `$F47A`/`$E5FC`).
+3. `tst.w $9CCA`; negativo → som ($093C) + `$9CCA=5`. Espera `$9B62≠0`
+   (loop $33E6), roda 15 quadros.
+4. **Loop de espera** ($33FE): clr `$FD76`, `$FCDE(0)` (roda
+   Main_FrameLoop 1x — CB42 só espera VBlank se `$FD76`≠0, então o loop
+   roda MUITAS iterações por quadro), testa:
+   - `$FD55` bit7 / `$FD57` bit7 (bit `$0080` da borda do pad) → **saída A**
+     **$3492** (compartilhada): `$D7A8`, `$D750`, 1 quadro, `$093C`,
+     `$9354→$FEFA`, limpa `$9CCC/$9CB2/$9CCA/$9CBE/$9CBC`, rts — `$9CB6`
+     fica 0 → tabela de modos avança (09→01) → **estado 1**
+   - `$FD61` bit7 (heartbeat) → **saída B**: `$9CCA++`, `$9CCC=2`,
+     `$9CB6=2` (ou `=$D` se `$9CCA==6`), `$9388=1`, limpa flags, roda 1
+     quadro, rts → **estado 13**
+
 
 ### Handler do menu (estado 13, $36B2 — analisado por disassembly, 2026-11-18)
 
