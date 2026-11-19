@@ -74,7 +74,17 @@ está ativo — suspeita: ou o jogo real seta `FD61` por outro caminho
 (VBlank/interrupção), ou o cursor do menu caiu num item diferente (OPTIONS?).
 `Sub_C870` = rotina de input (lê `$A10003` via `$CA80` — protocolo de pad),
 chamada pelo laço principal quando estado≠7 e `$FD69` bit7 setado.
-Próximo passo: comparar com Genesis Plus GX (referência do harness).
+
+**RESOLVIDO (comparação com Genesis Plus GX):** construí o loader libretro
+mínimo (`tools/vendor/gpgx_runner/`) e rodei o mesmo cenário na referência:
+GPGX **permanece no menu** após 1 Start e só transiciona (9→13) após vários —
+enquanto o ares foi 9→1 (o caminho de **reset**: boot modes 9→1) com UM
+Start. **O ares diverge no input do menu** (o protocolo do FightingPad do
+ares é simplificado — sem a latência por ciclos do MK-1653-50 que o GPGX
+modela). Conclusão: usar o **GPGX como referência dinâmica** (o `gpgx_runner`
+já é o esqueleto do harness §8) e tratar o ares como fonte do P2/N2 (ou
+portar o protocolo de pad do GPGX para o ares). Sequência de referência:
+0→7 (24) → 9 (688) → 13 (1582, após Starts repetidos).
 
 ## Fluxo de um quadro (FUN_0000fd24)
 

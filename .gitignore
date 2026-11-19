@@ -24,7 +24,18 @@ __pycache__/
 node_modules/
 
 # Ferramentas externas baixadas localmente
-tools/vendor/
+# (usamos tools/vendor/* em vez de tools/vendor/ para poder re-incluir
+#  as ferramentas PRÓPRIAS do projeto que vivem junto aos vendors)
+tools/vendor/*
+!tools/vendor/README.md
+!tools/vendor/ares_cli/
+!tools/vendor/gpgx_runner/
+
+# Artefatos de build das ferramentas próprias (não versionados)
+tools/vendor/ares_cli/build/
+tools/vendor/gpgx_runner/gpgx_runner
+tools/vendor/gpgx_runner/gpgx_runner_dbg
+
 
 # Projetos de referência: ferramentas externas, não fazem parte do repo (DESIGN §5.1)
 ares/
