@@ -3,6 +3,7 @@
 > Roadmap operacional do projeto, derivado do `DESIGN.md` v0.3 (2026-11-07).
 > Status: v0.1 (2026-11-18). Os marcos M0–M8/N1–N3 citados aqui são os do DESIGN §16.
 > Cada fase lista tarefas concretas, a ferramenta local a usar e o critério de saída.
+> **Estado detalhado do projeto: `docs/PROGRESS.md` (atualizado em 2026-11-19).**
 
 ---
 
@@ -26,7 +27,10 @@ Arquivo: `roms/eternal_champions_us.gen` (3.145.728 bytes = 24 Mbit, confirma §
 | Ferramenta | O que é | Papel no projeto |
 |---|---|---|
 | `segagenesisrecomp/` | **Genesis Recomp** (mstan): framework beta de recompilação estática de Mega Drive/Sega CD. Recompilador 68k→C (`recompiler/src/`: `m68k_decoder.c`, `code_generator.c`, `function_finder.c`…), runner com VDP/áudio/barramento/Z80 compartilhados, **fallback interpretado**, suporte a Sega CD (`feature/segacd-backend`), tools Python (`frame_wram_diff.py`, `genesis_cosim.py`, `divergence_report.py`…), integração Ghidra (`tools/ghidra/SonicAnnotationProject.java`), docs densos (VDP batching, GPU raster, Z80 static recomp, netplay). | **Base principal das Fases 2–3** e modelo de layout `game.toml`/seeds/jumptables. |
-| `ares/` | Emulador ciclo-a-ciclo em C++ (`ares/md/`: cpu, vdp, apu, opn2, mcd). | Referência dinâmica da Fase 1 (debugger) e **base do P2** (fallback previsto no DESIGN §11.6). |
+| `ares/` | Emulador ciclo-a-ciclo em C++ (`ares/md/`: cpu, vdp, apu, opn2, mcd). **Patchado localmente**: FightingPad com máscara 0xFF (assinatura de 6 botões). | Base do **P2** (fallback previsto no DESIGN §11.6); driver headless em `tools/vendor/ares_cli/` (input programado, trace, dump de RAM). |
+| `tools/vendor/gpgx/` | **Genesis Plus GX** compilado localmente (core libretro, `genesis_plus_gx_libretro.so`), sem prints de debug. | **Referência dinâmica oficial** (harness §8) — decisão tomada após a comparação ares/GPGX. |
+| `tools/vendor/gpgx_runner/` | Loader libretro mínimo (projeto próprio): `start@N`, `dump@N,arq`, `--trace`, **filmes `.ecm`** (hash SHA-256 da ROM no cabeçalho + máscara de input por quadro, DESIGN §8). | Esqueleto do harness da Fase 3. |
+| `tools/vendor/ares_cli/` | Driver headless do núcleo do ares (projeto próprio): `--press quadro:botão`, `--trace` (estado/edge/flags por quadro), `--dump N:arq`. | Análise dinâmica da Fase 1. |
 | `StreetsOfRageProject/` | Repo do projeto homônimo. ⚠️ **Os 4 submodules (`RageDecompiler`, `MegaDriveEnvironment`, `StreetsOfRageRecompilation`, `MegaDriveEnvironmentSampleGame`) não estão inicializados** (pastas vazias). Precisa de rede: `git submodule update --init --recursive`. | Referência de arquitetura (decompiler próprio + runtime SDL3). Opcional: só se for adotado o caminho de runtime próprio (§8.3). |
 | `sonic3air-26.03.28.0-stable/` | Código-fonte do Sonic 3 A.I.R. (Oxygen engine, lemonscript, librmx). | **Modelo do produto final** (§15): lógica traduzida + engine novo + widescreen. Referência de renderer e estrutura de dados de assets. |
 | `RGen-1.0.0-compiler-sources/` | Fontes do toolchain WinLibs **GCC 14.2.0 + binutils 2.43.1 + mingw-w64 12.0.0** usado pelo RGen (compilador dos projetos de recomp). | Só para builds Windows com toolchain idêntico ao dos projetos de referência. Baixa prioridade. |
@@ -37,11 +41,11 @@ Arquivo: `roms/eternal_champions_us.gen` (3.145.728 bytes = 24 Mbit, confirma §
 
 | Ferramenta | Uso (DESIGN) | Status |
 |---|---|---|
-| `vasmm68k_mot` | Montador da Fase 1 (§6.2) | ❌ não instalado |
-| Ghidra 12.x | Análise estática (§6.2) **e provider de análise do REA** (§7) | ❌ não instalado |
-| Genesis Plus GX (core libretro) | Referência do harness (§8) | ❌ não instalado |
-| Exodus / debugger MAME | Active disassembly (§6.2) | ❌ não instalado (opcional; ares cobre parte) |
-| Musashi (núcleo 68k) | Fallback (§7.2) — desnecessário se adotarmos o runner do Genesis Recomp (§8.3) | ❌ |
+| `vasmm68k_mot` | Montador da Fase 1 (§6.2) | ✅ 1.9d em `tools/vendor/vasm/` |
+| Ghidra 12.x | Análise estática (§6.2) **e provider de análise do REA** (§7) | ✅ 12.2 em `tools/vendor/` (+JDK 25) |
+| Genesis Plus GX (core libretro) | Referência do harness (§8) | ✅ compilado em `tools/vendor/gpgx/` + `gpgx_runner` |
+| Exodus / debugger MAME | Active disassembly (§6.2) | ❌ não instalado (opcional; ares/gpgx cobrem parte) |
+| Musashi (núcleo 68k) | Fallback (§7.2) — desnecessário se adotarmos o runner do Genesis Recomp (§8.3) | ❌ (desnecessário após D2) |
 
 ## 0.4 Progresso da Fase 0 (2026-11-18)- [x] `git init` + `.gitignore` (`roms/`, `assets/`, `disasm/data/`, ferramentas externas)
 - [x] `reference/roms.toml` com todos os hashes + validação de header (checksum `$3630` bate)
@@ -53,7 +57,7 @@ Arquivo: `roms/eternal_champions_us.gen` (3.145.728 bytes = 24 Mbit, confirma §
 - [x] **REA operacional na ROM** (após `/restart` do usuário + troca do JDK 21→25 via symlink): `open_binary` raw-binary m68k no Ghidra 12.2 (`68000:BE:32`), **268 funções descobertas** (cluster principal `0xC000`–`0x11000`), `analyze_function`/pseudocódigo/xrefs validados (ex.: `FUN_000006f0` = laço de espera com flag Z80 em `0xA01A60`). Primeiras hipóteses em `disasm/symbols/labels.toml`; Evidence exportado em `reference/rea/`
 - [x] Primeiro commit: `ea6b14c` (repo leve, sem as ferramentas externas)
 - [ ] Conferência da revisão No-Intro (DAT-o-MATIC bloqueia sem aceitar termos no navegador)
-- [ ] M0.5 — teste de boot em ares: build bloqueado sem `libgtk-3-dev`/`libsdl2-dev` (sem sudo). Opções: pedir senha do sudo para `apt install`, ou compilar só o núcleo (`md.cpp` inclui m32x/SH2 → arrastaria qon; adiado)
+- [x] M0.5 — boot em ares: `tools/vendor/ares_cli/` compila só o núcleo via CMake wrapper (sem GUI); ROM boota, RAM dumpada, input programado
 - [ ] CI de hash (GitHub Actions ou hook local)
 
 **Descobertas da Fase 1 já registradas:** Reset `$000200`, VBlank `$0006B6`, IRQ2 `$0006E2`, demais exceções `$0006DE`; HBlank aponta para `$00FF0000` (desabilitado no boot — anotar no disasm).
@@ -66,7 +70,9 @@ Arquivo: `roms/eternal_champions_us.gen` (3.145.728 bytes = 24 Mbit, confirma §
 
 **Fase 1 (dia 2):** máquina de estados convertida (`state_table.asm` com 40 handlers, `state_dispatch.asm` com FrameRun/SetState/Dispatch/PostChange/init do sistema e da câmera, `state_handlers1.asm` + `state1_handler2.asm` com o estado 1 completo). **ares_cli com input programável** (`--press quadro:botão`, FightingPad de 6 botões) e `--trace` por quadro. Mapa dinâmico: boot→**7**(título)→Start→**9**(menu)→Start→**1**(setup). Estado 1 não progride no ares — depende da detecção de pad (`$9CB0`), suspeita de diferença no handshake de 6 botões do ares (comparar com Genesis Plus GX). Escritores de `$FD64`: menu→7/13, boot→7/9/1 (via State_SetState), `$2FE59C`→29, restore via `$9B66`.
 
-**Fase 1 (dia 2, noite — GPGX vira referência dinâmica):** `tools/vendor/gpgx_runner/` construído (loader libretro mínimo: `retro_input_poll` registrado, RAM dump com byte-swap, `start@N`/`dump@N`/`--trace`). ⚠️ Bug corrigido: `JOYPAD_START` errado (7=RIGHT) invalidou as primeiras comparações. Com input correto: **máquina de estados idêntica nos dois emuladores sem input** (0→7→0→9→13→7→13, ~44 quadros de defasagem); 9→13 é **timer de attract**. Divergência real só com input no estado 9: ares+Start→**9→1**, GPGX+Start→ignorado→13. Mecanismo: handler $3256 tem 2 saídas — bit15 da borda do pad (→estado 1) vs `$FD61` bit7 da tarefa de input (→estado 13); a diferença está no protocolo de 6 botões (ares instantâneo vs GPGX ciclo-a-ciclo). `Main_FrameLoop` ($FD24) **convertido** (hash ok): incrementa `$FD70`, lê pads (Sub_C870) quando estado≠7 e `$FD69` bit7, chama subsistemas por bits de `$FD69`, sincroniza com o Z80 quando `$9B32`≠0. **Contadores corrigidos**: `$FD70` = contador do laço (único writer), `$FD72–FD75` = contador 32-bit do VBlank (`$FD74` = low word), `$FD76` = flag de VBlank consumida por quadro. **Input mapeado e verificado no GPGX**: Sub_CA80 (TH toggling + detecção de 6 botões) → Sub_C870 (tabelas $9274/$92B4/$92A4 = identidade) → FD58/5A estado, FD54/56 borda, FD50/52 anterior (dump com Start: FD58=$0008). **Estado 9 ($3256) e menu ($36B2) decodificados** (docs/main_loop.md); escalonador cooperativo mapeado ($DB14 yield/$DB4A dispatch/$DC10 volta, tarefa de input $1FF00). Handlers 2–7 em conversão por subagente.
+**Fase 1 (dia 2, noite — GPGX vira referência dinâmica):** `tools/vendor/gpgx_runner/` construído (loader libretro mínimo: `retro_input_poll` registrado, RAM dump com byte-swap, `start@N`/`dump@N`/`--trace`). ⚠️ Bug corrigido: `JOYPAD_START` errado (7=RIGHT) invalidou as primeiras comparações. Com input correto: **máquina de estados idêntica nos dois emuladores sem input** (0→7→0→9→13→7→13, ~44 quadros de defasagem); 9→13 é **timer de attract**. Divergência real só com input no estado 9: ares+Start→**9→1**, GPGX+Start→ignorado→13. Mecanismo: handler $3256 tem 2 saídas — bit 7 ($0080) da borda do pad (→estado 1) vs `$FD61` bit7 da tarefa de input (→estado 13); a diferença está no protocolo de 6 botões (ares instantâneo vs GPGX ciclo-a-ciclo). `Main_FrameLoop` ($FD24) **convertido** (hash ok): incrementa `$FD70`, lê pads (Sub_C870) quando estado≠7 e `$FD69` bit7, chama subsistemas por bits de `$FD69`, sincroniza com o Z80 quando `$9B32`≠0. **Contadores corrigidos**: `$FD70` = contador do laço (único writer), `$FD72–FD75` = contador 32-bit do VBlank (`$FD74` = low word), `$FD76` = flag de VBlank consumida por quadro. **Input mapeado e verificado no GPGX**: Sub_CA80 (TH toggling + detecção de 6 botões) → Sub_C870 (tabelas $9274/$92B4/$92A4 = identidade) → FD58/5A estado, FD54/56 borda, FD50/52 anterior (dump com Start: FD58=$0080). **Estado 9 ($3256) e menu ($36B2) decodificados** (docs/main_loop.md); escalonador cooperativo mapeado ($DB14 yield/$DB4A dispatch/$DC10 volta, tarefa de input $1FF00). Handlers 2–7 em conversão por subagente. *(Nota do dia 3: as conclusões de divergência desta entrada foram refinadas — ver entrada do dia 3.)*
+
+**Fase 1 (dia 3 — conversão 8–13, .ecm, divergência refinada):** handlers dos **estados 2–7** ($2ADC–$313A, seleção de personagem + título) e **8–13** ($313A–$397F, menu-init + menu) convertidos por subagentes — hash byte a byte ✓. Estados 11/12 = apelidos de 1/13; estado 10 termina em `jmp $200`. `gpgx_runner` ganhou o formato **`.ecm`** (DESIGN §8: hash SHA-256 da ROM no cabeçalho + 1 máscara de input por quadro, verificação de hash, replay idêntico). `ares_cli`: trace estendido (edge/FD61/$9CCA/$9CB6 por quadro) + `--dump N:arq`. **Divergência ares/GPGX refinada**: com **2+ presses** os emuladores **concordam** (9→1 em 1033 vs 1034); com 1 press único o ares captura a borda (→1) e o GPGX perde (→13 attract). No quadro do pressionar a RAM é idêntica nos dois — a diferença está na oscilação intra-quadro do contador do FightingPad vs a estabilidade do MK-1653-50. Questão em aberto: qual bate com hardware real (referendar com BlastEm/Exodus).
 
 ---
 
