@@ -65,10 +65,16 @@ Handlers: `State_HandlerTable[$27B4]` (40 offsets relativos). Estado 7 →
 cria objetos `$B8/$41/$AB`, espera `Start` em `$FD61` bit7, termina em `rts`).
 `$FD68` = flag "estado mudou" ($FFFF a cada dispatch).
 
-**Em aberto:** no ares_cli o estado 1 não progride (a transição deve vir de um
-subsistema — o array de tarefas de `$D7E4` — que depende de detecção de pad
-`$9CB0` ou de timing fino; investigar). A lógica do menu vive nos subsistemas
-(`$F32C`/`$F47A` criam os objetos do menu).
+**Em aberto:** no ares_cli o estado 1 não progride. Investigação: o loop do
+estado 1 espera `$FD61` bit 7 — flag setada pelas **tarefas de input do
+escalonador cooperativo** (`bset #7,($FD61)` em `$1FF26`, região não
+convertida) que rodam sob o `Main_OuterLoop` (`jsr DB14` = troca de tarefa).
+No fluxo do estado 1 (sequência de modos de boot), o `Main_OuterLoop` não
+está ativo — suspeita: ou o jogo real seta `FD61` por outro caminho
+(VBlank/interrupção), ou o cursor do menu caiu num item diferente (OPTIONS?).
+`Sub_C870` = rotina de input (lê `$A10003` via `$CA80` — protocolo de pad),
+chamada pelo laço principal quando estado≠7 e `$FD69` bit7 setado.
+Próximo passo: comparar com Genesis Plus GX (referência do harness).
 
 ## Fluxo de um quadro (FUN_0000fd24)
 
