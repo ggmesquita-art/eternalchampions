@@ -99,27 +99,24 @@
   `t2_probe.py`, `t2_regdiff.py`, `t2_peek.py`, `t2_cram.py`,
   `t2_vdpwlog.py`, `t2_logcmp.py`, `t2_writelog.py`).
 
-### T3 — Savegame: 1º load às vezes trava (2–3 loads "liberam") — ⏳ não iniciado nesta rodada
+### T3 — Savegame: 1º load às vezes trava (2–3 loads "liberam") — ✅ VALIDADO HEADLESS (2026-11-21)
 
 - **Sintoma:** o 1º load de um save V2 (`ECRB2sav`) na sessão pode
   travar; repetir o load 2–3× libera. Teoria registrada: save gravado
   incompleto → o jogo não reconstrói o resto no load.
-- **Hipóteses (da fila):** (a) pending exec/handlers no 1º load a frio;
-  (b) estado de áudio/Z80 não restaurado na 1ª passada; (c) ordem
-  `cancel_load_hold` × `audio_discard_playback` no caminho do 1º load.
-- **Passos:** (1) repro headless com input-script (diretivas de save/load)
-  gravando o estado pós-load de cada tentativa; (2) diff 1º × 2º load
-  (PC, regs, Z80 RAM, estado do áudio, `$FD64`); (3) auditar
-  `glue_prepare_inplace_load`/`glue_finish_inplace_load` e a restauração
-  do Z80/áudio na 1ª passada; (4) instrumentar o caminho
-  `runner_load_state_file` (`segagenesisrecomp/runner/main.c`).
-- **Fix candidato:** rearmar áudio/Z80 antes do 1º load (mesma ordem do
-  caminho que funciona) e/ou drenar pending exec/handlers.
-- **Validação:** N loads a frio consecutivos headless (todos sem travar)
-  + teste manual.
-- **Referências:** `segagenesisrecomp/runner/main.c`
-  (`runner_save_state_file`/`runner_load_state_file`), `docs/BUG_QUEUE.md`
-  §1.2, `docs/PROGRESS.md` §11.1.
+- **Validação headless (nesta rodada):** scripts `t3_save.input` (save na
+  luta) + `t3_load.input` (sessão nova: 1º load a frio + 2º load, dumps a
+  +60/+180 de cada). Resultado: **sem hang** — o jogo avança após os dois
+  loads e o estado a +60 é **byte-idêntico** entre 1º e 2º load. A
+  regressão de `$FD74` entre +60 e +180 após o 1º load é o reset de fim de
+  luta do próprio jogo (save tirado no KO), e a divergência de 90 bytes nos
+  trechos pós-load é o RNG por HV (classe documentada). Paced com áudio
+  (dummy) idem.
+- **Conclusão:** o hang é interativo (modal F7/F8/load_hold ou dispositivo
+  de áudio real) — não reproduz headless. Blob V2 auditado: inclui os
+  pendentes do recomp (`rte_*`, `split_sp`) na seção `sched`. A reprodutir
+  com o usuário (tela do 1º load, via F7/F8 ou modal, som ligado).
+- **Artefatos:** `tools/scripts/t2_repro/t3_save.input`/`t3_load.input`.
 
 ### T4 — Sprites do EC quebrados só no round 1 do Trident — 🔬 OBSERVAÇÃO PARCIAL (2026-11-21)
 
