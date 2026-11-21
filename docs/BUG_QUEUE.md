@@ -12,19 +12,28 @@
 - **Sintoma:** jogando com o Eternal Champion (modo `--unlock-boss`), os
   sprites dos dois ECs aparecem quebrados/ausentes **apenas no round 1** na
   arena do Trident (estado 24). Nos rounds seguintes os sprites carregam.
-- **Pista:** carregamento/timing — os assets do boss são carregados sob
-  demanda e no round 1 do Trident o carregamento perde a corrida contra o
-  primeiro frame da luta.
-- **Observação 2026-11-21 (nova):** capturas de VRAM/SAT no início do
-  round 1 (f2950+) do cenário VS Trident com EC (P2=9, forma base): os
-  tiles do EC (faixa 384–605) já estão carregados e idênticos ao estado
-  "assentado" desde o primeiro frame — a corrida **não reproduz** no modo
-  headless com a forma base. SAT idêntico entre round 1 e round 2 (a única
-  diferença entre rounds é a cinemática de KO). A reproduzir com as
-  variáveis do usuário: forma da fera (1–4), mirror match EC×EC, modo
-  interativo (timing real) ou assets HD (`--hd-manifest`).
+- **Condições confirmadas (2026-11-21):** todas as formas da fera
+  (base+1–4), mirror EC×EC (os dois ECs), pior em **movimentos aéreos**;
+  independente de `--hd-manifest`.
+- **Progresso do repro headless (2026-11-21):** infra em
+  `tools/scripts/t4_repro/` (`t4_gen.py`, `t4_cursor.py` — variantes do
+  movie 17 + probe do id via ASSERT). Descobertas:
+  1. Poke direto de `$9CBE`/`$9CBC` (ids) **não funciona**: o setup da
+     luta re-deriva os ids da seleção do menu (`jsr $CB82` em `loc_02E4FC`,
+     `move.b $9367 → $9CBC`) e o jogo **trava na tela de loading** quando
+     os ids do chefe são pokados sem o menu tê-los selecionado.
+  2. O char-select do VS (com `--unlock-boss`) responde só a UP/DOWN na
+     janela f2080–2200: UP4 volta a Rax (ciclo de 4), UP1–3/5–9 = 0,
+     LEFT/RIGHT ignorados — o unlock patcheia a ROM (clamp 9→11, roster
+     relocada) e o layout muda. Falta mapear a tabela do roster patchado
+     para achar o slot do EC.
+- **Próximo passo:** decodificar o roster patchado (`ec_boss.c`
+  `apply_rom_patches`) e o handler do select (`menu_system.asm` — bitmap
+  `$9B40`, índice `$9B4E`, `$9367`), mapear o cursor ao EC e gerar o
+  script mirror completo (mash aéreo + `DUMP_VRAM`; tiles do EC na faixa
+  384–605 base `$2000`, SAT em `$1400`).
 - **Referência:** `game/ec_boss.c`, arena Trident `$8D60`
-  (`state_handlers10.asm`); repros em `tools/scripts/t4_*` (`/tmp/opencode`).
+  (`state_handlers10.asm`), `menu_system.asm` `$02E190`–`$02E4FC`/`$CB82`.
 - **Status:** em investigação.
 
 ### [~] 1º load do savegame às vezes trava (carregar 2–3× libera)
