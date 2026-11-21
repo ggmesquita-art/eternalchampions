@@ -467,15 +467,14 @@ Ver [docs/offlabel_arenas.md](offlabel_arenas.md). Resumo do estado final:
   (mismatch em cascata wf 5237), trace de SP do ring, bisect de A6 via
   `owner_review step`, trace env-gated `GENESIS_VDP_TRACE=FROM-TO`.
 
-### 12.3 T4 — Sprites do EC no round 1 do Trident — OBSERVAÇÃO PARCIAL
+### 12.3 T4 — Sprites do EC no round 1 do Trident — REPRO EM CONSTRUÇÃO
 
-- Capturas de VRAM/SAT no início do round 1 (f2950+) do cenário VS Trident
-  com EC (P2=9, forma base): os tiles do EC (faixa 384–605) já estão
-  carregados e idênticos ao estado assentado desde o primeiro frame; SAT
-  idêntico entre round 1 e round 2 (diferença entre rounds = só a
-  cinemática de KO). A corrida de carga **não reproduz** headless na forma
-  base. A reproduzir com as variáveis do usuário: forma da fera (1–4),
-  mirror EC×EC, modo interativo ou assets HD.
+- Condições do usuário confirmadas: todas as formas (base+1–4), mirror
+  EC×EC, pior em movimentos aéreos, independente de HD.
+- Infra `tools/scripts/t4_repro/` (t4_gen/t4_cursor): poke de `$9CBE`/`$9CBC`
+  descartado (menu re-deriva os ids via `$CB82`/`$9367` e trava na loading);
+  mapeamento do cursor do select com `--unlock-boss` iniciado (UP4 cicla a
+  Rax; roster patchado clamp 9→11 ainda por decodificar).
 
 ### 12.4 T3 — 1º load do savegame — STAGING INTERATIVO IMPLEMENTADO (2026-11-21)
 
