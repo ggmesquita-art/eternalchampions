@@ -76,33 +76,28 @@
   `disasm/code/state_handlers6.asm` `$59B6–$59F0`,
   `disasm/code/obj_tasks3.asm` `$1EE40–$1F0A8`, `docs/PROGRESS.md` §11.3.
 
-### T2 — Training: tela preta ao terminar (após 1 round) — 🔬 DIAGNOSTICADO (2026-11-21)
+### T2 — Training: tela preta ao terminar (após 1 round) — 🔬 CAUSA RAIZ EM 2 CAMADAS (2026-11-21)
 
 - **Sintoma (reportado):** no Training (original e/ou off-label), ao
-  terminar a disputa a tela fica preta após o 1º round. Na fila já consta
-  que vencer no Training Mode original pode levar à finalização
-  (`BUG_QUEUE.md` §1.3).
-- **Hipóteses (a verificar):**
-  - H1: o caminho de match-end dos estados 14/18 grava `$9CB6=8/10`
-    (finalização) antes do exit `$3BE8` do estado 14, e o estado
-    8/10 não inicializa o vídeo no contexto do training (preto).
-  - H2: o KO no training muda `$FD64` por via direta (sem `$9CB6`),
-    pulando o exit normal do handler.
-  - H3: diferença de setup entre o training original (`$9CB0=4`,
-    `$9422`/`$9424`) e o off-label Holo (já validado headless com
-    `ko_holo`: 14 → 1).
-- **Passos:** (1) repro do training original até o fim do round com
-  dumps; (2) quem escreve `$9CB6`/`$FD64` nos últimos frames; (3) diff
-  de fluxo training original × off-label Holo; (4) checar init de vídeo
-  dos estados 8/10 no contexto do training.
-- **Fix candidato:** hook no exit do training original forçando
-  `$9CB6=1` (menu) com guard correto (`$9CB0==4` e/ou arena do training),
-  ou correção do match-end para não gravar finalização no training.
-- **Validação:** movie de training original completo terminando no
-  estado 1 sem tela preta; suíte verde.
-- **Referências:** `disasm/code/state_handlers4.asm` `$3BE8`,
-  `disasm/code/obj_tasks3.asm` `$1EF88–$1F0A8`,
-  `docs/BUG_QUEUE.md` §1.3.
+  terminar a disputa a tela fica preta após o 1º round. Repro: Holo
+  off-label (VS bg 10 → estado 14, `ko_holo`).
+- **Camada 1 — FIXADA:** o interp cobrava ciclos pela tabela nominal PRM
+  em vez da tabela medida do recompilador (`<game>_cycles.c` era gerada
+  mas nunca compilada; `game_cycles.c` não linkava). O drift do
+  `g_audio_cycle_counter` dessincronizava o scheduler de tasks do menu
+  (VINT caía em pontos diferentes do stream de dispatch ~85 frames após o
+  estado 1; cascata de layout 2 frames atrasada). Fix: tabela medida no
+  shipping (`m68k_interp.c` + 2 arquivos cmake). Suíte base verde.
+- **Camada 2 — diagnosticada (pendente):** com as tasks alinhadas, o CRAM
+  do menu segue zerado no recomp. Write-log da porta VDP: o fade de
+  paleta (`Sub_StateMachine` `$D7E4`) só escreve CRAM no interp
+  (f5133–5157); o burst de tiles via fila VDP roda nos dois lados mas 25
+  frames deslocado (f5167 × f5192) — o slicing wall-frame/scanline dos
+  backends ainda difere. Próximo passo: alinhar o cadence de chunk do
+  interp com o do recomp ou contornar com hook opt-in.
+- **Artefatos:** `tools/scripts/t2_repro/` (repros + probes
+  `t2_probe.py`, `t2_regdiff.py`, `t2_peek.py`, `t2_cram.py`,
+  `t2_vdpwlog.py`, `t2_logcmp.py`, `t2_writelog.py`).
 
 ### T3 — Savegame: 1º load às vezes trava (2–3 loads "liberam") — ⏳ não iniciado nesta rodada
 

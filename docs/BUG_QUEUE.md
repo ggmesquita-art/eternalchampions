@@ -61,29 +61,53 @@
 - **Sintoma (reportado):** no Training Mode, ao terminar a disputa a tela
   fica **preta** após 1 round. **Reproduzido deterministicamente** no
   Holo-Trainer off-label (VS bg 10 → estado 14, `ko_holo`): KO → RAM vai
-  ao estado 1 (menu) mas o render fica 100% preto (VRAM sem o tilemap do
-  menu); o fluxo original (menus → estado 17) renderiza normalmente.
-- **Diagnóstico (2026-11-21):** é uma **divergência recomp × interpretador**
-  (não é lógica do jogo): com `GENESIS_FORCE_INTERP=1` o mesmo fluxo
-  renderiza o menu (14–16 cores); o recompilado diverge ~300 frames após a
-  entrada do estado 1 (~41 words de RAM — stack/records de sprite/task — e
-  1.749 words de VRAM; o upload do tilemap do menu nunca acontece). WRAM
-  idêntica (0 divergências) do KO até ~f5450 — a divergência começa depois,
-  em evento de task da tela do menu (classe interleave/task-resume, a mesma
-  classe difícil de `BUG_QUEUE` §3.2). Hipóteses descartadas com
-  experimentos: `$9CB2=0` e `$9CB2=2` forçados no exit `$3BE8` (hooks com
-  `return 1` no recomp causam `ILLEGAL pc=$3AB8` intermitente — abordagem
-  abandonada).
-- **Próximo passo:** localizar a instrução divergente com o debug server
-  (`frame_wram_diff.py`, ports A/B recomp × interp) e corrigir no gerador
-  ou contornar com hook seguro (sem skip de instrução).
+  ao estado 1 (menu) mas o render fica 100% preto; o fluxo original
+  (menus → estado 17) renderiza normalmente.
+- **Diagnóstico (2026-11-21, 3ª rodada — causa raiz em 2 camadas):**
+  1. **Tabela de ciclos do interpretador (FIXADO):** o interp
+     (`GENESIS_FORCE_INTERP=1`) cobrava `m68k_68000_nominal_cycles`
+     (estimativa PRM) por instrução, enquanto o recomp usa a tabela
+     **medida** emitida pelo recompilador (`<game>_cycles.c`, gerada mas
+     **nunca compilada** — faltava em `_sources` do
+     `GenesisRecompGenerated.cmake`; `game_cycles.c` também não linkava).
+     O drift de `g_audio_cycle_counter` dessincronizava o scheduler de
+     tasks do menu (~85 frames após entrar no estado 1 o VINT caía em
+     pontos diferentes do stream de dispatch — task da cascata de layout
+     disparava 2 wall frames depois; 5235 no interp × 5237 no recomp).
+     Fix: tabela medida habilitada no shipping (o gate `GENESIS_COSIM` foi
+     removido — a mudança era a "validated pacing change" já prevista no
+     comentário do código). Validado: contador da cascata (`$9CCF`) em
+     sincronia no fim do fluxo; suíte base segue verde.
+  2. **Upload de CRAM do menu (diagnosticado, pendente):** mesmo com as
+     tasks em sincronia, o CRAM do menu fica **todo zerado** no recomp
+     (paleta nunca sobe → tela preta). Escrita a porta de dados do VDP
+     medida nos dois lados (write-log TCP): o handler do estado 1 faz
+     `0x8134` (display off) + comando CRAM `0xC000` + dados + `0x8174`
+     em ambos; o **fade de paleta** (Pal_FadeOut → registro tipo 3 em
+     `$F136` → `Sub_StateMachine` `$D7E4`, subsistema bit4 do frame loop)
+     escreve a CRAM cor a cor (~1 byte/frame) só no interp (f5133–5157);
+     no recomp o fade nunca escreve. O burst de tiles (DMA via fila VDP
+     `$F620`/drain `$CD74`) acontece nos dois lados mas **25 frames
+     deslocado** (5167 no recomp × 5192 no interp) — o wall-frame slicing
+     (chunk por scanline) dos dois backends ainda difere. Conclusão: a
+     dessincronia restante é da mesma classe de engine (posição do
+     wall-frame/scanline no momento das escritas de VDP), mais profunda
+     que a tabela de ciclos.
+- **Próximo passo (2a camada):** comparar o slicing/chunk do interp com o
+  do recomp (o interp drena o orçamento por instrução via
+  `glue_check_vblank`/safety-net de 2 frames; o recomp por acesso de bus)
+  e alinhar o cadence, ou contornar com hook opt-in (ex.: forçar o fade
+  do menu a não depender do slicing). Artefatos: `t2_vdpwlog.py`,
+  `t2_logcmp.py`, logs em `/tmp/opencode/t2nat2/`/`t2int2/`.
 - **Artefatos:** repros em `tools/scripts/t2_repro/`
-  (`t2_holo_shots.input` = KO do Holo off-label + screenshots do fim;
-  `t2_dv.input` = dump VRAM/RAM no estado 1+300; `t2_win_to_1.input`/
-  `t2_nav5.input` = fluxo do training original).
+  (`t2_holo_shots.input`, `t2_dv.input`, `t2_win_to_1.input`,
+  `t2_nav5.input` + probes `t2_probe.py`, `t2_regdiff.py`, `t2_peek.py`,
+  `t2_cram.py`, `t2_vdpwlog.py`, `t2_logcmp.py`, `t2_writelog.py`).
 - **Referência:** tasklist T2 em `docs/proposta_bugfix_2026-11-21.md`;
   `state_handlers4.asm` `$3BE8` (exit do estado 14), `$C578`/`$C6A4`
-  (cadeia de decisão pós-partida dos estados que funcionam).
+  (cadeia de decisão pós-partida), `util_alloc_vdp.asm` `$D6A0`
+  (VBlank_VdpUpdate) e `$D7E4` (Sub_StateMachine/fade),
+  `irq.asm` `$6B6` (handler de VBlank).
 
 ### [ ] Finalizador da Jetta — bug reportado, a reproduzir
 - **Sintoma:** problema com o finalizador (Overkill) da Jetta — detalhes a

@@ -448,23 +448,38 @@ Ver [docs/offlabel_arenas.md](offlabel_arenas.md). Resumo do estado final:
   segue → menu; suíte `17/17` verde (`det=0/65536`, `interp_diff=0/65536`,
   `png_eq=True`).
 
-### 12.2 T2 — Training (Holo off-label) termina em tela preta — DIAGNOSTICADO
+### 12.2 T2 — Training (Holo off-label) termina em tela preta — CAUSA RAIZ (2 camadas)
 
 - **Repro determinística:** `ko_holo` (VS bg 10 → estado 14): KO → RAM vai
-  ao estado 1 mas o render fica 100% preto (VRAM sem o tilemap do menu).
-  O training original (menus → estado 17) renderiza normalmente.
-- **Causa:** divergência **recomp × interpretador**: com
-  `GENESIS_FORCE_INTERP=1` o mesmo fluxo renderiza o menu; o recompilado
-  diverge ~300 frames após a entrada do estado 1 (~41 words de RAM e 1.749
-  de VRAM; o upload do tilemap do menu nunca acontece). WRAM idêntica do KO
-  até ~f5450 — a divergência surge depois, em evento de task da tela do
-  menu (classe interleave/task-resume, cf. §11.7 nota do handshake Z80).
-  Hipóteses descartadas por experimento: `$9CB2=0`/`=2` forçados no exit
-  `$3BE8` (e hooks com skip de instrução no recomp causam
-  `ILLEGAL pc=$3AB8` intermitente — abordagem abandonada).
-- **Próximo passo:** localizar a instrução divergente com o debug server
-  (recomp × interp) e corrigir no gerador ou contornar com hook seguro.
-  Repro preservado em `tools/scripts/t2_repro/`.
+  ao estado 1 mas o render fica 100% preto no recomp; o interp renderiza.
+- **Camada 1 — tabela de ciclos do interp (FIXADO nesta rodada):** o interp
+  cobrava a estimativa nominal PRM (`m68k_68000_nominal_cycles`) por
+  instrução; o recomp cobra a tabela **medida** emitida pelo recompilador.
+  O `<game>_cycles.c` era **gerado mas nunca compilado** (faltava em
+  `_sources` do `GenesisRecompGenerated.cmake`) e `game_cycles.c` não
+  linkava no runner. O drift do `g_audio_cycle_counter` dessincronizava o
+  scheduler do menu: ~85 frames após o estado 1, o VINT caía em pontos
+  diferentes do stream de dispatch e a cascata de layout (task `$AD28`,
+  contador `$9CCF`) disparava 2 wall frames depois (f5237 × f5235).
+  **Fix:** tabela medida habilitada no shipping (gate `GENESIS_COSIM`
+  removido do `interp_account_cycles` — a "validated pacing change" já
+  prevista no comentário). Validado: `$9CCF` sincronizado no fim do fluxo;
+  suíte base verde (`det=0/65536`, `interp_diff=0/65536`, `png_eq=True`).
+- **Camada 2 — upload de CRAM do menu (diagnosticado, pendente):** com as
+  tasks alinhadas, o CRAM do menu segue **zerado** no recomp (paleta nunca
+  sobe → tela preta). Write-log da porta de dados do VDP nos dois lados:
+  o fade de paleta (`Pal_FadeOut` → registro tipo 3 em `$F136` →
+  `Sub_StateMachine` `$D7E4`) escreve a CRAM cor a cor só no interp
+  (f5133–5157); no recomp o fade nunca escreve. O burst de tiles via fila
+  VDP (`$F620`/`$CD74`) roda nos dois lados mas **25 frames deslocado**
+  (f5167 × f5192) — o slicing por wall-frame/scanline dos backends ainda
+  difere (o interp drena o orçamento por instrução via safety-net de 2
+  frames; o recomp por acesso de bus). Mesma classe de engine já
+  documentada em `BUG_QUEUE` §3.2.
+- **Próximo passo:** alinhar o cadence de chunk do interp com o do recomp
+  (ou contornar com hook opt-in no fade do menu). Instrumentação preservada
+  em `tools/scripts/t2_repro/` (`t2_vdpwlog.py`, `t2_logcmp.py`,
+  `t2_probe.py`, `t2_regdiff.py`, `t2_peek.py`, `t2_cram.py`).
 
 ### 12.3 T4 — Sprites do EC no round 1 do Trident — OBSERVAÇÃO PARCIAL
 
