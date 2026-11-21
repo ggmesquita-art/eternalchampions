@@ -1,7 +1,7 @@
 # PROGRESS.md — Estado do projeto EternalRecomp
 
 > Documento vivo do progresso do projeto (complementa `DESIGN.md` e
-> `ROADMAP.md`). Atualizado em 2026-11-19.
+> `ROADMAP.md`). Atualizado em 2026-11-21.
 
 ## 1. Objetivo e princípios
 
@@ -287,11 +287,191 @@ Resumo da investigação ([docs/main_loop.md](docs/main_loop.md)):
     - **Latência WSL2 Mesa D3D12:** async `GL_TIME_ELAPSED` `320×224` `p50=5,6767 ms / p99=9,7828 ms` (`sync=1`: `p50=7,0952 ms`, widescreen `p50=8,1396 ms`; referência PyTorch CUDA FP16 nativa `p50=1,1871 ms / p99=1,4109 ms` — medição OpenGL `≤ 2 ms` a revalidar em Windows nativo conforme `ROADMAP.md §11.5`). Ver detalhes em [docs/phase-4.md](phase-4.md).
 - **Teste headless de `EC_HD_MANIFEST=pipeline/manifest.json` e `--hd-manifest pipeline/manifest.json` (`--benchmark 120`):** carga confirmada com **`6135 entradas (437 approved, fallback=Modo A/B)`**, exit `0` em ambos.
 
+### 9.5 Backend CUDA/ONNX Runtime do Modo B+ (`P3` alternativo, 2026-11-20)
+
+- **Habilitação do CUDA 13 no WSL2 (sem sudo):** `onnxruntime-gpu 1.32.0` exige CUDA `13.*`; o ambiente tinha `12.6`. Resolvido com wheels pip **dentro do `.venv`** — `nvidia-cuda-runtime 13.4.92` (fixado: o driver `616.56` suporta até CUDA `13.4` UMD; `13.5.37` segfaulta), `nvidia-cublas 13.8.2.12`, `nvidia-curand 10.4.5.25`, `nvidia-cudnn-cu13 9.28.1.4`. **Correção de segfault no WSL2:** o `libnvidia-ptxjitcompiler.so.1` do Ubuntu (família `580.178.04`) é incompatível com o driver Windows `616.56` — `tools/scripts/cuda-env.sh` pré-carrega a cópia do próprio driver (`/usr/lib/wsl/drivers/nvmdi.inf_amd64_*/`) antes das libs dos wheels, no `LD_LIBRARY_PATH`.
+- **Backend `neural/infer/ec_bplus_ort.{h,c}`:** ONNX Runtime via `dlopen` (sem dependência de link; headers C API v1.32 vendored em `neural/infer/ort/`), CUDAExecutionProvider, suporte a modelos fp32 e fp16 (auto-detectado pelo tipo do input). Seleção por `--bplus-backend auto|cuda|gl` (ou `EC_BPLUS_BACKEND`): `auto` tenta CUDA e cai pro OpenGL (`ec_bplus_gl`) e depois Modo A/B; `cuda` sem ambiente CUDA falha limpo com mensagem (sem crash). Como o grafo ONNX exporta a imagem final (base+residual compostos na rede), o backend CUDA honra `intensity == 1.0` (default); intensidade ≠ 1.0 é roteada ao GL.
+- **Modelo fp16:** `assets/models/ec_bplus_espcn4x_fp16.onnx` (onnxconverter-common, IO fp16) com paridade `max_abs_err=1,29e-3` vs fp32 na GPU; preferido automaticamente quando presente. Download half→u8 via lookup table de 64 KB.
+- **Resultados in-game (600 quadros, 0 fallbacks, WSL2):** `320×224 → 1280×896` **`p50=8,85 ms / p99=14,76 ms`** wall-clock (inclui round-trip CPU→GPU inerente ao WSL2; referências: GL async `p50=5,68 ms`, PyTorch CUDA fp16 `p50=1,19 ms`). Métricas impressas na saída (`[EC_VIDEO] B+ CUDA: N frames, ... p50/p99/mean`). Latências a revalidar em Windows nativo conforme `ROADMAP.md §11.5`.
+
+### 9.6 Remaster generativo Flux dos 437 assets (`M7.4`, 2026-11-20) — CONCLUÍDO
+
+- **Workflow `pipeline/workflows/remaster_flux_usdu.json`** (Flux.1 Dev fp8 + Ultimate SD Upscale: pré-upscale GAN `4x-UltraSharp` → difusão tiled 1024 com `denoise=0.30`, `steps=20`, `seam_fix=Half Tile` + imposição de silhueta pelo pipeline). Node `ComfyUI_UltimateSDUpscale` instalado no ComfyUI 0.45.4 (Windows, alcançável do WSL via `127.0.0.1:8188`).
+- **Pilotos aprovados**: 6 arenas + 6 sprites comparados em 4 vias (original × pixel-art × 90sCartoonXL × Flux) — Flux vencedor (`assets/review/piloto_comparacao_4vias.png` e `piloto_sprites_4vias.png`); silhueta preservada (`min_iou ≥ 0,995`).
+- **Rodada completa: `437/437` assets (`410` sprites + `27` planos) remasterizados em ~5h40** na RTX 5060 Ti, `min_iou=0,9730`, zero falhas, status `approved` → **todos os assets Flux estão vivos no Modo C**. Os `5.698` tiles `8×8` seguem `extracted` sem upscale isolado (decisão M7.1 mantida — evitar costuras).
+- Kit portátil do workflow em `~/EternalChampions_Flux_Remaster_kit/` (workflow + README com receita completa + folhas de comparação).
+
 ## 10. Estado de Pendências e Bloqueios Reais
 
 1. **BlastEm (`1.0.0`, `/usr/local/bin/blastem`) — Arbitragem `M1` CONCLUÍDA**: controlado via PTY debugger (`-g -d`), detecta `6-button gamepad` nos dois ports (`$9376=$0101`) e concorda em 100% dos cenários (`A`, `B1`, `B2`, `B3`, `C1`, `C2`) com `GPGX`, `ares` e `Native`. O `gpgx_runner` segue como referência automatizada em lote do harness.
 2. **Paridade determinística `M3` CONCLUÍDA (critério de 2 camadas)**: **Camada 1** (`Recomp` × `GENESIS_FORCE_INTERP=1`): `16/16` (`01`..`12`, `14`..`17`) com `gameplay_match=True`, `png_eq=True`, `pad=0x0101` e **`65.536/65.536` B idênticos** com o jogo `100%` recompilado (o resultado anterior, `65.534/65.536` em `12/12`, contava com partes do jogo interpretadas pelo floor — ver item 5). **Camada 2** (`Native` × `GPGX`): `13/13` autodeterminismo `0/65536` + `0` misses e `12/12` acordo em `$FD64`/`pad`/elenco P1-P2 (diff residual `640`–`2.216` B por leitura ao vivo do contador HV em `$CB82`); `gvdp_read_hv_counter` (`genesis_vdp.c:467`) mantido intocado por decisão documentada em [docs/phase-3.md](phase-3.md).
-3. **Export ONNX (`N2`) e Runtime B+ `P3` (`N3`) — CONCLUÍDOS**: `ec_bplus_espcn4x.onnx` (`332.523` B, `opset 17`) e `ec_bplus_espcn4x_weights.bin` (`329.408` B, `ECBP` v1) validados via `neural/export_onnx.py` (`det=0.0`, `PSNR≥144,48 dB`), e backend OpenGL 4.3+ Compute Shaders integrado em `neural/infer/ec_bplus_gl.{h,c}` + `game/ec_video.c` + `segagenesisrecomp/runner/{game_video.h,main.c}` (`PSNR=78,603 dB` / `SSIM=0,999998` em `1280×896`, `PSNR=62,973 dB` em widescreen `1592×896`, `0/65536` WRAM diff, `p50=5,3423 ms` no WSL2 Mesa D3D12 — revalidar `≤ 2 ms` OpenGL em Windows nativo conforme `ROADMAP.md §11.5`).
+3. **Export ONNX (`N2`) e Runtime B+ `P3` (`N3`) — CONCLUÍDOS**: `ec_bplus_espcn4x.onnx` (`332.523` B, `opset 17`) e `ec_bplus_espcn4x_weights.bin` (`329.408` B, `ECBP` v1) validados via `neural/export_onnx.py` (`det=0.0`, `PSNR≥144,48 dB`), e backend OpenGL 4.3+ Compute Shaders integrado em `neural/infer/ec_bplus_gl.{h,c}` + `game/ec_video.c` + `segagenesisrecomp/runner/{game_video.h,main.c}` (`PSNR=78,603 dB` / `SSIM=0,999998` em `1280×896`, `PSNR=62,973 dB` em widescreen `1592×896`, `0/65536` WRAM diff, `p50=5,3423 ms` no WSL2 Mesa D3D12 — revalidar `≤ 2 ms` OpenGL em Windows nativo conforme `ROADMAP.md §11.5`). **Backend alternativo CUDA/ONNX Runtime adicionado em 2026-11-20** (`--bplus-backend auto|cuda|gl`, ver §9.5).
 4. **Curadoria HD (`M7.2`) e modos extras (`M7.3`) — CONCLUÍDOS**: todos os **`437/437` assets (`27/27` planos + `410/410` sprites, `min_iou=0,972973`)** foram revisados/aprovados (`approved_count=437`, carga `EC_HD_MANIFEST` e retreino `ECStudentESPCN4x` + re-export `ONNX`/`ECBP` `crc32=0x6c2bd111` validados; `5.698` tiles `8×8` mantidos em `extracted` sem upscale isolado). `M7.3`: `.ecm` ganhou 2ª coluna opcional (pad 2) em `gpgx_runner`/`ec_harness.py`/`gen_roster_movies.py` e a suíte passou a `17` movies — `14_2p_vs_rax_vs_blade_s24` (2P VS, Background fixo via Options), `15_tournament_roundabout_jetta_vs_xavier_s27` (Round-A-Bout, `Tournament_Type=$9424=3`; arena sorteada pelo RNG HV, no GPGX basta estado de luta) e `16_2p_vs_match_end_s24_to_s1` (KO no round final → `WINS COMPETITION` → Estado `1`). Overkill mapeado (`$5E4B6` → `$269E4` → handler por arena, flag `Fight_OverkillActive` `$9C7C`) e confirmado pelo movie `17_2p_vs_overkill_trident_s24` (Estado `24`, `$9C7C=1`, HP `104/0` em nativo, interpretador e GPGX); ver [docs/phase-5.md](phase-5.md).
 5. **Correção da recompilação (2026-11-19, descoberta no `M7.3`)**: o nativo **travava em todo fim de partida** (Estado `21`/`24` congelado após `WINS COMPETITION`; GPGX e interpretador voltam ao Estado `1`). Causas e correções: (a) `19` tabelas `jmp (pc,Dn.w)` + `bra.w` sem cobertura (ex.: slot 8 `$024CEC` de `Sub_024C98`) → declaradas em `BRA_JUMP_TABLES`; (b) heurística ASCII de `is_valid_code_start` descartava slots `bra` e alvos de task reais (`$E8AE`, `$C5D0`, `$05E2FE`) → slots de tabela e ponteiros de `jsr` a APIs de task isentos; (c) callbacks `$36(a0)` de objetos (`$2479E`…), ponteiros em `$968E` (`$3533E`/`$3547C`) e listas `bra.w` dos descritores de menu (`$2DA54`, `$2D918`, `$2DBE8`…) viraram sementes; (d) o gerador cobrava os ciclos de `jsr`/`bsr` **após** o retorno do callee (interpretador e 68000 cobram antes) → `segagenesisrecomp/external/m68k-recomp-core/profiles/genesis/code_generator.c` agora cobra antes da chamada. **Achado importante:** a antiga "Camada 1 `12/12`" era em parte artefato — a task `$24C98` do attract entrava pelo floor Tier-3 e o laço principal, escalonador, IRQ e menus rodavam **interpretados** (`4.111` PCs, `1.062` fps). Agora o jogo roda `100%` recompilado (`1.449` fps, `--exec-coverage-out` vazio) com `0/65536` B contra `GENESIS_FORCE_INTERP=1` em `16/16` movies e `0` misses em `17/17`. O Duff's device `$05E242` virou switch interno (`INTERIOR_UNRESOLVED = 0`), mas não é exercitado pela suíte; resíduo de temporização caracterizado em `f1143` (sem efeito em WRAM) documentado em [docs/phase-3.md](phase-3.md) §5.
 6. **Expansão Sega CD (`M8`) — ADIADA por decisão de escopo**: `roms/` já contém `Eternal Champions - Challenge from the Dark Side (U).chd` e o pack completo de BIOS Sega CD (US/EU/JP, incluindo `us_scd1_9210.bin`, `eu_mcd1_9210.bin` e `jp_mcd1_9112.bin`); retomada apenas após concluir os marcos do cartucho Genesis (`M4`–`M7`, `N2`–`N3`).
+
+### 10.5 Captura e remaster de áudio (2026-11-20, preparação)
+
+- **Captura do fluxo FM/PSG (`GEN_DEV_TRACE`):** opção CMake `EC_GEN_DEV_TRACE` em `game/CMakeLists.txt` (default OFF); com ela, `F12` (ou `--snd-dump-frame N`) grava `chip_ring.txt` (fluxo de registradores YM2612/SN76489 com timestamps `wf`/scanline) + `snd_ring.txt` (ciclo de comandos 68k↔Z80) + `z80_ram.bin`. Anéis ampliados para `1<<21` (chip, ~2 min) e `1<<19` (snd) em `chip_trace.c`/`genesis_machine.c` — um `F12` captura logo → título → seleção → luta numa sessão.
+- **Conversor `tools/audio/chip_ring_to_vgm.py`:** chip_ring → VGM 1.51 com offsets relativos corretos e clock do YM2612 em `0x2C` (sem ele, players como o VGMPlay ignoram o FM e dessincronizam — corrigido empiricamente contra o código-fonte do VGMPlay legado). Recorte por faixa via `--start-wf`/`--end-wf`.
+- **Validadas de ouvido (3 faixas, VGMPlay):** `musica_titulo.vgm` (16,7 s), `musica_selecao.vgm` (40,4 s), `musica_luta.vgm` (23,8 s) — capturadas da ROM do usuário (mesmo princípio dos assets HD: tudo derivado da ROM própria, sem material de terceiros). Referência auditiva externa apenas por streaming (Spotify), sem extração (DRM/licença).
+- **Próximos passos do áudio:** render HQ (WAV via VGMPlay) para A/B contra o som em tempo real; cadeia de FX in-game (stereo widen/EQ/reverb leve) no drain; e VGM → MIDI (VGMTrans) → Dexed para o remaster criativo.
+
+## 11. Ciclo 2026-11-21: Save/Load V2, Cold Reset, EC jogável, cenários off-label e fim de partida
+
+> Fila de bugs e pendências: [docs/BUG_QUEUE.md](BUG_QUEUE.md).
+> Princípio mantido: jogo base 100% autêntico; todos os desvios são
+> opt-in via `--unlock-boss` (ou `EC_UNLOCK_BOSS=1`).
+
+### 11.1 Save/load V2 (`ECRB2sav`) e reset frio (F10)
+
+- **Problema:** o formato antigo de save (seções exec/input) não era
+  portável e o load não restaurava o estado por completo (input fantasma
+  após carregar).
+- **Solução — formato V2 `ECRB2sav`** (`segagenesisrecomp/runner/main.c`):
+  magic própria de 8 bytes + `size_t` + **blob portátil do rollback**
+  (`genesis_rb_save_portable`), a mesma maquinaria validada do rewind, mas
+  portável entre processos. Sem seções exec (que carregam o PC do guest) e
+  input.
+- **Load in-place:** o blob é restaurado no estado corrente sem
+  reinicializar a máquina; A7 preservado; re-entrada pela
+  `dispatch_main_loop_pc = 0x255E` (`Main_OuterLoop`). Estado de input é
+  rearmado para eliminar o **input fantasma** (bug resolvido).
+- **F10 = cold reset** (`runner_cold_reset`): RAM zerada + `machine_init` +
+  SRAM de bateria preservado + boot do vetor de reset — comportamento de
+  console desligar/ligar. Diretiva `COLD_RESET` disponível no input-script
+  (testes headless reproduzem o F10).
+
+### 11.2 Cenários off-label no VS 2P (Holo-Trainer + Santuário) — CONCLUÍDO
+
+Ver [docs/offlabel_arenas.md](offlabel_arenas.md). Resumo do estado final:
+
+- **Lista de nomes off-label realocada para ROM livre em `$257051`**
+  (241 bytes zerados, maior janela de zeros do cartucho): 12 ponteiros +
+  strings `"HOLO-TRN"` em `$257081` e `"SANCTUARY"` em `$25708A`. As
+  definições LONG do menu (`$2E8B0`/`$2EC7E`) foram repontadas para lá.
+  **Por quê:** a primeira versão usava RAM `$FFCF3C–$FFCF7E`, que o jogo
+  usa como records de sprites durante a intro/luta — sentinel confirmou o
+  conflito, que causava o **bug global de sprites** (intro + cenários) e o
+  **hang do valor 10** (a 10ª entrada caía sobre a string "Random", bytes
+  lidos como ponteiro inválido). Ambos resolvidos com a realocação.
+- **Clamp do Background:** `9 → 11` nas defs `$2E8AC`/`$2EC7A`
+  (`EC_OFFLABEL_TEST` bit 1; lista realocada = bit 4; default 5).
+- **Commit da seleção (`$2E42E`, hook return 1 — site é entrada via bsr):**
+  `$936F=10 → estado 14` (Holo-Trainer) e `$936F=11 → estado 18`
+  (câmara/santuário do EC). Verificado headless: navegação sem travar,
+  ponteiros válidos lidos da ROM, commit dispara e a luta roda viva
+  (~1000 objetos ativos nos estados 14/18).
+- **Validação visual (por pixel/VRAM):** Holo-Trainer off-label com
+  **96–98% de overlap** de pixels com o Training Mode original (estado 14).
+  Santuário (estado 18) confirmado pelo usuário ("arena certinha").
+
+### 11.3 Fim de partida nos estados off-label — CONCLUÍDO
+
+- **Sintoma:** vencer no VS off-label (santuário) jogava para a
+  finalização/endgame em vez do menu — e uma primeira tentativa de fix
+  travava o cenário.
+- **Fluxo original do estado 18** (`$59B6–$59F0`): `$9350==1 → $59E0` grava
+  `$9CB6=8` (finalização); `$9352!=0 → $59E8` grava `$9CB6=10`; também
+  `$59D0→18` e `$59D8→4`. O unwind segue: `$59E0` → `$24EC` (mesmo frame) →
+  ~17 frames → `$FE74` (State_SetState).
+- **Armadilhas encontradas:**
+  1. Hook com `return 1` nos writes `$59E0`/`$59E8` **trava**: são pontos de
+     fall-through; `return 1` abandona a função nativa e quebra o unwind.
+  2. Patch direto na ROM não funciona em **imediatos de instrução** — o
+     código gerado inlinea o imediato como constante C.
+- **Solução final:** hooks nos **RTS `$59E6`/`$59EE`** (logo após os
+  writes) com `return 0`: sobrescrevem `$9CB6=1` (menu) quando
+  `$936F==11` e deixam o fluxo/unwind intactos. `game/game.toml` exige
+  `cmake --build build/native --target genesisrecomp_generate_ec` após
+  editar.
+- **Validação:** headless `ko_sanc` — `[OFFLABEL] fim de partida: estado 18
+  → menu` e dumps mostram `f5100: state=0001` (antes: estado 8/10 ou
+  travado). Usuário confirmou: "fechou o cenário do chefão".
+- **Off-label Holo-Trainer (bg 10 → estado 14):** já retornava ao menu
+  (`ko_holo`: estado 14 → 1). **Fica na fila:** vencer no Training Mode
+  **original** pode levar à finalização (ver `BUG_QUEUE.md`).
+
+### 11.4 EC jogável e sprites ilimitados
+
+- Hooks do EC jogável concentrados em `game/ec_boss.c`/`ec_boss.h`
+  (`ec_boss_instruction_hook` + `ec_boss_vblank` + `ec_boss_apply_rom_patches`),
+  registrados em `game/game.toml` (26 sites `game_hook`).
+- **Sprites ilimitados** ligados ao `--unlock-boss`;
+  `EC_LIMIT_SPRITES=1` restaura o limite original.
+- **Bug restante na fila:** sprites do EC falham nos DOIS ECs só no
+  round 1 no Trident (pista: carregamento/timing).
+
+### 11.5 Arquitetura da máquina de estados mapeada (neste ciclo)
+
+- `$2230` = `Main_Entry` (soft restart) · boot loop `$22E6–$231E` (consome
+  `$9CB6`) · `$246E`→`$24E0`→`$FE74` = único chamador de `State_SetState`
+  (`$FE74`: `d0 → $FD64` + init + dispatch) · `$255E` = `Main_OuterLoop` ·
+  `State_Dispatch` `$FE8C` · exit do estado 18 em `$59B6–$59F0` ·
+  match-end em `$1EE40+` (`$9350++` em `$1EFD8`) · `$9CCC`=1 = VS 2P ·
+  `$9CB0` = 0/2/4 = 1P/VS/training · `$9CB6` = "próximo estado pedido".
+
+### 11.6 Limpeza e metodologia
+
+- **Limpeza:** removidos RENDER-DBG (`$31A34`/`$31A40`), arena-checks
+  mortos (`$47958`/`$47960`/`$47B92`/`$47B9A`), `EC_OFFLABEL_TRACE`, trap
+  NULL-READ do runner e hooks de debug (`$2306`/`$FE74`/`$24EC`/`$2230`).
+- **Metodologia:** harness determinístico (movies `.ecm` → input-scripts,
+  `gpgx_runner`, `verify.py`) + análise de screenshots por pixel/VRAM
+  (modelo sem visão de imagem) + debug server TCP 4378
+  (`get_registers`/`get_frame`/`frame_info`/`read_memory`, frame ring de
+  600). Movies de seleção `v3_{holo,sanc}.input` e de KO
+  `ko_{holo,sanc}.input` com dumps de RAM a cada 100 frames em
+  `/tmp/opencode/`.
+
+## 12. Ciclo 2026-11-21 (2ª rodada): fluxo do chefe (T1 ✅), training preto (T2) e sprites do Trident (T4)
+
+> Tasklist: [docs/proposta_bugfix_2026-11-21.md](proposta_bugfix_2026-11-21.md) (T1–T4). Fila: [docs/BUG_QUEUE.md](BUG_QUEUE.md).
+
+### 12.1 T1 — Cenário do EC voltava ao menu após o 1º round — RESOLVIDO
+
+- **Causa raiz (verificada em dumps):** o jogo grava `$936F=11` durante a
+  luta do santuário (índice interno da arena); o guard `$936F==11` dos
+  hooks de `$59E6`/`$59EE` (fix do fim de partida off-label do ciclo
+  anterior) não distinguia a luta do chefe e sobrescrevia `$9CB6=8`
+  (estado 8 = tela de arte/transformação) com `$9CB6=1` (menu) no 1º KO.
+  Repro determinística: VS 2P santuário com EC → KO → `$9350: 0→1`,
+  `FD64: 18→1` (antes: deveria ser `18→8`).
+- **Fix (`game/ec_boss.c` + `game/game.toml`):** guard `$9CBC!=9 &&
+  $9CBE!=9` nos hooks `$59E6`/`$59EE` (hijack restrito ao VS off-label sem
+  EC). Fluxo natural do boss validado: `18-KO → 8 (arte) → [START] → 6 →
+  4 → 10 (ending) → reset`. Hooks novos em `$321A`/`$3662` (antes do
+  `btst.b #7,$FD61` dos wait loops dos estados 8/10) mapeiam START dos
+  pads de luta (`$FD59`/`$FD5B`) para bit7 de `$FD61` — em VS 2P a cadeia
+  de input de menu não alimenta esse flag.
+- **Validação:** cadeia completa headless com input real; kosanc (sem EC)
+  segue → menu; suíte `17/17` verde (`det=0/65536`, `interp_diff=0/65536`,
+  `png_eq=True`).
+
+### 12.2 T2 — Training (Holo off-label) termina em tela preta — DIAGNOSTICADO
+
+- **Repro determinística:** `ko_holo` (VS bg 10 → estado 14): KO → RAM vai
+  ao estado 1 mas o render fica 100% preto (VRAM sem o tilemap do menu).
+  O training original (menus → estado 17) renderiza normalmente.
+- **Causa:** divergência **recomp × interpretador**: com
+  `GENESIS_FORCE_INTERP=1` o mesmo fluxo renderiza o menu; o recompilado
+  diverge ~300 frames após a entrada do estado 1 (~41 words de RAM e 1.749
+  de VRAM; o upload do tilemap do menu nunca acontece). WRAM idêntica do KO
+  até ~f5450 — a divergência surge depois, em evento de task da tela do
+  menu (classe interleave/task-resume, cf. §11.7 nota do handshake Z80).
+  Hipóteses descartadas por experimento: `$9CB2=0`/`=2` forçados no exit
+  `$3BE8` (e hooks com skip de instrução no recomp causam
+  `ILLEGAL pc=$3AB8` intermitente — abordagem abandonada).
+- **Próximo passo:** localizar a instrução divergente com o debug server
+  (recomp × interp) e corrigir no gerador ou contornar com hook seguro.
+  Repro preservado em `tools/scripts/t2_repro/`.
+
+### 12.3 T4 — Sprites do EC no round 1 do Trident — OBSERVAÇÃO PARCIAL
+
+- Capturas de VRAM/SAT no início do round 1 (f2950+) do cenário VS Trident
+  com EC (P2=9, forma base): os tiles do EC (faixa 384–605) já estão
+  carregados e idênticos ao estado assentado desde o primeiro frame; SAT
+  idêntico entre round 1 e round 2 (diferença entre rounds = só a
+  cinemática de KO). A corrida de carga **não reproduz** headless na forma
+  base. A reproduzir com as variáveis do usuário: forma da fera (1–4),
+  mirror EC×EC, modo interativo ou assets HD.

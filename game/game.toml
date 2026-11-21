@@ -52,6 +52,25 @@ kind = "game_hook"
 addr = 0x02E270
 kind = "game_hook"
 
+# Cenários off-label no Background do VS (opt-in --unlock-boss):
+# $2E42E = commit $936F → $9CB6 (tabela $2E406). O hook substitui a instrução
+# para as seleções 10 (Holo-Trainer, estado 14) e 11 (santuário, estado 18).
+# $59E6/$59EE = RTS logo após a saída do handler do estado 18 no fim de
+# partida (boss → estados 8/10); o hook sobrescreve $9CB6 com estado 1 (menu)
+# quando a luta veio do VS off-label — hook no RTS (return 0) preserva o
+# unwind do fluxo recompilado.
+[[widescreen_site]]
+addr = 0x02E42E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x059E6
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x059EE
+kind = "game_hook"
+
 [[widescreen_site]]
 addr = 0x02E574
 kind = "game_hook"
@@ -114,4 +133,14 @@ kind = "game_hook"
 
 [[widescreen_site]]
 addr = 0x01F7A4
+kind = "game_hook"
+
+# Telas de espera do fluxo do chefe (estados 8/10): mapeia START dos pads
+# de luta (VS 2P) para bit7 de $FD61 (confirmar/avançar a tela).
+[[widescreen_site]]
+addr = 0x0321A
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x03662
 kind = "game_hook"
