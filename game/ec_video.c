@@ -12,6 +12,7 @@
 
 #include "ec_video.h"
 #include "ec_bplus_gl.h"
+#include "ec_bplus_ort.h"
 #include "genesis_runtime.h"
 #include "genesis_dac.h"
 #include "genesis_vdp.h"
@@ -34,9 +35,17 @@ static int        s_bplus_cli_set = 0;
 static int        s_bplus_enabled = 0;
 static int        s_bplus_model_cli_set = 0;
 static char       s_bplus_model_path[512] = "assets/models/ec_bplus_espcn4x_weights.bin";
+static int        s_bplus_onnx_cli_set = 0;
+static char       s_bplus_onnx_path[512] = "assets/models/ec_bplus_espcn4x.onnx";
 static int        s_bplus_budget_cli_set = 0;
 static double     s_bplus_budget_ms = 0.0;
+static int        s_bplus_intensity_cli_set = 0;
+static double     s_bplus_intensity = 1.0;
+enum { EC_BPLUS_BACKEND_AUTO = 0, EC_BPLUS_BACKEND_GL = 1, EC_BPLUS_BACKEND_CUDA = 2 };
+static int        s_bplus_backend = EC_BPLUS_BACKEND_AUTO;
+static int        s_bplus_backend_cli_set = 0;
 static EcBplusGl *s_bplus_gl = NULL;
+static EcBplusOrt *s_bplus_ort = NULL;
 static int        s_bplus_checked = 0;
 
 static uint16_t ec_ram16(unsigned a)
@@ -303,6 +312,47 @@ void ec_video_set_bplus_budget_ms(double budget_ms)
     }
 }
 
+void ec_video_set_bplus_intensity(double intensity)
+{
+    if (intensity >= 0.0) {
+        s_bplus_intensity = intensity;
+        s_bplus_intensity_cli_set = 1;
+    }
+}
+
+void ec_video_set_bplus_backend(const char *backend)
+{
+    if (!backend || !*backend)
+        return;
+    s_bplus_backend_cli_set = 1;
+    if (strcmp(backend, "gl") == 0)
+        s_bplus_backend = EC_BPLUS_BACKEND_GL;
+    else if (strcmp(backend, "cuda") == 0 || strcmp(backend, "ort") == 0 ||
+             strcmp(backend, "onnx") == 0)
+        s_bplus_backend = EC_BPLUS_BACKEND_CUDA;
+    else if (strcmp(backend, "auto") == 0)
+        s_bplus_backend = EC_BPLUS_BACKEND_AUTO;
+    else
+        fprintf(stderr, "[EC_VIDEO] --bplus-backend desconhecido '%s' (auto|cuda|gl)\n",
+                backend);
+}
+
+static int ec_resolve_bplus_backend(void)
+{
+    if (s_bplus_backend_cli_set)
+        return s_bplus_backend;
+    const char *env = getenv("EC_BPLUS_BACKEND");
+    if (env && *env) {
+        if (strcmp(env, "gl") == 0)
+            return EC_BPLUS_BACKEND_GL;
+        if (strcmp(env, "cuda") == 0 || strcmp(env, "ort") == 0 || strcmp(env, "onnx") == 0)
+            return EC_BPLUS_BACKEND_CUDA;
+        if (strcmp(env, "auto") == 0)
+            return EC_BPLUS_BACKEND_AUTO;
+    }
+    return EC_BPLUS_BACKEND_AUTO;
+}
+
 static int ec_video_present_gpu_enabled(void)
 {
     if (s_bplus_cli_set)
@@ -332,6 +382,40 @@ static const char *ec_resolve_bplus_model_path(void)
     return s_bplus_model_path;
 }
 
+static const char *ec_resolve_bplus_onnx_path(void)
+{
+    if (s_bplus_onnx_cli_set)
+        return s_bplus_onnx_path;
+    const char *env = getenv("EC_BPLUS_ONNX");
+    if (env && *env)
+        return env;
+    /* Prefere o modelo fp16 quando disponível (paridade < 1/255, ~2x mais
+     * rápido no CUDA); cai pro fp32 senão. */
+    static const char *fp16_candidates[] = {
+        "assets/models/ec_bplus_espcn4x_fp16.onnx",
+        "../../assets/models/ec_bplus_espcn4x_fp16.onnx",
+    };
+    for (size_t i = 0; i < sizeof(fp16_candidates) / sizeof(fp16_candidates[0]); ++i) {
+        FILE *fp = fopen(fp16_candidates[i], "rb");
+        if (fp) {
+            fclose(fp);
+            return fp16_candidates[i];
+        }
+    }
+    FILE *fp = fopen(s_bplus_onnx_path, "rb");
+    if (fp) {
+        fclose(fp);
+        return s_bplus_onnx_path;
+    }
+    static const char k_rel_from_build[] = "../../assets/models/ec_bplus_espcn4x.onnx";
+    fp = fopen(k_rel_from_build, "rb");
+    if (fp) {
+        fclose(fp);
+        return k_rel_from_build;
+    }
+    return s_bplus_onnx_path;
+}
+
 static double ec_resolve_bplus_budget_ms(void)
 {
     if (s_bplus_budget_cli_set)
@@ -346,6 +430,20 @@ static double ec_resolve_bplus_budget_ms(void)
     return s_bplus_budget_ms;
 }
 
+static double ec_resolve_bplus_intensity(void)
+{
+    if (s_bplus_intensity_cli_set)
+        return s_bplus_intensity;
+    const char *env = getenv("EC_BPLUS_INTENSITY");
+    if (env && *env) {
+        char *end = NULL;
+        double v = strtod(env, &end);
+        if (end != env && *end == '\0' && v >= 0.0)
+            return v;
+    }
+    return s_bplus_intensity;
+}
+
 static struct SDL_Texture *ec_video_present_gpu(
     struct SDL_Renderer *renderer,
     struct SDL_Texture *activation,
@@ -358,19 +456,57 @@ static struct SDL_Texture *ec_video_present_gpu(
         return NULL;
     if (!s_bplus_checked) {
         s_bplus_checked = 1;
-        const char *mpath = ec_resolve_bplus_model_path();
+        const char *wpath = ec_resolve_bplus_model_path();
+        const char *opath = ec_resolve_bplus_onnx_path();
         double budget = ec_resolve_bplus_budget_ms();
-        s_bplus_gl = ec_bplus_gl_create(renderer, activation, mpath, budget);
-        if (!s_bplus_gl)
-            fprintf(stderr, "[EC_VIDEO] Mode B+ unavailable; retaining Modo A/B fallback\n");
+        float intensity = (float)ec_resolve_bplus_intensity();
+        int backend = ec_resolve_bplus_backend();
+        int want_cuda = backend == EC_BPLUS_BACKEND_CUDA || backend == EC_BPLUS_BACKEND_AUTO;
+        int want_gl = backend == EC_BPLUS_BACKEND_GL || backend == EC_BPLUS_BACKEND_AUTO;
+
+        if (want_cuda && intensity == 1.0f) {
+            s_bplus_ort = ec_bplus_ort_create(renderer, activation, opath, budget);
+            if (!s_bplus_ort && backend == EC_BPLUS_BACKEND_CUDA)
+                fprintf(stderr, "[EC_VIDEO] Mode B+ CUDA unavailable; retaining Modo A/B fallback\n");
+        } else if (want_cuda) {
+            if (backend == EC_BPLUS_BACKEND_CUDA)
+                fprintf(stderr, "[EC_VIDEO] CUDA backend requires intensity=1.0 (got %.3f); using GL\n",
+                        intensity);
+        }
+
+        if (!s_bplus_ort && want_gl) {
+            s_bplus_gl = ec_bplus_gl_create(renderer, activation, wpath, budget);
+            if (!s_bplus_gl)
+                fprintf(stderr, "[EC_VIDEO] Mode B+ unavailable; retaining Modo A/B fallback\n");
+        }
+
+        if (s_bplus_ort)
+            ec_bplus_ort_set_intensity(s_bplus_ort, intensity);
+        if (s_bplus_gl)
+            ec_bplus_gl_set_intensity(s_bplus_gl, intensity);
     }
-    if (!s_bplus_gl)
-        return NULL;
-    return ec_bplus_gl_process(s_bplus_gl, argb, width, height, stride_px);
+    if (s_bplus_ort)
+        return ec_bplus_ort_process(s_bplus_ort, argb, width, height, stride_px);
+    if (s_bplus_gl)
+        return ec_bplus_gl_process(s_bplus_gl, argb, width, height, stride_px);
+    return NULL;
 }
 
 static void ec_video_present_gpu_destroy(void)
 {
+    if (s_bplus_ort) {
+        EcBplusOrtMetrics m;
+        ec_bplus_ort_metrics(s_bplus_ort, &m);
+        if (m.frames > 0)
+            fprintf(stderr,
+                    "[EC_VIDEO] B+ CUDA: %llu frames, %llu fallbacks | last=%.3f ms "
+                    "p50=%.3f p99=%.3f mean=%.3f | %ux%u -> %ux%u\n",
+                    (unsigned long long)m.frames, (unsigned long long)m.fallback_frames,
+                    m.last_gpu_ms, m.p50_gpu_ms, m.p99_gpu_ms, m.mean_gpu_ms,
+                    m.input_width, m.input_height, m.output_width, m.output_height);
+        ec_bplus_ort_destroy(s_bplus_ort);
+        s_bplus_ort = NULL;
+    }
     if (s_bplus_gl) {
         ec_bplus_gl_destroy(s_bplus_gl);
         s_bplus_gl = NULL;

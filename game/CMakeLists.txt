@@ -5,6 +5,8 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(GENESIS_NATIVE_IPO "OFF" CACHE STRING "" FORCE)
 
+option(EC_GEN_DEV_TRACE "Compila os traces de som dev (chip_ring/snd_ring, F12/--snd-dump)" OFF)
+
 find_package(SDL2 REQUIRED CONFIG)
 
 set(RECOMP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../segagenesisrecomp")
@@ -24,6 +26,7 @@ add_executable(EternalChampionsRecomp
     ec_boss.c
     ec_video.c
     ../neural/infer/ec_bplus_gl.c
+    ../neural/infer/ec_bplus_ort.c
     ${EC_GEN_SOURCES}
     ${RUNNER_SOURCES}
 )
@@ -50,6 +53,9 @@ target_compile_definitions(EternalChampionsRecomp PRIVATE
     RECOMP_LAUNCHER=0
     GENESIS_HAS_RECOMP_NET=0
 )
+if(EC_GEN_DEV_TRACE)
+    target_compile_definitions(EternalChampionsRecomp PRIVATE GEN_DEV_TRACE)
+endif()
 
 target_link_libraries(EternalChampionsRecomp PRIVATE
     SDL2::SDL2

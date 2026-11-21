@@ -141,7 +141,9 @@ struct EcBplusGl {
 
     GLint u_width, u_height, u_g_in, u_w_offset, u_b_offset, u_act, u_add_res, u_slope;
     GLint u_tex_in, u_tex_res;
-    GLint up_u_in, up_u_tail, up_u_in_size, up_u_scale;
+    GLint up_u_in, up_u_tail, up_u_in_size, up_u_scale, up_u_intensity;
+
+    float intensity;
 
     GLuint   queries[BPLUS_QUERY_SLOTS];
     unsigned query_pending[BPLUS_QUERY_SLOTS];
@@ -253,6 +255,7 @@ static const char s_upscale_fs[] =
     "uniform sampler2DArray u_tail;\n"
     "uniform ivec2 u_in_size;\n"
     "uniform int   u_scale;\n"
+    "uniform float u_intensity;\n"
     "out vec4 result;\n"
     "void main() {\n"
     "    ivec2 op = ivec2(gl_FragCoord.xy);\n"
@@ -281,7 +284,7 @@ static const char s_upscale_fs[] =
     "        texelFetch(u_tail, ivec3(lp, c2 >> 2), 0)[c2 & 3],\n"
     "        texelFetch(u_tail, ivec3(lp, c3 >> 2), 0)[c3 & 3]\n"
     "    );\n"
-    "    result = clamp(base + delta, 0.0, 1.0);\n"
+    "    result = clamp(base + delta * u_intensity, 0.0, 1.0);\n"
     "}\n";
 
 static uint32_t read_le32(const uint8_t *p)
@@ -761,6 +764,7 @@ EcBplusGl *ec_bplus_gl_create(SDL_Renderer *renderer, SDL_Texture *activation,
     ctx->renderer = renderer;
     ctx->context = SDL_GL_GetCurrentContext();
     ctx->budget_ms = budget_ms;
+    ctx->intensity = 1.0f;
 
     if (!load_bplus_gl(&ctx->gl)) {
         free(ctx);
@@ -839,6 +843,7 @@ EcBplusGl *ec_bplus_gl_create(SDL_Renderer *renderer, SDL_Texture *activation,
         ctx->up_u_tail = ctx->gl.GetUniformLocation(ctx->up_prog, "u_tail");
         ctx->up_u_in_size = ctx->gl.GetUniformLocation(ctx->up_prog, "u_in_size");
         ctx->up_u_scale = ctx->gl.GetUniformLocation(ctx->up_prog, "u_scale");
+        ctx->up_u_intensity = ctx->gl.GetUniformLocation(ctx->up_prog, "u_intensity");
     }
 
     state_end(&ctx->gl, &st);
@@ -974,6 +979,14 @@ static void maybe_capture_diagnostic(EcBplusGl *ctx, const uint32_t *argb,
     }
 }
 
+void ec_bplus_gl_set_intensity(EcBplusGl *ctx, float intensity)
+{
+    if (!ctx) return;
+    if (intensity < 0.0f) intensity = 0.0f;
+    if (intensity > 4.0f) intensity = 4.0f;
+    ctx->intensity = intensity;
+}
+
 SDL_Texture *ec_bplus_gl_process(EcBplusGl *ctx, const uint32_t *argb,
                                  int width, int height, int stride_px)
 {
@@ -1064,6 +1077,7 @@ SDL_Texture *ec_bplus_gl_process(EcBplusGl *ctx, const uint32_t *argb,
     ctx->gl.Uniform1i(ctx->up_u_tail, 1);
     ctx->gl.Uniform2i(ctx->up_u_in_size, width, height);
     ctx->gl.Uniform1i(ctx->up_u_scale, (GLint)ctx->model.scale);
+    ctx->gl.Uniform1f(ctx->up_u_intensity, ctx->intensity);
     ctx->gl.Viewport(0, 0, (GLsizei)ctx->out_w, (GLsizei)ctx->out_h);
     ctx->gl.DrawArrays(GL_TRIANGLES, 0, 3);
 

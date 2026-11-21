@@ -205,8 +205,23 @@ static void (*retro_set_audio_sample_batch_fn)(void *);
 
 static void input_poll(void) { /* nada */ }
 
+/* Captura de framebuffer para shot@N,path (RGB565, GPGX default) */
+static uint8_t *s_shot = NULL;
+static size_t  s_shot_size = 0;
+static unsigned s_shot_w = 0, s_shot_h = 0, s_shot_pitch = 0;
+
 static void video_cb(const void *data, unsigned width, unsigned height, size_t pitch) {
-  (void)data; (void)width; (void)height; (void)pitch;
+  if (!data) return;
+  size_t need = pitch * height;
+  if (need > s_shot_size) {
+    free(s_shot);
+    s_shot = (uint8_t*)malloc(need);
+    s_shot_size = s_shot ? need : 0;
+  }
+  if (s_shot) {
+    memcpy(s_shot, data, need);
+    s_shot_w = width; s_shot_h = height; s_shot_pitch = (unsigned)pitch;
+  }
 }
 static void audio_cb(int16_t l, int16_t r) { (void)l; (void)r; }
 static size_t audio_batch_cb(const int16_t *data, size_t frames) { (void)data; return frames; }
@@ -330,12 +345,22 @@ int main(int argc, char **argv) {
   long frames = movieMode ? movieFrames : (argc > 3 ? atol(argv[3]) : 60);
   int trace = 0;
   for(int a = 5; a < argc; a++) if(strcmp(argv[a], "--trace") == 0) trace = 1;
-  long startAt[8] = {-1,-1,-1,-1,-1,-1,-1,-1};
+  long startAt[16] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
   int nstarts = 0;
   long dumpAt[16] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
   int ndumps = 0;
   char dumpPath[16][512];
-  for(int a = 5; a < argc && nstarts < 8 && ndumps < 16; a++) {
+  /* shots */
+  long shotAt[16] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+  int nshots = 0;
+  char shotPath[16][512];
+  /* pokes: poke@N,$AAAA=CC,$BBBB=DD,... (antes do retro_run do frame N) */
+  long pokeAt[16] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+  int npokes = 0;
+  uint16_t pokeAddr[16][16];
+  uint8_t  pokeVal[16][16];
+  int pokeCount[16];
+  for(int a = 5; a < argc && nstarts < 8 && ndumps < 16 && nshots < 16 && npokes < 16; a++) {
     if(strncmp(argv[a], "start@", 6) == 0) startAt[nstarts++] = atol(argv[a] + 6);
     else if(strncmp(argv[a], "dump@", 5) == 0) {
       char *comma = strchr(argv[a], ',');
@@ -343,6 +368,33 @@ int main(int argc, char **argv) {
       if(comma && ndumps < 16) { snprintf(dumpPath[ndumps], 512, "%s", comma + 1); }
       else snprintf(dumpPath[ndumps], 512, "dump_%ld.bin", dumpAt[ndumps]);
       ndumps++;
+    } else if(strncmp(argv[a], "shot@", 5) == 0) {
+      char *comma = strchr(argv[a], ',');
+      shotAt[nshots] = atol(argv[a] + 5);
+      if(comma) snprintf(shotPath[nshots], 512, "%s", comma + 1);
+      else snprintf(shotPath[nshots], 512, "shot_%ld.raw", shotAt[nshots]);
+      nshots++;
+    } else if(strncmp(argv[a], "poke@", 5) == 0) {
+      char *p = argv[a] + 5;
+      long fr = atol(p);
+      while(*p && *p != ',') p++;
+      int cnt = 0;
+      while(*p == ',' && cnt < 16) {
+        p++;
+        unsigned addr = (unsigned)strtoul(p, &p, 16);
+        if(*p != '=') break;
+        p++;
+        unsigned val = (unsigned)strtoul(p, &p, 16);
+        pokeAddr[npokes][cnt] = (uint16_t)(addr & 0xFFFF);
+        pokeVal[npokes][cnt] = (uint8_t)(val & 0xFF);
+        cnt++;
+      }
+      if(cnt) {
+        pokeAt[npokes] = fr;
+        pokeCount[npokes] = cnt;
+        npokes++;
+        fprintf(stderr, "poke@%ld: %d byte(s)\n", fr, cnt);
+      }
     }
   }
 
@@ -355,6 +407,17 @@ int main(int argc, char **argv) {
     } else {
       for(int s = 0; s < nstarts; s++)
         if(i >= startAt[s] && i < startAt[s] + 20) g_buttons = 1 << 3; /* START */
+    }
+    /* pokes antes do quadro */
+    for(int p = 0; p < npokes; p++) {
+      if(i == pokeAt[p]) {
+        if(!ramlive) ramlive = (uint8_t*)retro_get_memory_data_fn(RETRO_MEMORY_SYSTEM_RAM);
+        if(ramlive) {
+          for(int k = 0; k < pokeCount[p]; k++)
+            ramlive[pokeAddr[p][k]] = pokeVal[p][k];
+          fprintf(stderr, "poke@%ld aplicado (%d bytes)\n", i, pokeCount[p]);
+        }
+      }
     }
     retro_run_fn();
     if(trace) {
@@ -372,6 +435,19 @@ int main(int argc, char **argv) {
           fwrite(ramlive, 1, 0x10000, f);
           fclose(f);
           fprintf(stderr, "dump@%ld salvo em %s\n", i, dumpPath[d]);
+        }
+      }
+    }
+    /* screenshots depois do quadro */
+    for(int s = 0; s < nshots; s++) {
+      if(i == shotAt[s] && s_shot) {
+        FILE *f = fopen(shotPath[s], "wb");
+        if(f) {
+          uint32_t hdr[3] = { s_shot_w, s_shot_h, s_shot_pitch };
+          fwrite(hdr, 4, 3, f);
+          fwrite(s_shot, 1, (size_t)s_shot_pitch * s_shot_h, f);
+          fclose(f);
+          fprintf(stderr, "shot@%ld salvo em %s (%ux%u pitch=%u)\n", i, shotPath[s], s_shot_w, s_shot_h, s_shot_pitch);
         }
       }
     }

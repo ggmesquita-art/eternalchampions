@@ -28,6 +28,10 @@ typedef struct EcBplusMetrics {
 EcBplusGl   *ec_bplus_gl_create(SDL_Renderer *renderer, SDL_Texture *activation,
                                 const char *weights_path, double budget_ms);
 void         ec_bplus_gl_destroy(EcBplusGl *ctx);
+/* Effect intensity: scales the neural residual (delta) added over the
+ * bilinear base. 1.0 = exact model output (default); 0.0 = pure bilinear;
+ * >1.0 exaggerates the neural detail. Clamped to [0, 4]. */
+void         ec_bplus_gl_set_intensity(EcBplusGl *ctx, float intensity);
 /* Runs 4x ECStudentESPCN4x on GPU and returns borrowed SDL_Texture* (ARGB8888 target),
  * or NULL on fallback (invalid state, budget overrun, or unavailable GL 4.3+). */
 SDL_Texture *ec_bplus_gl_process(EcBplusGl *ctx, const uint32_t *argb,

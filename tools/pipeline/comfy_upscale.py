@@ -250,6 +250,7 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=19931211)
     ap.add_argument("--reference", type=Path, default=None, help="Folha de referência opcional para remaster SDXL")
     ap.add_argument("--force", action="store_true", help="Reprocessa mesmo se hd_file já existir")
+    ap.add_argument("--timeout", type=float, default=180.0, help="Timeout por asset no ComfyUI (s)")
     args = ap.parse_args()
 
     try:
@@ -312,7 +313,7 @@ def main() -> int:
             if node.get("class_type") == "KSampler" and "seed" in node.get("inputs", {}):
                 node["inputs"]["seed"] = args.seed
 
-        out_bytes = submit_and_wait(server, graph, timeout_s=180.0)
+        out_bytes = submit_and_wait(server, graph, timeout_s=args.timeout)
         hd_rgb = Image.open(io.BytesIO(out_bytes))
         final_rgba, iou = enforce_silhouette(orig_rgba, hd_rgb, scale=scale, tolerance_px=args.silhouette_tolerance)
         min_iou = min(min_iou, iou)

@@ -50,6 +50,9 @@ static void ec_on_post_reset(void)
     if (unlock_boss && strcmp(unlock_boss, "1") == 0)
         ec_boss_set_enabled(1);
 
+    /* Patches de ROM opt-in (clamp do Background + lista de nomes off-label). */
+    ec_boss_apply_rom_patches();
+
     const char *manifest = getenv("EC_HD_MANIFEST");
     if (manifest && *manifest)
         (void)ec_video_load_hd_manifest(manifest);
@@ -63,11 +66,22 @@ static void ec_call_entry_point(void)
 
 static void ec_call_vblank(void)
 {
+    ec_boss_vblank();
     if (s_diag_boss_sanctuary) {
         uint16_t st = spec_ram16(0xFD64u);
         if (st == 18u) {
             s_diag_boss_sanctuary = 0;
         } else if (st == 1u && g_ram[0x978Au] == 9u) {
+            static int fired = 0;
+            static uint32_t first_frame = 0;
+            uint32_t fr = (uint32_t)((uint32_t)g_ram[0xFD72u] << 24 |
+                                     (uint32_t)g_ram[0xFD73u] << 16 |
+                                     (uint32_t)g_ram[0xFD74u] << 8 |
+                                     (uint32_t)g_ram[0xFD75u]);
+            if (fired == 0) first_frame = fr;
+            fired++;
+            if (fired == 1)
+                fprintf(stderr, "[BOSS-HOOK] first fire frame=$%08X st=%d 978A=%02X\n", first_frame, (int)st, g_ram[0x978Au]);
             g_ram[0x9782u] = 9u;
             g_ram[0x9CBCu] = 0u;
             g_ram[0x9CBDu] = 9u;
@@ -105,7 +119,30 @@ static int ec_handle_arg(const char *key, const char *val)
             return 2;
         }
     }
+    if (strcmp(key, "--bplus-intensity") == 0 && val && *val) {
+        char *end = NULL;
+        double v = strtod(val, &end);
+        if (end != val && *end == '\0' && v >= 0.0) {
+            ec_video_set_bplus_intensity(v);
+            return 2;
+        }
+    }
+    if (strcmp(key, "--bplus-backend") == 0 && val && *val) {
+        ec_video_set_bplus_backend(val);
+        return 2;
+    }
     return 0;
+}
+
+static uint32_t ec_save_resume_pc(uint8_t game_mode)
+{
+    /* Reentrada segura pós-load: o PC exato do save cai DENTRO da rotina de
+     * espera (endereço interior, que o recompilador não cobre como entrada).
+     * Reentra no topo do loop externo ($255E) — fronteira coberta — que
+     * despacha o quadro pela State_Current ($FD64) restaurada. O momento
+     * exato desliza até o início do quadro (mesma classe do ruído HV). */
+    (void)game_mode;
+    return 0x00255Eu; /* Main_OuterLoop */
 }
 
 static void ec_fill_frame_record(uint8_t game_data[256])
@@ -135,12 +172,20 @@ const GameSpec g_game_spec = {
     .expected_rom_size     = 0x300000u,
     .tier3_floor_default   = 1,
     .call_entry_point      = ec_call_entry_point,
+    .dispatch_main_loop_pc = 0x000255Eu, /* Main_OuterLoop: re-enter when the
+                                            loop unwinds (file-load resumes
+                                            lack the boot chain's tail
+                                            frames; the win-sequence rts must
+                                            land somewhere that loops) */
+    .save_resume_pc        = ec_save_resume_pc,
     .call_vblank           = ec_call_vblank,
     .call_hblank           = NULL,
     .on_post_reset         = ec_on_post_reset,
     .handle_arg            = ec_handle_arg,
-    .arg_usage             = "--hd-manifest <path> | --neural-bplus | --bplus-model <bin> | --bplus-budget-ms <ms> | --unlock-boss",
+    .arg_usage             = "--hd-manifest <path> | --neural-bplus | --bplus-model <bin> | --bplus-backend <auto|cuda|gl> | --bplus-budget-ms <ms> | --bplus-intensity <f> | --unlock-boss",
     .instruction_hook      = ec_boss_instruction_hook,
+    .rb_state_save         = ec_boss_rb_state_save,
+    .rb_state_load         = ec_boss_rb_state_load,
     .fill_frame_record     = ec_fill_frame_record,
     .frame_record_version  = 1u,
 };
