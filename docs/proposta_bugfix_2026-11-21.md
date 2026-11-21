@@ -98,24 +98,25 @@
   `t2_vdpwlog.py`, `t2_logcmp.py`, `t2_cramscan*.py`, `t2_writelog.py`,
   `t2_a6bisect.py`, `t2_alive.py`, `t2_pcfreeze.py`).
 
-### T3 — Savegame: 1º load às vezes trava (2–3 loads "liberam") — ✅ VALIDADO HEADLESS (2026-11-21)
+### T3 — Savegame: 1º load às vezes trava (2–3 loads "liberam") — 🔧 FIX APLICADO (2026-11-21)
 
 - **Sintoma:** o 1º load de um save V2 (`ECRB2sav`) na sessão pode
-  travar; repetir o load 2–3× libera. Teoria registrada: save gravado
-  incompleto → o jogo não reconstrói o resto no load.
-- **Validação headless (nesta rodada):** scripts `t3_save.input` (save na
-  luta) + `t3_load.input` (sessão nova: 1º load a frio + 2º load, dumps a
-  +60/+180 de cada). Resultado: **sem hang** — o jogo avança após os dois
-  loads e o estado a +60 é **byte-idêntico** entre 1º e 2º load. A
-  regressão de `$FD74` entre +60 e +180 após o 1º load é o reset de fim de
-  luta do próprio jogo (save tirado no KO), e a divergência de 90 bytes nos
-  trechos pós-load é o RNG por HV (classe documentada). Paced com áudio
-  (dummy) idem.
-- **Conclusão:** o hang é interativo (modal F7/F8/load_hold ou dispositivo
-  de áudio real) — não reproduz headless. Blob V2 auditado: inclui os
-  pendentes do recomp (`rte_*`, `split_sp`) na seção `sched`. A reprodutir
-  com o usuário (tela do 1º load, via F7/F8 ou modal, som ligado).
-- **Artefatos:** `tools/scripts/t2_repro/t3_save.input`/`t3_load.input`.
+  travar; repetir o load 2–3× libera. Direção do usuário: o state
+  "sobrescreve irregularmente" — pausar o sistema todo antes do load.
+- **Validação headless (scripted):** sem hang — 1º e 2º load a frio
+  avançam; estado a +60 frames difere em 73 bytes (classe RNG/HV,
+  documentada; o fix do rts do T2 deslocou o drift de timing).
+- **Fix aplicado:** os loads interativos (hold do pad/RB e modal F7/F8)
+  agora são **staged** e aplicados no ponto seguro pós-frame (junto ao
+  tick do input script) — o swap nunca acontece no meio do loop com o
+  fiber em yield site arbitrário. `runner_stage_load_state` +
+  `s_pending_load_path` (`main.c`); modal via `local_states.c`.
+- **Validação:** scripted regredido (sem hang), quick suíte verde;
+  interativo fica para teste do usuário. Plano B: exigir
+  `s_yield_site == GLUE_YIELD_VBLANK` no `glue_prepare_inplace_load`
+  (senão, cold-restart `glue_restart_game_fiber_keep_a7`).
+- **Referências:** `segagenesisrecomp/runner/main.c`,
+  `local_states.c`, `docs/BUG_QUEUE.md` §1.2, `docs/PROGRESS.md` §12.4.
 
 ### T4 — Sprites do EC quebrados só no round 1 do Trident — 🔬 OBSERVAÇÃO PARCIAL (2026-11-21)
 

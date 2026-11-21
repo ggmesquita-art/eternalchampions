@@ -30,35 +30,32 @@
 ### [~] 1º load do savegame às vezes trava (carregar 2–3× libera)
 - **Sintoma:** ao carregar um save (V2 `ECRB2sav`) pela primeira vez na
   sessão, o jogo pode travar; carregar 2–3 vezes "libera" e aí funciona.
-- **Teoria do usuário:** o save é gravado incompleto, faltando informações;
-  ao carregar, o jogo não sabe como reconstruir o restante. Deveria haver um
-  ciclo de carregamento das funções do controle, recarregando sprites,
-  cenário e música do save.
-- **Estado técnico:** o blob V2 é um snapshot de rollback completo e
-  validado byte a byte (round-trip com resíduo de 84 bytes de ruído HV,
-  classe documentada e aceita). O load é in-place com re-entrada em
-  `dispatch_main_loop_pc = 0x255E` e A7 preservado.
-- **Validação headless (2026-11-21, 3ª rodada):** save na luta (script
-  `t3_save.input`) → sessão NOVA com `t3_load.input` (1º load a frio +
-  2º load). Resultado: **o 1º load não trava headless** — após ambos os
-  loads o jogo avança (`$FD74`/`$FD70` crescem), e o estado a +60 frames é
-  **idêntico** entre o 1º e o 2º load (0 bytes de RAM divergentes). A
-  regressão de contador vista entre +60 e +180 após o 1º load é o reset do
-  próprio jogo na transição de fim de luta (o save foi tirado no momento do
-  KO), e a diferença de 90 bytes entre os trechos pós-load é o RNG por
-  HV-counter (classe documentada §3.1) — nada disso é o hang. Também
-  validado paced com áudio (SDL dummy): mesma ausência de hang.
-- **Conclusão:** o hang é **interativo** (não reproduz headless nem com
-  áudio dummy) — o caminho do modal F7/F8 (load_hold) ou o dispositivo de
-  áudio real são os suspeitos restantes. A reproduzir com o usuário: em que
-  tela o 1º load trava (menu? luta?), com F7/F8 ou pelo modal, e se o som
-  está ligado no momento.
+- **Direção do usuário (aplicada em 2026-11-21):** "o state não carrega
+  completamente ou sobrescreve irregularmente; o correto é **pausar o
+  sistema todo antes de carregar** e aplicar o load".
+- **Implementação (commit no segagenesisrecomp):** os loads interativos
+  (atalho hold do pad/RB e o modal F7/F8) agora são **staged**: em vez de
+  aplicar o swap no meio do loop (o fiber do jogo pode estar yield-ed em
+  um site que não é o vblank-wait — BUDGET/SPIN/Z80POLL — e o resume
+  in-place sai do ponto errado), o caminho é guardado em
+  `s_pending_load_path` e aplicado no **ponto seguro pós-frame** (junto ao
+  tick do input script), onde o sistema inteiro está estacionado entre
+  frames — o mesmo ponto do `LOAD_STATE` de script, já validado headless.
+  Caminho do modal (`local_states.c`) idem via `runner_stage_load_state`.
+- **Validação headless (scripted, inalterado):** segue sem hang — 1º e 2º
+  load a frio avançam; o estado a +60 frames difere em 73 bytes (classe
+  RNG/HV já documentada — antes 0 por coincidência de timing; o fix do
+  rts do T2 deslocou o drift). Quick suíte verde.
+- **Pendente:** validação interativa com o usuário (o hang não reproduz
+  headless). Se persistir, o próximo passo é endurecer
+  `glue_prepare_inplace_load` (exigir `s_yield_site == GLUE_YIELD_VBLANK`
+  para o in-place; senão, cold-restart `glue_restart_game_fiber_keep_a7`).
 - **Referência:** `segagenesisrecomp/runner/main.c`
-  (`runner_save_state_file`/`runner_load_state_file`, magics
-  `GROWNS3`/`ECRB2sav`), `rb_state.c` (blob GRB2 com seções
-  exec/cpu/sched/ram/machine/fm/psg/evq/input/game — pendentes do recomp
-  como `rte_*`/`split_sp` incluídos na seção `sched`), `load_hold.c`.
-- **Status:** validado headless; aguardando repro interativo do usuário.
+  (`runner_load_state_file`, `runner_stage_load_state`,
+  `s_pending_load_path`), `local_states.c`, `rb_state.c` (blob GRB2 com
+  seções exec/cpu/sched/ram/machine/fm/psg/evq/input/game — pendentes do
+  recomp como `rte_*`/`split_sp` incluídos na seção `sched`),
+  `load_hold.c`.
 
 ### [x] ~~Vencer round 1 no cenário do EC (VS) → volta ao menu inicial~~ — RESOLVIDO (2026-11-21)
 - Causa raiz e fix: itens 8–9 da tabela de resolvidos abaixo. O fluxo natural

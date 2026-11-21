@@ -477,19 +477,21 @@ Ver [docs/offlabel_arenas.md](offlabel_arenas.md). Resumo do estado final:
   base. A reproduzir com as variáveis do usuário: forma da fera (1–4),
   mirror EC×EC, modo interativo ou assets HD.
 
-### 12.4 T3 — 1º load do savegame — VALIDADO HEADLESS (sem hang)
+### 12.4 T3 — 1º load do savegame — STAGING INTERATIVO IMPLEMENTADO (2026-11-21)
 
 - Repro headless: `t3_save.input` grava na luta (momento do KO); sessão
   nova com `t3_load.input` faz o 1º load a frio e o 2º load, com dumps a
   +60/+180 frames de cada.
-- Resultado: o jogo avança após ambos os loads e o estado a +60 frames é
-  **byte-idêntico** entre o 1º e o 2º load. A regressão de `$FD74` entre
-  +60 e +180 (só após o 1º load) é o reset de fim de luta do próprio jogo
-  (o save foi tirado no KO), e a divergência de 90 bytes nos trechos
-  pós-load é o RNG por HV (classe documentada §3.1) — nada disso é o hang.
-  Idem em paced com áudio (SDL dummy).
-- Conclusão: o hang reportado é **interativo** (modal F7/F8/load_hold ou
-  dispositivo de áudio real). O blob V2 foi auditado e inclui os pendentes
-  do recomp (`rte_*`, `split_sp`, `early_return`) na seção `sched` — o
-  estado do save é completo. Pendente: repro interativo com o usuário
-  (tela do 1º load, via F7/F8 ou modal, som ligado).
+- Resultado (scripted): o jogo avança após ambos os loads; o estado a
+  +60 frames difere em **73 bytes** entre o 1º e o 2º load (classe
+  RNG/HV documentada §3.1 — o fix do rts do T2 deslocou o drift; antes
+  era 0 por coincidência de timing). Nada disso é o hang.
+- **Direção do usuário aplicada:** os loads interativos (hold do pad e
+  modal F7/F8) agora são **staged** e aplicados no ponto seguro pós-frame
+  (junto ao tick do script) — "pausar o sistema todo antes de aplicar o
+  load". O swap nunca mais acontece no meio do loop com o fiber em um
+  yield site arbitrário. `runner_stage_load_state` +
+  `s_pending_load_path` em `main.c`; modal via `local_states.c`.
+- Pendente: validação interativa com o usuário. Plano B documentado:
+  endurecer `glue_prepare_inplace_load` para exigir
+  `s_yield_site == GLUE_YIELD_VBLANK` (senão, cold-restart).
