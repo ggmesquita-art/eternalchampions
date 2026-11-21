@@ -76,28 +76,27 @@
   `disasm/code/state_handlers6.asm` `$59B6–$59F0`,
   `disasm/code/obj_tasks3.asm` `$1EE40–$1F0A8`, `docs/PROGRESS.md` §11.3.
 
-### T2 — Training: tela preta ao terminar (após 1 round) — 🔬 CAUSA RAIZ EM 2 CAMADAS (2026-11-21)
+### T2 — Training: tela preta ao terminar (após 1 round) — ✅ RESOLVIDO (2026-11-21)
 
-- **Sintoma (reportado):** no Training (original e/ou off-label), ao
-  terminar a disputa a tela fica preta após o 1º round. Repro: Holo
-  off-label (VS bg 10 → estado 14, `ko_holo`).
-- **Camada 1 — FIXADA:** o interp cobrava ciclos pela tabela nominal PRM
-  em vez da tabela medida do recompilador (`<game>_cycles.c` era gerada
-  mas nunca compilada; `game_cycles.c` não linkava). O drift do
-  `g_audio_cycle_counter` dessincronizava o scheduler de tasks do menu
-  (VINT caía em pontos diferentes do stream de dispatch ~85 frames após o
-  estado 1; cascata de layout 2 frames atrasada). Fix: tabela medida no
-  shipping (`m68k_interp.c` + 2 arquivos cmake). Suíte base verde.
-- **Camada 2 — diagnosticada (pendente):** com as tasks alinhadas, o CRAM
-  do menu segue zerado no recomp. Write-log da porta VDP: o fade de
-  paleta (`Sub_StateMachine` `$D7E4`) só escreve CRAM no interp
-  (f5133–5157); o burst de tiles via fila VDP roda nos dois lados mas 25
-  frames deslocado (f5167 × f5192) — o slicing wall-frame/scanline dos
-  backends ainda difere. Próximo passo: alinhar o cadence de chunk do
-  interp com o do recomp ou contornar com hook opt-in.
+- **Causa raiz:** o padrão artesanal link/unlk do ring do Z80
+  (`Z80_RingRead` `$07E4`/`$0810`) vazava 4 bytes de pilha por comando no
+  recomp (rts gerado não desempilhava + wrapper não compensava quando
+  `SP == slot+4`). No burst de comandos da transição KO→menu, a pilha
+  desceu até as slots do frame loop → `movem` restaurou **A0/A6=0** → o
+  VBlank passou a escrever a DMA em `$000004` em vez de `$C00004` → o
+  upload de CRAM morreu → tela preta. O interp (fiel ao hardware) nunca
+  vazou.
+- **Fix:** `m68k-recomp-core` `2666e9f` — `rts` desempilha o retorno
+  (hardware-fiel) + wrapper do JSR compensa só quando o slot está
+  intacto (`SP == slot`). Regenerado. Suíte 17/17 verde (`det=0`,
+  `png_eq=True`, `gp_ok=True`); T2 validado (CRAM 33/64 = paleta do menu,
+  A6=C00000, screenshots 24 cores × 1 cor/preto antes). Movie 08 interp
+  residual 4→55 bytes (mesma classe RNG/stack; `gameplay_match=True`) —
+  documentado como exceção equivalente à anterior.
 - **Artefatos:** `tools/scripts/t2_repro/` (repros + probes
-  `t2_probe.py`, `t2_regdiff.py`, `t2_peek.py`, `t2_cram.py`,
-  `t2_vdpwlog.py`, `t2_logcmp.py`, `t2_writelog.py`).
+  `t2_probe.py`, `t2_regdiff.py`, `t2_peek.py`, `t2_cram*.py`,
+  `t2_vdpwlog.py`, `t2_logcmp.py`, `t2_cramscan*.py`, `t2_writelog.py`,
+  `t2_a6bisect.py`, `t2_alive.py`, `t2_pcfreeze.py`).
 
 ### T3 — Savegame: 1º load às vezes trava (2–3 loads "liberam") — ✅ VALIDADO HEADLESS (2026-11-21)
 
