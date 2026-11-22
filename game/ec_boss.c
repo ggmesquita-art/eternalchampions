@@ -53,8 +53,70 @@ static int is_cpu_sanctuary_boss(uint16_t a5)
 {
     return (a5 == 0xAA52u) &&
            (ram16(0xFD64u) == 0x0012u) &&
+           (ram16(0x9CB0u) == 0u) &&
            (ram16(0x9CCCu) == 0u) &&
            (ram16(0x9422u) == 0u);
+}
+
+static int is_vs_offlabel_sanctuary(void)
+{
+    return (ram16(0xFD64u) == 0x0012u) &&
+           (ram16(0x9CCCu) != 2u) &&
+           (ram16(0x9CB0u) != 0u || ram16(0x9424u) != 0u);
+}
+
+/* Replicates Stage_ExitCleanup ($C578) for off-label VS/Tournament fights
+ * in State 18 so Best-of-N rounds and menu return work identically to normal
+ * arenas while leaving 1P Arcade Boss ($9CB0==0 && $9424==0) untouched. */
+static void sanctuary_vs_exit_cleanup(int undo_round_inc)
+{
+    static const uint16_t k_win_target[5] = { 1u, 2u, 3u, 6u, 11u };
+    static const uint16_t k_max_round[5]  = { 0u, 2u, 4u, 10u, 20u };
+    static const uint16_t k_exit_9cb2[4]  = { 0u, 2u, 2u, 1u };
+
+    if (undo_round_inc)
+        ram16_write(0x9352u, (uint16_t)(ram16(0x9352u) - 1u));
+
+    g_ram[0xFD69u] &= (uint8_t)~0x80u;
+
+    uint8_t cfg   = g_ram[0x936Du];
+    uint16_t p1w  = ram16(0x9350u);
+    uint16_t p2w  = ram16(0x934Eu);
+    uint16_t tourn = ram16(0x9424u);
+    uint16_t gmode = ram16(0x9CB0u);
+
+    int match_over = 0;
+    if (cfg == 0u) {
+        if (tourn == 0u || p1w == 1u || p2w == 1u) {
+            match_over = 1;
+        } else {
+            ram16_write(0x9352u, 0xFFFFu);
+        }
+    } else if (cfg <= 4u) {
+        uint16_t target = k_win_target[cfg];
+        if (p1w == target || p2w == target)
+            match_over = 1;
+    } else {
+        match_over = 1;
+    }
+
+    if (!match_over && (gmode == 2u || gmode == 3u) &&
+        cfg <= 4u && ram16(0x9352u) == k_max_round[cfg]) {
+        match_over = 1;
+    }
+
+    if (!match_over) {
+        ram16_write(0x9352u, (uint16_t)(ram16(0x9352u) + 1u));
+        ram16_write(0x9CB6u, 0x0012u);
+        return;
+    }
+
+    if (tourn != 0u && tourn != 3u) {
+        ram16_write(0x9CB6u, 0x001Du);
+    } else {
+        ram16_write(0x9CB2u, (gmode < 4u) ? k_exit_9cb2[gmode] : 2u);
+        ram16_write(0x9CB6u, 0x0001u);
+    }
 }
 
 static int is_playable_ec_slot(uint16_t a5)
@@ -443,23 +505,28 @@ int ec_boss_instruction_hook(uint32_t pc)
         return 0;
     }
 
-    /* Fim de partida no estado 18 (santuário off-label): o handler do boss
-     * escreve o próximo estado como se a luta contra o EC tivesse terminado
-     * ($59E0 → estado 8 = finalização; $59E8 → estado 10). Em VS off-label
-     * substituímos por estado 1 (menu), como nos arenas normais.
-     *
-     * NOTA: hooks com return 1 "abandonam" a função nativa — em pontos de
-     * fall-through (como $59E0) isso desmonta o unwind e trava o jogo. Por
-     * isso o hook fica nos RTS ($59E6/$59EE, logo após os writes), com
-     * return 0: sobrescreve $9CB6 e deixa o fluxo seguir intacto. */
+    /* VS/Torneio off-label no Santuário (Estado 18): quando não é o Boss 1P
+     * ($9CB0 != 0 || $9424 != 0), desvia dos atalhos exclusivos de boss em
+     * Sub_01EDD6 ($1EE74/$1EF8E), intro freeze ($5E652) e timer ($1FD20/$1FD96)
+     * para usar o fluxo normal de rounds (banner, contador P1/P2, relógio). */
+    case 0x01EE74u:
+    case 0x01EF8Eu:
+    case 0x05E652u:
+    case 0x01FD20u:
+    case 0x01FD96u: {
+        if (is_vs_offlabel_sanctuary())
+            g_cpu.SR &= (uint16_t)~SR_Z;
+        return 0;
+    }
+
+    /* Fim de partida no estado 18 (santuário off-label): nos 3 RTS de saída
+     * do handler ($59D6/$59E6/$59EE), aplica Stage_ExitCleanup ($C578) se for
+     * VS/Torneio/Practice; no Boss 1P ($9CB0==0 && $9424==0) segue intacto. */
+    case 0x059D6u:
     case 0x059E6u:
     case 0x059EEu: {
-        /* VS off-label do santuário: fim de luta sem o EC no elenco →
-         * menu (estado 1). Se há EC na luta (cenário do chefe), o fluxo
-         * natural do boss segue: estado 8 (arte/transformação) → 6 → 10. */
-        if (g_ram[0x936Fu] == 11u &&
-            ram16(0x9CBCu) != 9u && ram16(0x9CBEu) != 9u)
-            ram16_write(0x9CB6u, 1u);
+        if (is_vs_offlabel_sanctuary())
+            sanctuary_vs_exit_cleanup(pc == 0x059D6u);
         return 0;
     }
 
@@ -472,6 +539,87 @@ int ec_boss_instruction_hook(uint32_t pc)
     case 0x03662u: {
         if ((g_ram[0xFD59u] & 0x80u) || (g_ram[0xFD5Bu] & 0x80u))
             g_ram[0xFD61u] |= 0x80u;
+        return 0;
+    }
+
+    /* Trident (Estado 24): pula a criação dos 2 objetos $1B (Sub_013408, ondas
+     * nos pés anexos 2/3) para o Eternal Champion ($40 == $000C). A folha $7C
+     * só tem 2 pontos de anexo (0/1) e o EC não está em $016F74/$0136E0 —
+     * criar $1B deixava ($8C,a5)=$0001B9FE, que saltava para $0136FE
+     * (MOVE.W D0,-(A3)) e corrompia o pool de peças de sprite no Round 1. */
+    case 0x05AF92u: {
+        uint16_t a5 = (uint16_t)g_cpu.A[5];
+        if (ram16((uint32_t)a5 + 0x40u) == 0x000Cu)
+            g_cpu.SR &= (uint16_t)~SR_Z;
+        return 0;
+    }
+
+    /* Defesa em profundidade + compatibilidade com saves legados (ex.: sav4)
+     * que já têm objetos $1B do EC vivos na RAM com ($8C,a5) fora de
+     * $016F74–$01718F: aponta para a linha segura do Trident ($016FEE, índice
+     * 26 = $00 → loc_013F32), oculta e marca deleção ($74 bit 2). */
+    case 0x01354Cu: {
+        uint16_t a5 = (uint16_t)g_cpu.A[5];
+        uint32_t tbl = ((uint32_t)ram16((uint32_t)a5 + 0x8Cu) << 16) |
+                       (uint32_t)ram16((uint32_t)a5 + 0x8Eu);
+        if (tbl < 0x016F74u || tbl >= 0x017190u) {
+            ram16_write((uint32_t)a5 + 0x8Cu, 0x0001u);
+            ram16_write((uint32_t)a5 + 0x8Eu, 0x6FEEu);
+            g_cpu.D[1] = (g_cpu.D[1] & 0xFFFF0000u) | 0x001Au;
+            g_ram[((uint32_t)a5 + 0x20u) & 0xFFFFu] |= 0x80u;
+            g_ram[((uint32_t)a5 + 0x74u) & 0xFFFFu] |= 0x04u;
+        }
+        return 0;
+    }
+
+    case 0x01367Cu: {
+        if ((g_cpu.D[0] & 0xFFFFu) == 0x000Cu)
+            g_cpu.D[0] = (g_cpu.D[0] & 0xFFFF0000u) | 0x000Au;
+        return 0;
+    }
+
+    /* T5 — Overkills / Finishers no Eternal Champion ($40 == $000C):
+     * Substitui `ble.w loc_044C70` ($044AE2, logo após `tst.w ($68,a5)`) por
+     * chamada a Sub_05E49C com ($8,a4)=$044C70 — espelho exato de loc_0474FC
+     * nos lutadores normais. Evita depender de ($E6,a5) bit 7, que o hitstop
+     * de golpes pesados ($01773A) já seta antes da entrada em loc_044C70. */
+    case 0x044AE2u: {
+        uint16_t a5 = (uint16_t)g_cpu.A[5];
+        if (is_playable_ec_slot(a5) &&
+            (int16_t)ram16((uint32_t)a5 + 0x68u) <= 0) {
+            uint16_t a4 = (uint16_t)g_cpu.A[4];
+            ram16_write((uint32_t)a4 + 8u, 0x0004u);
+            ram16_write((uint32_t)a4 + 10u, 0x4C70u);
+            g_cpu.A[0] = 0x0005E49Cu;
+            recomp_call_addr(0x0005E49Cu);
+            return 1;
+        }
+        return 0;
+    }
+
+    /* T5 — Tabelas de lookup por $40 sem $000C nos scripts de Overkill:
+     * Trident Tubarão ($015F38), Larcen Carro ($01222E / $01244E),
+     * Xavier Bola de Fogo & Fumaça ($012738 / $012C38). Mapeia para índice 8. */
+    case 0x015F90u: {
+        uint16_t a0 = (uint16_t)g_cpu.A[0];
+        if (ram16((uint32_t)a0 + 0x40u) == 0x000Cu) {
+            g_cpu.D[0] = (g_cpu.D[0] & 0xFFFF0000u) | 0x0008u;
+            g_cpu.SR |= SR_Z;
+        }
+        return 0;
+    }
+
+    case 0x0123C4u: {
+        if ((g_cpu.D[1] & 0xFFFFu) == 0x000Cu)
+            g_cpu.D[1] = (g_cpu.D[1] & 0xFFFF0000u) | 0x0008u;
+        return 0;
+    }
+
+    case 0x01259Eu:
+    case 0x012832u:
+    case 0x012C76u: {
+        if ((g_cpu.D[0] & 0xFFFFu) == 0x000Cu)
+            g_cpu.D[0] = (g_cpu.D[0] & 0xFFFF0000u) | 0x0008u;
         return 0;
     }
 

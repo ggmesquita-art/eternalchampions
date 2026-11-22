@@ -55,12 +55,17 @@ kind = "game_hook"
 # Cenários off-label no Background do VS (opt-in --unlock-boss):
 # $2E42E = commit $936F → $9CB6 (tabela $2E406). O hook substitui a instrução
 # para as seleções 10 (Holo-Trainer, estado 14) e 11 (santuário, estado 18).
-# $59E6/$59EE = RTS logo após a saída do handler do estado 18 no fim de
-# partida (boss → estados 8/10); o hook sobrescreve $9CB6 com estado 1 (menu)
-# quando a luta veio do VS off-label — hook no RTS (return 0) preserva o
-# unwind do fluxo recompilado.
+# $59D6/$59E6/$59EE = os 3 RTS na saída do handler do estado 18 ($59B6–$59EE);
+# quando em VS/Torneio/Practice off-label, o hook aplica a regra de rounds e
+# saída do Stage_ExitCleanup ($C578) preservando o fluxo do Boss 1P.
+# $01EE74/$01EF8E/$01FD20/$01FD96/$05E652 = bypass dos desvios de boss do
+# estado 18 em Sub_01EDD6 / timer / intro freeze quando em VS off-label.
 [[widescreen_site]]
 addr = 0x02E42E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x0059D6
 kind = "game_hook"
 
 [[widescreen_site]]
@@ -69,6 +74,26 @@ kind = "game_hook"
 
 [[widescreen_site]]
 addr = 0x059EE
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01EE74
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01EF8E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01FD20
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01FD96
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x05E652
 kind = "game_hook"
 
 [[widescreen_site]]
@@ -143,4 +168,48 @@ kind = "game_hook"
 
 [[widescreen_site]]
 addr = 0x03662
+kind = "game_hook"
+
+# T4 — Arena Trident (Estado 24): pula objetos $1B (ondas nos pés) para o EC
+# ($40 == $000C) em $05AF92 e protege $01354C/$01367C caso save legado os tenha
+# vivos na RAM.
+[[widescreen_site]]
+addr = 0x05AF92
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01354C
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01367C
+kind = "game_hook"
+
+# T5 — Overkills / Finishers no Eternal Champion ($40 == $000C):
+# $044AE2 = `ble.w loc_044C70` após `tst.w ($68,a5)` (redireciona para $05E49C
+# com retorno em $044C70, idêntico ao loc_0474FC dos lutadores normais);
+# $015F90 (Trident), $0123C4/$01259E (Larcen), $012832/$012C76 (Xavier) =
+# tabelas de índice por lutador sem $000C nas tarefas de Overkill.
+[[widescreen_site]]
+addr = 0x044AE2
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x015F90
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x0123C4
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01259E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x012832
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x012C76
 kind = "game_hook"
