@@ -19,7 +19,7 @@ player_object  = 0xFFAB86
 level_modes    = [17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
 
 [functions]
-extra = [0x000200, 0x0006B6, 0x0006DE, 0x0006E2, 0x002230, 0x00FD24, 0x00FE1E]
+extra = [0x000200, 0x0006B6, 0x0006DE, 0x0006E2, 0x002230, 0x00FD24, 0x00FE1E, 0x04EDD4]
 late_extra = []
 blacklist = []
 
@@ -212,4 +212,68 @@ kind = "game_hook"
 
 [[widescreen_site]]
 addr = 0x012C76
+kind = "game_hook"
+
+# Microtarefa 2 — Arena de Treino (Estado 14, $FD64 == $000E) em VS/Practice
+# off-label + desativação do flicker holográfico 30 Hz do Player 2:
+[[widescreen_site]]
+addr = 0x003986
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x0039BA
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x003BE8
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01EE6A
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01EF98
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01F166
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x05AF4E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01F5EE
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01FAE6
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01F6D6
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01F6E6
+kind = "game_hook"
+
+# Microtarefa 3 — Sanctuary (Estado 18, $FD64 == $0012) Overkill no vitral
+# (opt-in --unlock-boss em VS/Torneio off-label):
+# $005818 = `bne.b loc_5822` em State18_Handler após `cmpi.w #$6,$FD64`
+# (carrega grupo de tiles $B necessário para Sub_026638 e reseta estado);
+# $01F4FA = tick por frame em Sub_01F3F2 (máquina de estados da quebra do vitral);
+# $026A16 = loop de estados em Sub_0269E4 (ativa Overkill na zona do vitral 1).
+[[widescreen_site]]
+addr = 0x005818
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x01F4FA
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x026A16
 kind = "game_hook"

@@ -58,6 +58,11 @@ static int is_cpu_sanctuary_boss(uint16_t a5)
            (ram16(0x9422u) == 0u);
 }
 
+static uint16_t s_holo_saved_977c = 0u;
+static uint16_t s_holo_saved_9384 = 0u;
+static uint16_t s_holo_saved_9378 = 0u;
+static uint8_t  s_holo_saved_9383 = 0u;
+
 static int is_vs_offlabel_sanctuary(void)
 {
     return (ram16(0xFD64u) == 0x0012u) &&
@@ -65,10 +70,29 @@ static int is_vs_offlabel_sanctuary(void)
            (ram16(0x9CB0u) != 0u || ram16(0x9424u) != 0u);
 }
 
+typedef struct {
+    int      phase;   /* 0=idle, 1=init/dma, 2=fly_to_window, 3=shatter_exit, 4=settle_finish */
+    int      timer;
+    uint16_t victim;  /* 0xAB86 or 0xAA52 */
+    int16_t  start_x;
+    int16_t  start_y;
+    int16_t  cur_x;
+    int16_t  cur_y;
+} SancOverkillState;
+
+static SancOverkillState s_sanc_ok = {0};
+
+static int is_vs_offlabel_holo(void)
+{
+    return (ram16(0xFD64u) == 0x000Eu) &&
+           (ram16(0x9CCCu) != 2u) &&
+           (ram16(0x9CB0u) != 4u);
+}
+
 /* Replicates Stage_ExitCleanup ($C578) for off-label VS/Tournament fights
- * in State 18 so Best-of-N rounds and menu return work identically to normal
- * arenas while leaving 1P Arcade Boss ($9CB0==0 && $9424==0) untouched. */
-static void sanctuary_vs_exit_cleanup(int undo_round_inc)
+ * (State 14 Holo-Trainer and State 18 Sanctuary) so Best-of-N rounds and menu
+ * return work identically to normal arenas. */
+static void offlabel_vs_exit_cleanup(uint16_t arena_state, int undo_round_inc)
 {
     static const uint16_t k_win_target[5] = { 1u, 2u, 3u, 6u, 11u };
     static const uint16_t k_max_round[5]  = { 0u, 2u, 4u, 10u, 20u };
@@ -107,7 +131,7 @@ static void sanctuary_vs_exit_cleanup(int undo_round_inc)
 
     if (!match_over) {
         ram16_write(0x9352u, (uint16_t)(ram16(0x9352u) + 1u));
-        ram16_write(0x9CB6u, 0x0012u);
+        ram16_write(0x9CB6u, arena_state);
         return;
     }
 
@@ -117,6 +141,11 @@ static void sanctuary_vs_exit_cleanup(int undo_round_inc)
         ram16_write(0x9CB2u, (gmode < 4u) ? k_exit_9cb2[gmode] : 2u);
         ram16_write(0x9CB6u, 0x0001u);
     }
+}
+
+static void sanctuary_vs_exit_cleanup(int undo_round_inc)
+{
+    offlabel_vs_exit_cleanup(0x0012u, undo_round_inc);
 }
 
 static int is_playable_ec_slot(uint16_t a5)
@@ -195,6 +224,7 @@ void ec_boss_reset(void)
     s_wrap_to_9[1] = 0u;
     s_prev_ud[0] = 0u;
     s_prev_ud[1] = 0u;
+    s_sanc_ok.phase = 0;
 }
 
 /* ---------------------------------------------------------------------------
@@ -268,10 +298,67 @@ void ec_boss_apply_rom_patches(void)
         offlabel_patch_rom();
 }
 
+/* Recupera cadeias de tasks de lutador já corrompidas em saves legados
+ * (ex.: native_save_4.bin e native_save_9.bin do Energy Drain do Midknight):
+ * o 5º nó (t4, next == 0) deve sempre executar loc_05D8AC ($05D8B2, sprites/
+ * colisão), e se t1 ficou preso em $04EF16 esperando bit 7 de ($A8, a5) com
+ * a animação t2 já finalizada ($00DC10/$00DC14), libera o bit 7 para retomar. */
+static void sanitize_corrupted_fighter_tasks(void)
+{
+    uint16_t st = ram16(0xFD64u);
+    if (st != 14u && !(st >= 17u && st <= 27u))
+        return;
+
+    static const uint16_t k_slots[2] = { 0xAB86u, 0xAA52u };
+    for (int s = 0; s < 2; ++s) {
+        uint16_t a5 = k_slots[s];
+        uint16_t obj_id = ram16((uint32_t)a5 + 0x40u);
+        if (obj_id < 0x0002u || obj_id > 0x000Cu)
+            continue;
+
+        uint16_t nodes[5];
+        uint16_t cur = ram16((uint32_t)a5 + 0x7Au);
+        int ok = 1;
+        for (int i = 0; i < 5; ++i) {
+            if (cur < 0xE000u || cur > 0xEFF0u) {
+                ok = 0;
+                break;
+            }
+            nodes[i] = cur;
+            cur = ram16(cur);
+        }
+        if (!ok || cur != 0u)
+            continue;
+
+        uint16_t t1 = nodes[1];
+        uint16_t t2 = nodes[2];
+        uint16_t t4 = nodes[4];
+        uint32_t pc4 = ((uint32_t)ram16((uint32_t)t4 + 2u) << 16) |
+                       (uint32_t)ram16((uint32_t)t4 + 4u);
+        if (pc4 != 0x0005D8ACu && pc4 != 0x0005D8B2u) {
+            ram16_write((uint32_t)t4 + 2u, 0x0005u);
+            ram16_write((uint32_t)t4 + 4u, 0xD8B2u);
+            ram16_write((uint32_t)t4 + 6u, 0u);
+            ram16_write(0xAB86u + 0x12u, 0xFFFFu);
+            ram16_write(0xAA52u + 0x12u, 0xFFFFu);
+
+            uint32_t pc1 = ((uint32_t)ram16((uint32_t)t1 + 2u) << 16) |
+                           (uint32_t)ram16((uint32_t)t1 + 4u);
+            uint32_t pc2 = ((uint32_t)ram16((uint32_t)t2 + 2u) << 16) |
+                           (uint32_t)ram16((uint32_t)t2 + 4u);
+            if (pc1 == 0x0004EF16u &&
+                (pc2 == 0x0000DC10u || pc2 == 0x0000DC14u)) {
+                g_ram[((uint32_t)a5 + 0xA8u) & 0xFFFFu] |= 0x80u;
+                ram16_write((uint32_t)t1 + 6u, 0u);
+            }
+        }
+    }
+}
+
 void ec_boss_vblank(void)
 {
-    (void)s_unlock_boss;
-    /* (hook reservado; sem trabalho por frame no modo atual) */
+    if (s_unlock_boss)
+        sanitize_corrupted_fighter_tasks();
 }
 
 /* Host-side adapter state que um tick lê/escreve (formas do EC): precisa
@@ -308,7 +395,193 @@ int ec_boss_rb_state_load(const void *src, size_t len)
     s_wrap_to_9[1] = p[4];
     s_prev_ud[0] = p[5];
     s_prev_ud[1] = p[6];
+    s_sanc_ok.phase = 0;
+    if (s_unlock_boss)
+        sanitize_corrupted_fighter_tasks();
     return 1;
+}
+
+static void call_68k_sub(uint32_t addr)
+{
+    int saved_split = g_split_sp_popped;
+    g_split_sp_popped = 0;
+    g_cpu.A[7] -= 4u;
+    m68k_write32(g_cpu.A[7], 0x00000000u);
+    recomp_call_addr(addr);
+    g_split_sp_popped = saved_split;
+}
+
+static void call_68k_sfx(uint32_t sfx_id)
+{
+    g_cpu.A[7] -= 4u;
+    m68k_write32(g_cpu.A[7], sfx_id);
+    call_68k_sub(0x000008B0u);
+    g_cpu.A[7] += 4u;
+}
+
+static void call_68k_pal(uint16_t idx, uint16_t color)
+{
+    g_cpu.D[0] = idx;
+    g_cpu.D[1] = idx;
+    g_cpu.D[2] = color;
+    call_68k_sub(0x0000D6F6u);
+}
+
+static void sanc_apply_window_hole(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+{
+    ram16_write(0x9C38u, 0x0000u);
+    ram16_write(0x9C44u, x);
+    ram16_write(0x9C42u, y);
+    ram16_write(0x9C40u, w);
+    ram16_write(0x9C3Eu, h);
+    ram16_write(0x9C3Au, 0x4000u);
+    ram16_write(0x9C34u, 0x0003u);
+    ram16_write(0x9C36u, 0x09DEu);
+    ram16_write(0x9C3Cu, 0x000Bu);
+    call_68k_sub(0x00026638u);
+}
+
+static void sanc_overkill_tick(void)
+{
+    if (s_sanc_ok.phase == 0 || ram16(0xFD64u) != 0x0012u ||
+        (s_sanc_ok.victim != 0xAB86u && s_sanc_ok.victim != 0xAA52u)) {
+        s_sanc_ok.phase = 0;
+        return;
+    }
+
+    uint32_t sd[8], sa[7];
+    for (int i = 0; i < 8; ++i) sd[i] = g_cpu.D[i];
+    for (int i = 0; i < 7; ++i) sa[i] = g_cpu.A[i];
+    uint16_t ssr = g_cpu.SR;
+    g_cpu.A[6] = 0x00C00000u;
+
+    uint16_t v = s_sanc_ok.victim;
+
+    switch (s_sanc_ok.phase) {
+    case 1:
+        ram16_write(0x9CB4u, 0xFFFFu);
+        g_ram[0xFD69u] &= (uint8_t)~0x80u;
+        call_68k_sub(0x0005B01Au);
+        if (ram16(0xE210u + 0x0Bu * 2u) == 0u) {
+            g_cpu.D[0] = 0x000Bu;
+            call_68k_sub(0x0000E408u);
+        }
+        g_cpu.D[0] = 0x0018u;
+        call_68k_sub(0x00026954u);
+        call_68k_sfx(0x6Au);
+        s_sanc_ok.phase = 2;
+        s_sanc_ok.timer = 0;
+        break;
+
+    case 2:
+        ++s_sanc_ok.timer;
+        if (s_sanc_ok.timer == 10) {
+            g_ram[((uint32_t)v + 0xE7u) & 0xFFFFu] |= 0x02u;
+            ram16_write((uint32_t)v + 0xF4u, 0x1000u);
+            s_sanc_ok.start_x = (int16_t)ram16((uint32_t)v + 0x42u);
+            s_sanc_ok.start_y = (int16_t)ram16((uint32_t)v + 0x46u);
+        } else if (s_sanc_ok.timer > 10 && s_sanc_ok.timer <= 28) {
+            int step = s_sanc_ok.timer - 10;
+            int16_t nx = (int16_t)(s_sanc_ok.start_x + ((0x0064 - (int)s_sanc_ok.start_x) * step) / 18);
+            int16_t ny = (int16_t)(s_sanc_ok.start_y + ((0x00A4 - (int)s_sanc_ok.start_y) * step) / 18
+                                   - (24 * step * (18 - step)) / 81);
+            ram16_write((uint32_t)v + 0x42u, (uint16_t)nx);
+            ram16_write((uint32_t)v + 0xA4u, (uint16_t)nx);
+            ram16_write((uint32_t)v + 0x102u, (uint16_t)nx);
+            ram16_write((uint32_t)v + 0x46u, (uint16_t)ny);
+            ram16_write((uint32_t)v + 0xA6u, (uint16_t)ny);
+            ram16_write((uint32_t)v + 0x104u, (uint16_t)ny);
+        }
+        if ((s_sanc_ok.timer >= 28 && ram16(0x9CA2u) == 0u && ram16(0xCD1Au) <= 0x0008u) ||
+            s_sanc_ok.timer >= 120) {
+            s_sanc_ok.phase = 3;
+            s_sanc_ok.timer = 0;
+            s_sanc_ok.cur_x = 0x0064;
+            s_sanc_ok.cur_y = 0x00A4;
+        }
+        break;
+
+    case 3:
+        if (s_sanc_ok.timer == 0) {
+            call_68k_sfx(0x2Fu);
+            sanc_apply_window_hole(0x0030u, 0x0068u, 0x000Bu, 0x0005u);
+            sanc_apply_window_hole(0x0050u, 0x0058u, 0x0005u, 0x0001u);
+            sanc_apply_window_hole(0x0080u, 0x0060u, 0x0000u, 0x0000u);
+
+            g_cpu.D[0] = 0x00B4u;
+            g_cpu.D[1] = 0x0064u;
+            g_cpu.D[2] = 0x0078u;
+            call_68k_sub(0x0000DCEAu);
+            if (!(g_cpu.SR & SR_C) && (uint16_t)g_cpu.A[0] != 0u) {
+                uint16_t b4 = (uint16_t)g_cpu.A[0];
+                ram16_write((uint32_t)b4 + 0x16u, (uint16_t)(ram16((uint32_t)b4 + 0x16u) & (uint16_t)~0x6000u));
+            }
+
+            ram16_write(0x9C44u, 0x0000u);
+            ram16_write(0x9C42u, 0x0050u);
+            ram16_write(0x9C40u, 0x0007u);
+            ram16_write(0x9C3Eu, 0x000Cu);
+            ram16_write(0x9C38u, 0x0000u);
+            call_68k_sub(0x000266AEu);
+
+            g_ram[((uint32_t)v + 0x16u) & 0xFFFFu] &= (uint8_t)~0x80u;
+            call_68k_pal(0x0Bu, 0x0EEEu);
+            call_68k_pal(0x0Du, 0x0EEEu);
+        } else {
+            s_sanc_ok.cur_x = (int16_t)(s_sanc_ok.cur_x - 4);
+            s_sanc_ok.cur_y = (int16_t)(s_sanc_ok.cur_y - 1);
+            ram16_write((uint32_t)v + 0x42u, (uint16_t)s_sanc_ok.cur_x);
+            ram16_write((uint32_t)v + 0xA4u, (uint16_t)s_sanc_ok.cur_x);
+            ram16_write((uint32_t)v + 0x102u, (uint16_t)s_sanc_ok.cur_x);
+            ram16_write((uint32_t)v + 0x46u, (uint16_t)s_sanc_ok.cur_y);
+            ram16_write((uint32_t)v + 0xA6u, (uint16_t)s_sanc_ok.cur_y);
+            ram16_write((uint32_t)v + 0x104u, (uint16_t)s_sanc_ok.cur_y);
+
+            if (s_sanc_ok.timer <= 8)
+                ram16_write(0xCD16u, (uint16_t)(0x0017 + ((s_sanc_ok.timer & 1) ? -3 : 3)));
+            else
+                ram16_write(0xCD16u, 0x0017u);
+
+            if (s_sanc_ok.timer == 3) {
+                call_68k_pal(0x0Bu, 0x0EEAu);
+                call_68k_pal(0x0Du, 0x0EEEu);
+            } else if (s_sanc_ok.timer == 6) {
+                call_68k_pal(0x0Bu, 0x0CC8u);
+                call_68k_pal(0x0Du, 0x0ECAu);
+            } else if (s_sanc_ok.timer == 9) {
+                call_68k_pal(0x0Bu, 0x0AA4u);
+                call_68k_pal(0x0Du, 0x0EC8u);
+            }
+        }
+        ++s_sanc_ok.timer;
+        if (s_sanc_ok.timer >= 14 || s_sanc_ok.cur_x <= 0x0018) {
+            g_ram[((uint32_t)v + 0x20u) & 0xFFFFu] |= 0x80u;
+            ram16_write(0xCD16u, 0x0017u);
+            call_68k_pal(0x0Bu, 0x0AA4u);
+            call_68k_pal(0x0Du, 0x0EC8u);
+            s_sanc_ok.phase = 4;
+            s_sanc_ok.timer = 0;
+        }
+        break;
+
+    case 4:
+        ++s_sanc_ok.timer;
+        if (s_sanc_ok.timer >= 52) {
+            ram16_write(0xCD1Au, 0x0004u);
+            ram16_write(0xCD16u, 0x0017u);
+            call_68k_sub(0x00016F32u);
+            s_sanc_ok.phase = 0;
+        }
+        break;
+
+    default:
+        s_sanc_ok.phase = 0;
+        break;
+    }
+
+    for (int i = 0; i < 8; ++i) g_cpu.D[i] = sd[i];
+    for (int i = 0; i < 7; ++i) g_cpu.A[i] = sa[i];
+    g_cpu.SR = ssr;
 }
 
 int ec_boss_instruction_hook(uint32_t pc)
@@ -622,6 +895,128 @@ int ec_boss_instruction_hook(uint32_t pc)
             g_cpu.D[0] = (g_cpu.D[0] & 0xFFFF0000u) | 0x0008u;
         return 0;
     }
+
+    /* VS/Practice/Torneio off-label no Holo-Trainer (Estado 14): preserva
+     * opções de partida do VS, neutraliza objetos exclusivos de treino 1P
+     * ($78/$7A) na entrada de suas tasks, usa fluxo normal de rounds/vitórias
+     * em Sub_01EDD6/loc_01F15C e executa Stage_ExitCleanup na saída ($003BE8). */
+    case 0x003986u: {
+        if (is_vs_offlabel_holo()) {
+            s_holo_saved_977c = ram16(0x977Cu);
+            s_holo_saved_9384 = ram16(0x9384u);
+            s_holo_saved_9378 = ram16(0x9378u);
+            s_holo_saved_9383 = g_ram[0x9383u];
+        }
+        return 0;
+    }
+
+    case 0x0039BAu: {
+        if (is_vs_offlabel_holo()) {
+            g_ram[0x936Eu] = g_ram[0x9B44u];
+            ram16_write(0x977Cu, s_holo_saved_977c);
+            ram16_write(0x9384u, s_holo_saved_9384);
+            ram16_write(0x9378u, s_holo_saved_9378);
+            g_ram[0x9383u] = s_holo_saved_9383;
+        }
+        return 0;
+    }
+
+    case 0x01F5EEu:
+    case 0x01FAE6u: {
+        if (is_vs_offlabel_holo()) {
+            uint16_t a5 = (uint16_t)g_cpu.A[5];
+            g_ram[((uint32_t)a5 + 0x20u) & 0xFFFFu] |= 0x80u;
+            g_ram[((uint32_t)a5 + 0x74u) & 0xFFFFu] |= 0x04u;
+            recomp_call_addr(0x0000DC10u);
+            return 1;
+        }
+        return 0;
+    }
+
+    case 0x01EE6Au:
+    case 0x01EF98u:
+    case 0x01F166u:
+    case 0x05AF4Eu: {
+        if (is_vs_offlabel_holo())
+            g_cpu.SR &= (uint16_t)~SR_Z;
+        return 0;
+    }
+
+    case 0x003BE8u: {
+        if (is_vs_offlabel_holo())
+            offlabel_vs_exit_cleanup(0x000Eu, 0);
+        return 0;
+    }
+
+    /* Item 2-B: desativa o flicker holográfico de 30 Hz do Player 2 (bit 5 de
+     * $FFFFAA72 e de objetos filhos em $FFFFAB5E) logo após $01F6D0/$01F6E0. */
+    case 0x01F6D6u:
+        g_ram[0xAA72u] &= (uint8_t)~0x20u;
+        return 0;
+
+    case 0x01F6E6u: {
+        uint16_t child = ram16(0xAB5Eu);
+        if (child != 0u)
+            g_ram[((uint32_t)child + 0x20u) & 0xFFFFu] &= (uint8_t)~0x20u;
+        return 0;
+    }
+
+    /* Item 4 (Microtarefa 3): Overkill customizado no vitral 1 do Santuário
+     * (Estado 18 off-label em VS/Torneio). */
+    case 0x005818u:
+        s_sanc_ok.phase = 0;
+        if (is_vs_offlabel_sanctuary())
+            g_cpu.SR |= (uint16_t)SR_Z;
+        return 0;
+
+    case 0x026A16u: {
+        if (!is_vs_offlabel_sanctuary() || s_sanc_ok.phase != 0)
+            return 0;
+        uint16_t a5 = (uint16_t)g_cpu.A[5];
+        if (a5 != 0xAB86u && a5 != 0xAA52u)
+            return 0;
+        if (g_ram[((uint32_t)a5 + 0xDDu) & 0xFFFFu] & 0x40u)
+            return 0;
+        uint16_t vx = ram16((uint32_t)a5 + 0x42u);
+        int facing_left = (g_ram[((uint32_t)a5 + 0xE6u) & 0xFFFFu] & 0x08u) != 0;
+        int in_zone = (!facing_left && vx >= 0x0040u && vx <= 0x00F0u) ||
+                      (facing_left && vx >= 0x0028u && vx <= 0x0088u);
+        if (!in_zone)
+            return 0;
+
+        ram16_write(0x9C74u, a5);
+        ram16_write(0x9C7Cu, 1u);
+        ram16_write(0x9C7Au, 0x0004u);
+        ram16_write(0x9C76u, 0x0017u);
+        ram16_write(0x9C7Eu, 1u);
+
+        uint32_t sd[5] = { g_cpu.D[0], g_cpu.D[1], g_cpu.D[2], g_cpu.D[3], g_cpu.D[4] };
+        uint32_t sa[4] = { g_cpu.A[0], g_cpu.A[1], g_cpu.A[5], g_cpu.A[6] };
+        g_cpu.A[6] = 0x00C00000u;
+        g_cpu.D[0] = 0x0075u;
+        g_cpu.D[1] = 0u;
+        g_cpu.D[2] = 0u;
+        call_68k_sub(0x0000DCEAu);
+        for (int i = 0; i < 5; ++i) g_cpu.D[i] = sd[i];
+        g_cpu.A[0] = sa[0];
+        g_cpu.A[1] = sa[1];
+        g_cpu.A[5] = sa[2];
+        g_cpu.A[6] = sa[3];
+
+        s_sanc_ok.phase = 1;
+        s_sanc_ok.timer = 0;
+        s_sanc_ok.victim = a5;
+
+        g_cpu.SR = (uint16_t)((g_cpu.SR & 0xFF00u) | SR_C);
+        g_cpu.PC = m68k_read32(g_cpu.A[7]);
+        g_cpu.A[7] += 4u;
+        return 1;
+    }
+
+    case 0x01F4FAu:
+        if (s_sanc_ok.phase != 0)
+            sanc_overkill_tick();
+        return 0;
 
     default:
         return 0;
