@@ -205,11 +205,165 @@ typedef struct {
     uint8_t hl[GVDP_MAX_WIDTH];
 } EcMarginSprites;
 
-static void ec_eval_margin_sprites_line(const GVDP *v, int line, int native_w,
-                                        int left, int width, EcMarginSprites *ms)
+static int     s_frame_had_display = 0;
+static int     s_last_floor_line = 215;
+static uint8_t s_sat_is_hud[80];
+
+typedef struct {
+    uint16_t y;
+    uint16_t x;
+    uint16_t attr;
+} EcHudSubSprite;
+
+/*
+ * Identifica no início de cada quadro (line == 0) quais entradas da SAT em VRAM
+ * pertencem ao HUD: o pool reservado ($D858 -> SAT[0..($DF7A)-2], barras de vida
+ * e gemas) e objetos screen-space ($ACBA com ($18,a0) == 6: yin-yangs, timer, textos).
+ */
+static void ec_refresh_frame_hud_sat(const GVDP *v)
+{
+    memset(s_sat_is_hud, 0, sizeof(s_sat_is_hud));
+    s_last_floor_line = 215;
+    if (!v) {
+        s_frame_had_display = 0;
+        return;
+    }
+    s_frame_had_display = (v->reg[1] & 0x40u) != 0;
+
+    int reserved = (int)ec_ram16(0xDF7Au) - 1;
+    if (reserved > 0) {
+        if (reserved > 80)
+            reserved = 80;
+        for (int i = 0; i < reserved; ++i)
+            s_sat_is_hud[i] = 1;
+    }
+
+    EcHudSubSprite hud_entries[128];
+    int hud_count = 0;
+
+    uint16_t a0 = ec_ram16(0xACBAu + 6u);
+    for (int obj_step = 0; obj_step < 64 && a0 != 0u; ++obj_step) {
+        if (ec_ram16((unsigned)a0 + 0x18u) == 6u &&
+            (ec_ram16((unsigned)a0 + 0x20u) & 0x8080u) == 0u) {
+            uint16_t a1  = ec_ram16((unsigned)a0 + 0x0Cu);
+            uint16_t cnt = ec_ram16((unsigned)a0 + 0x0Eu);
+            if (cnt > 80u)
+                cnt = 80u;
+            if (a1 != 0u && cnt != 0u) {
+                uint16_t d6 = (uint16_t)(ec_ram16((unsigned)a0 + 0x4Au) + 0x80u);
+                uint16_t d7 = (uint16_t)(ec_ram16((unsigned)a0 + 0x4Cu) + 0x80u);
+                for (uint16_t i = 0; i < cnt && a1 != 0u && hud_count < 128; ++i) {
+                    uint16_t rx   = (uint16_t)(ec_ram16((unsigned)a1 + 0u) + d6);
+                    uint16_t ry   = (uint16_t)(ec_ram16((unsigned)a1 + 2u) + d7);
+                    uint16_t attr = ec_ram16((unsigned)a1 + 6u);
+                    hud_entries[hud_count].x    = (uint16_t)(rx & 0x3FFu);
+                    hud_entries[hud_count].y    = (uint16_t)(ry & 0x3FFu);
+                    hud_entries[hud_count].attr = attr;
+                    ++hud_count;
+                    a1 = ec_ram16((unsigned)a1 + 8u);
+                }
+            }
+        }
+        a0 = ec_ram16((unsigned)a0 + 6u);
+    }
+
+    if (hud_count == 0)
+        return;
+
+    int h40         = (v->reg[12] & 0x81u) != 0;
+    int max_sprites = h40 ? 80 : 64;
+    uint16_t sat    = (uint16_t)((v->reg[5] & 0x7Fu) << 9);
+
+    int link = 0;
+    for (int n = 0; n < max_sprites; ++n) {
+        uint16_t e    = (uint16_t)(sat + link * 8);
+        uint16_t w0   = ec_vram16(v, e);
+        uint16_t w1   = ec_vram16(v, (uint16_t)(e + 2));
+        uint16_t attr = ec_vram16(v, (uint16_t)(e + 4));
+        uint16_t w3   = ec_vram16(v, (uint16_t)(e + 6));
+        if (w0 == 0 && w1 == 0 && attr == 0 && w3 == 0)
+            break;
+
+        int sy = (int)(w0 & 0x3FFu);
+        int sx = (int)(w3 & 0x3FFu);
+        for (int k = 0; k < hud_count; ++k) {
+            int dy   = sy - (int)hud_entries[k].y;
+            int dx_s = sx - (int)hud_entries[k].x;
+            if ((abs(dy) <= 1 && attr == hud_entries[k].attr) ||
+                (dx_s == 0 && dy == 0 &&
+                 (attr & 0x07FFu) == (hud_entries[k].attr & 0x07FFu))) {
+                s_sat_is_hud[link] = 1;
+                break;
+            }
+        }
+
+        int next = (int)(w1 & 0x7Fu);
+        if (next == 0 || next >= max_sprites)
+            break;
+        link = next;
+    }
+}
+
+/*
+ * Compensa o parallax nos planos A/B quando x0 ancora a cena nas bordas widescreen
+ * (dx = x0 - left != 0). Avalia a última camada ativa em $FFFFD84E que escreve H-scroll.
+ */
+static int ec_plane_edge_comp(uint16_t pl, int line, int dx)
+{
+    if (dx == 0)
+        return 0;
+
+    int comp = 0;
+    uint16_t a4 = ec_ram16(0xD84Eu);
+    for (int step = 0; step < 32 && a4 != 0u; ++step, a4 = ec_ram16(a4)) {
+        if (ec_ram16((unsigned)a4 + 0x2Eu) != pl)
+            continue;
+        if ((g_ram[((unsigned)a4 + 0x30u) & 0xFFFFu] & 0x08u) == 0u)
+            continue;
+
+        int s1C = (int)(int16_t)ec_ram16((unsigned)a4 + 0x1Cu);
+        int hA  = (int)(int16_t)ec_ram16((unsigned)a4 + 0x0Au);
+        if (line < s1C || line >= s1C + hA)
+            continue;
+
+        /* Preserva tabelas raster por scanline ($36,a4). */
+        if (ec_ram32((unsigned)a4 + 0x36u) != 0u) {
+            comp = 0;
+            continue;
+        }
+
+        uint8_t hmode = g_ram[((unsigned)a4 + 0x26u) & 0xFFFFu];
+        switch (hmode) {
+        case 0x00:
+        case 0x08:
+        case 0x10:
+            comp = 0;
+            break;
+        case 0x04:
+            comp = -dx;
+            break;
+        case 0x14:
+            comp = dx;
+            break;
+        case 0x0C: {
+            int fac = (int)(int16_t)ec_ram16((unsigned)a4 + 0x28u);
+            int num = -fac * dx;
+            comp = (num >= 0) ? ((num + 2048) / 4096) : ((num - 2048) / 4096);
+            break;
+        }
+        default:
+            comp = 0;
+            break;
+        }
+    }
+    return comp;
+}
+
+static void ec_eval_full_sprites_line(const GVDP *v, int line, int left, int x0,
+                                      int width, int force_display, EcMarginSprites *ms)
 {
     memset(ms, 0, sizeof(*ms));
-    if (!(v->reg[1] & 0x40u))
+    if (!force_display && !(v->reg[1] & 0x40u))
         return;
 
     int h40          = (v->reg[12] & 0x81u) != 0;
@@ -224,6 +378,7 @@ static void ec_eval_margin_sprites_line(const GVDP *v, int line, int native_w,
     memset(drawn, 0, (size_t)width);
 
     int link = 0;
+    int any_nonzero_x = 0;
     for (int n = 0; n < max_sprites; ++n) {
         uint16_t e    = (uint16_t)(sat + link * 8);
         uint16_t w0   = ec_vram16(v, e);
@@ -241,13 +396,21 @@ static void ec_eval_margin_sprites_line(const GVDP *v, int line, int native_w,
         int next   = (int)(w1 & 0x7Fu);
 
         if (line >= y && line < y + height) {
-            /* Sub_E684 grava (screen_x + 128) com sinal 16-bit na SAT (sem cull quando bit6=0). */
-            int sx0   = (int)(int16_t)w3 - 128;
-            int spr_w = hsz * 8;
-            int ox0   = left + sx0;
-            int ox1   = ox0 + spr_w;
+            if ((w3 & 0x3FFu) == 0u) {
+                if (any_nonzero_x)
+                    break;
+            } else {
+                any_nonzero_x = 1;
+            }
 
-            if (ox1 > 0 && ox0 < width && (ox0 < left || ox1 > left + native_w)) {
+            /* Sub_E684 grava (screen_x + 128) com sinal 16-bit na SAT; HUD usa âncora fixa `left`. */
+            int sx0    = (int)(int16_t)w3 - 128;
+            int spr_w  = hsz * 8;
+            int base_x = s_sat_is_hud[link] ? left : x0;
+            int ox0    = base_x + sx0;
+            int ox1    = ox0 + spr_w;
+
+            if (ox1 > 0 && ox0 < width) {
                 int tile  = (int)(attr & 0x07FFu);
                 int pal   = (int)((attr >> 13) & 0x3u);
                 int pri   = (attr & 0x8000u) != 0;
@@ -260,8 +423,6 @@ static void ec_eval_margin_sprites_line(const GVDP *v, int line, int native_w,
                 for (int lx = 0; lx < spr_w; ++lx) {
                     int ox = ox0 + lx;
                     if (ox < 0 || ox >= width)
-                        continue;
-                    if (ox >= left && ox < left + native_w)
                         continue;
                     if (drawn[ox])
                         continue;
@@ -298,74 +459,158 @@ static void ec_eval_margin_sprites_line(const GVDP *v, int line, int native_w,
     }
 }
 
-static uint32_t ec_render_margin_pixel(const GVDP *v, int line, int native_w, int sx,
-                                       const EcMarginSprites *ms, int ox)
+static void ec_fetch_window_pixel(const GVDP *v, uint16_t base_w, int win_wt, int ht,
+                                  int px, int py, int im2,
+                                  uint8_t *idx, int *opaque, int *hi)
 {
-    int display_on = (v->reg[1] & 0x40u) != 0;
-    uint8_t backdrop = (uint8_t)(v->reg[7] & 0x3Fu);
-    if (!display_on)
-        return genesis_dac_cram_to_argb(v->cram[backdrop], GENESIS_DAC_NORMAL);
+    int shift      = im2 ? 4 : 3;
+    int fy_mask    = (1 << shift) - 1;
+    int tile_bytes = im2 ? 64 : 32;
+    int wpx        = win_wt * 8;
+    int hpx        = ht << shift;
 
+    px &= (wpx - 1);
+    py &= (hpx - 1);
+
+    uint16_t nt = (uint16_t)(base_w + (uint16_t)(((py >> shift) * win_wt + (px >> 3)) * 2));
+    uint16_t e  = ec_vram16(v, nt);
+    int ti      = e & 0x07FF;
+    int fx      = px & 7;
+    int fy      = py & fy_mask;
+    if (e & 0x0800u) fx ^= 7;
+    if (e & 0x1000u) fy ^= fy_mask;
+
+    uint16_t pa  = (uint16_t)(ti * tile_bytes + fy * 4 + (fx >> 1));
+    uint8_t byte = v->vram[pa];
+    int nib      = (fx & 1) ? (byte & 0x0F) : (byte >> 4);
+
+    *opaque = (nib != 0);
+    *hi     = (e & 0x8000u) != 0;
+    *idx    = (uint8_t)(((e >> 13) & 3u) * 16u + (unsigned)nib);
+}
+
+static void ec_render_ws_scanline_impl(const GVDP *v, int bg_line, int native_w, int left, int x0,
+                                       int width, int force_display, const EcMarginSprites *ms,
+                                       uint32_t *out, int *out_any_plane_opaque)
+{
+    *out_any_plane_opaque = 0;
+    int display_on = force_display || ((v->reg[1] & 0x40u) != 0);
+    uint8_t backdrop = (uint8_t)(v->reg[7] & 0x3Fu);
+    if (!display_on) {
+        uint32_t bg = genesis_dac_cram_to_argb(v->cram[backdrop], GENESIS_DAC_NORMAL);
+        for (int ox = 0; ox < width; ++ox)
+            out[ox] = bg;
+        return;
+    }
+
+    int h40     = (v->reg[12] & 0x81u) != 0;
     int im2     = (v->reg[12] & 0x06u) == 0x06u;
-    int rline   = im2 ? (line >> 1) : line;
+    int rline   = im2 ? (bg_line >> 1) : bg_line;
     int sh_mode = (v->reg[12] & 0x08u) != 0;
 
-    int wt = ec_plane_tiles(v->reg[16] & 0x03u);
-    int ht = ec_plane_tiles((v->reg[16] >> 4) & 0x03u);
+    int wt          = ec_plane_tiles(v->reg[16] & 0x03u);
+    int ht          = ec_plane_tiles((v->reg[16] >> 4) & 0x03u);
+    int win_wt      = h40 ? 64 : 32;
     uint16_t base_a = (uint16_t)((v->reg[2] & 0x38u) << 10);
     uint16_t base_b = (uint16_t)((v->reg[4] & 0x07u) << 13);
+    uint16_t base_w = (uint16_t)((v->reg[3] & (h40 ? 0x3Eu : 0x3Fu)) << 10);
 
     uint16_t hbase = (uint16_t)((v->reg[13] & 0x3Fu) << 10);
-    int hmode = v->reg[11] & 0x03;
-    int hidx  = (hmode == 0) ? 0 : (hmode == 2) ? (rline & ~7) : rline;
-    int hs_a  = (int)(ec_vram16(v, (uint16_t)(hbase + hidx * 4 + 0)) & 0x3FFu);
-    int hs_b  = (int)(ec_vram16(v, (uint16_t)(hbase + hidx * 4 + 2)) & 0x3FFu);
+    int hmode      = v->reg[11] & 0x03;
+    int hidx       = (hmode == 0) ? 0 : (hmode == 2) ? (rline & ~7) : rline;
+    int hs_a       = (int)(ec_vram16(v, (uint16_t)(hbase + hidx * 4 + 0)) & 0x3FFu);
+    int hs_b       = (int)(ec_vram16(v, (uint16_t)(hbase + hidx * 4 + 2)) & 0x3FFu);
+    int comp_a     = ec_plane_edge_comp(0u, bg_line, x0 - left);
+    int hs_a_adj   = (hs_a - comp_a) & 0x3FF;
+    int comp_b     = ec_plane_edge_comp(2u, bg_line, x0 - left);
+    int hs_b_adj   = (hs_b - comp_b) & 0x3FF;
 
-    int vs_mask = im2 ? 0x7FF : 0x3FF;
-    int va = (int)(v->vsram[0] & vs_mask);
-    int vb = (int)(v->vsram[1] & vs_mask);
-    if (v->reg[11] & 0x04u) {
-        int xc  = (sx < 0) ? 0 : (native_w - 1);
-        int col = (xc >> 4) * 2;
-        va = (int)(v->vsram[col % GVDP_VSRAM_ENTRIES] & vs_mask);
-        vb = (int)(v->vsram[(col + 1) % GVDP_VSRAM_ENTRIES] & vs_mask);
-    }
+    int vs_mask     = im2 ? 0x7FF : 0x3FF;
+    int vmode_2cell = (v->reg[11] & 0x04u) != 0;
+    int full_va     = (int)(v->vsram[0] & vs_mask);
+    int full_vb     = (int)(v->vsram[1] & vs_mask);
 
-    uint8_t idx_a = 0, idx_b = 0;
-    int op_a = 0, op_b = 0, hi_a = 0, hi_b = 0;
-    ec_fetch_plane_pixel(v, base_a, 0u, line, sx, hs_a, wt, ht, sx - hs_a, line + va, im2, &idx_a, &op_a, &hi_a);
-    ec_fetch_plane_pixel(v, base_b, 2u, line, sx, hs_b, wt, ht, sx - hs_b, line + vb, im2, &idx_b, &op_b, &hi_b);
+    unsigned wx        = v->reg[17];
+    unsigned wy        = v->reg[18];
+    int window_x       = (int)(wx & 0x1Fu) * 16;
+    int window_y       = (int)(wy & 0x1Fu) * 8;
+    int window_h_right = (wx & 0x80u) != 0;
+    int window_v_in    = (wy & 0x80u) ? (rline >= window_y) : (rline < window_y);
 
-    uint8_t s_idx = ms ? ms->idx[ox] : 0;
-    int s_op = ms ? (ms->op[ox] != 0) : 0;
-    int s_hi = ms ? (ms->hi[ox] != 0) : 0;
-    int s_sh = ms ? (ms->sh[ox] != 0) : 0;
-    int s_hl = ms ? (ms->hl[ox] != 0) : 0;
-
-    uint8_t cidx = backdrop;
-    if      (s_op && s_hi) cidx = s_idx;
-    else if (op_a && hi_a) cidx = idx_a;
-    else if (op_b && hi_b) cidx = idx_b;
-    else if (s_op)         cidx = s_idx;
-    else if (op_a)         cidx = idx_a;
-    else if (op_b)         cidx = idx_b;
-
-    int level = GENESIS_DAC_NORMAL;
-    if (sh_mode) {
-        int plane_hi = (op_a && hi_a) || (op_b && hi_b);
-        int any_hi   = plane_hi || (s_op && s_hi);
-        level = any_hi ? GENESIS_DAC_NORMAL : GENESIS_DAC_SHADOW;
-        if (s_hi || !plane_hi) {
-            if (s_hl)
-                level = (level == GENESIS_DAC_SHADOW) ? GENESIS_DAC_NORMAL : GENESIS_DAC_HIGHLIGHT;
-            else if (s_sh)
-                level = GENESIS_DAC_SHADOW;
+    int any_opaque = 0;
+    for (int ox = 0; ox < width; ++ox) {
+        int sx = ox - x0;
+        int va = full_va;
+        int vb = full_vb;
+        if (vmode_2cell) {
+            int xc  = (sx < 0) ? 0 : (sx >= native_w ? native_w - 1 : sx);
+            int col = (xc >> 4) * 2;
+            va = (int)(v->vsram[col % GVDP_VSRAM_ENTRIES] & vs_mask);
+            vb = (int)(v->vsram[(col + 1) % GVDP_VSRAM_ENTRIES] & vs_mask);
         }
-        if (s_op && cidx == 0x3Eu && level == GENESIS_DAC_SHADOW)
-            level = GENESIS_DAC_NORMAL;
-    }
 
-    return genesis_dac_cram_to_argb(v->cram[cidx & 63u], level);
+        uint8_t idx_a = 0, idx_b = 0;
+        int op_a = 0, op_b = 0, hi_a = 0, hi_b = 0;
+        int window_h_in = window_h_right ? (sx >= window_x) : (sx < window_x);
+        if (sx >= 0 && sx < native_w && (window_h_in || window_v_in))
+            ec_fetch_window_pixel(v, base_w, win_wt, ht, sx, bg_line, im2, &idx_a, &op_a, &hi_a);
+        else
+            ec_fetch_plane_pixel(v, base_a, 0u, bg_line, sx, hs_a_adj, wt, ht, sx - hs_a_adj, bg_line + va, im2, &idx_a, &op_a, &hi_a);
+        ec_fetch_plane_pixel(v, base_b, 2u, bg_line, sx, hs_b_adj, wt, ht, sx - hs_b_adj, bg_line + vb, im2, &idx_b, &op_b, &hi_b);
+        if (op_a || op_b)
+            any_opaque = 1;
+
+        uint8_t s_idx = ms ? ms->idx[ox] : 0;
+        int s_op = ms ? (ms->op[ox] != 0) : 0;
+        int s_hi = ms ? (ms->hi[ox] != 0) : 0;
+        int s_sh = ms ? (ms->sh[ox] != 0) : 0;
+        int s_hl = ms ? (ms->hl[ox] != 0) : 0;
+
+        uint8_t cidx = backdrop;
+        if      (s_op && s_hi) cidx = s_idx;
+        else if (op_a && hi_a) cidx = idx_a;
+        else if (op_b && hi_b) cidx = idx_b;
+        else if (s_op)         cidx = s_idx;
+        else if (op_a)         cidx = idx_a;
+        else if (op_b)         cidx = idx_b;
+
+        int level = GENESIS_DAC_NORMAL;
+        if (sh_mode) {
+            int plane_hi = (op_a && hi_a) || (op_b && hi_b);
+            int any_hi   = plane_hi || (s_op && s_hi);
+            level = any_hi ? GENESIS_DAC_NORMAL : GENESIS_DAC_SHADOW;
+            if (s_hi || !plane_hi) {
+                if (s_hl)
+                    level = (level == GENESIS_DAC_SHADOW) ? GENESIS_DAC_NORMAL : GENESIS_DAC_HIGHLIGHT;
+                else if (s_sh)
+                    level = GENESIS_DAC_SHADOW;
+            }
+            if (s_op && cidx == 0x3Eu && level == GENESIS_DAC_SHADOW)
+                level = GENESIS_DAC_NORMAL;
+        }
+
+        out[ox] = genesis_dac_cram_to_argb(v->cram[cidx & 63u], level);
+    }
+    *out_any_plane_opaque = any_opaque;
+}
+
+static void ec_render_ws_scanline(const GVDP *v, int line, int native_w, int left, int x0,
+                                  int width, int force_display, const EcMarginSprites *ms,
+                                  uint32_t *out)
+{
+    int any_plane_opaque = 0;
+    ec_render_ws_scanline_impl(v, line, native_w, left, x0, width, force_display, ms, out, &any_plane_opaque);
+    if (line >= 200 && any_plane_opaque)
+        s_last_floor_line = line;
+    if (line >= 216 && force_display && !any_plane_opaque) {
+        int src_line = 2 * s_last_floor_line - line;
+        if (src_line < 200)
+            src_line = 200;
+        if (src_line > s_last_floor_line)
+            src_line = s_last_floor_line;
+        int dummy = 0;
+        ec_render_ws_scanline_impl(v, src_line, native_w, left, x0, width, force_display, ms, out, &dummy);
+    }
 }
 
 static int ec_is_arena_state(void)
@@ -488,20 +733,22 @@ static void ec_video_scanline_lazy(const GVDP *vdp, int line, int native_w,
                                    uint32_t *out, int width,
                                    GameVideoNativeRow native_row, void *native_ctx)
 {
-    const uint32_t *src = native_row ? native_row(native_ctx) : NULL;
     int left = (width - native_w) / 2;
     if (left < 0) left = 0;
-    int x0 = left;
 
     if (vdp && ec_is_arena_state() && width > native_w && width <= GVDP_MAX_WIDTH) {
-        x0 = ec_compute_viewport_x0(line, native_w, width);
+        if (line == 0)
+            ec_refresh_frame_hud_sat(vdp);
+        int x0 = ec_compute_viewport_x0(line, native_w, width);
+        int force_display = (line >= 216 && s_frame_had_display && ec_ram16(0x9B32u) != 0u) ? 1 : 0;
         EcMarginSprites ms;
-        ec_eval_margin_sprites_line(vdp, line, native_w, x0, width, &ms);
-        for (int x = 0; x < x0; ++x)
-            out[x] = ec_render_margin_pixel(vdp, line, native_w, x - x0, &ms, x);
-        for (int x = x0 + native_w; x < width; ++x)
-            out[x] = ec_render_margin_pixel(vdp, line, native_w, x - x0, &ms, x);
-    } else if (width > native_w) {
+        ec_eval_full_sprites_line(vdp, line, left, x0, width, force_display, &ms);
+        ec_render_ws_scanline(vdp, line, native_w, left, x0, width, force_display, &ms, out);
+        return;
+    }
+
+    const uint32_t *src = native_row ? native_row(native_ctx) : NULL;
+    if (width > native_w) {
         for (int x = 0; x < left; ++x)
             out[x] = 0xFF000000u;
         for (int x = left + native_w; x < width; ++x)
@@ -509,9 +756,9 @@ static void ec_video_scanline_lazy(const GVDP *vdp, int line, int native_w,
     }
 
     if (src) {
-        int copy_w = (x0 + native_w <= width) ? native_w : (width - x0);
+        int copy_w = (left + native_w <= width) ? native_w : (width - left);
         if (copy_w > 0)
-            memcpy(out + x0, src, (size_t)copy_w * sizeof(uint32_t));
+            memcpy(out + left, src, (size_t)copy_w * sizeof(uint32_t));
     }
 }
 

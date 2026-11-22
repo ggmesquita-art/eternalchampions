@@ -78,4 +78,4 @@
 | Captura | Cenário / Estado | Dimensão PNG | Margem Esq. (não-preta / total) | Margem Dir. (não-preta / total) | WRAM Diff vs 320x224 |
 |---|---|---|---:|---:|---:|
 | `assets/captures/title_16_9.png` | Pillarbox Title (Estado 7) | 398x224 | 0/8736 | 0/8736 | 0/65536 |
-| `assets/captures/fight_16_9.png` | Battle Simulator / Training Room (S17) | 398x224 | 8517/8736 | 8420/8736 | 0/65536 |
+| `assets/captures/fight_16_9.png` | Battle Simulator / Training Room (S17) | 398x224 | 8593/8736 | 8461/8736 | 0/65536 |
