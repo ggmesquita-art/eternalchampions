@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Eternal Champions — Mixer Studio</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge">EC</div>
+      <div>
+        <h1>Eternal Champions — Mixer Studio</h1>
+        <p class="subtitle">Síntese MIDI em tempo real via TinySoundFont (<code>tsf.h</code>) — idêntica ao jogo (zero WAVs em disco)</p>
+      </div>
+    </div>
+
+    <div class="track-picker">
+      <label for="trackSelect">Música</label>
+      <select id="trackSelect" aria-label="Selecionar música"></select>
+      <button id="btnReloadTracks" class="btn btn-ghost" title="Recarregar lista de faixas">↻</button>
+    </div>
+
+    <div class="header-actions">
+      <button id="btnSave" class="btn btn-primary btn-save-main" title="Salvar perfil TOML usado em tempo real pelo jogo (Ctrl+S)">
+        <span id="unsavedDot" class="unsaved-dot hidden" aria-hidden="true"></span>
+        Salvar Perfil (.toml)
+      </button>
+      <button id="btnDownloadMidi" class="btn btn-secondary" title="Baixar arquivo MIDI Tipo 1 multi-canal (.mid)" disabled>
+        Baixar MIDI (.mid)
+      </button>
+      <button id="btnRenderAll" class="btn btn-ghost" title="Re-sintetizar todos os canais ativos em memória RAM via TinySoundFont (tsf.h)">
+        Atualizar Timbres
+      </button>
+    </div>
+  </header>
+
+  <section class="meta-bar" aria-label="Metadados e master da faixa">
+    <div class="meta-pills">
+      <span class="pill">BGM ID: <strong id="metaBgmId">—</strong></span>
+      <span class="pill" title="SoundFont configurado no perfil">SoundFont: <strong id="metaSoundfont">—</strong></span>
+      <span class="pill">Sample Rate: <strong id="metaSampleRate">—</strong></span>
+      <span class="pill">Loop: <strong id="metaLoop">—</strong></span>
+      <span class="pill">Canais MIDI: <strong id="metaStems">—</strong></span>
+      <span class="pill" title="Motor de síntese em memória RAM idêntico ao runtime C">Motor: <strong id="metaEngine">tsf.h (RAM)</strong></span>
+    </div>
+
+    <div class="master-controls">
+      <label class="inline-slider" title="Ganho de saída master (preview ao vivo + perfil .toml)">
+        <span>Master Gain</span>
+        <input id="masterGainSlider" type="range" min="-18" max="12" step="0.5" value="0" />
+        <output id="masterGainVal">0.0 dB</output>
+      </label>
+
+      <div class="chip-blend-control">
+        <label class="inline-slider" title="Mistura em tempo real (0 ms) entre stems SF2 e camada Chip DSP (0% = SF2 Puro, 100% = Chip DSP)">
+          <span>Chip Blend</span>
+          <input id="chipBlendSlider" type="range" min="0" max="1" step="0.01" value="0.65" />
+          <output id="chipBlendVal">65%</output>
+        </label>
+        <div class="chip-presets" role="group" aria-label="Presets rápidos de Chip Blend">
+          <button type="button" class="chip-preset-btn" data-blend="0" title="0% · Stems SF2 puros">0% (SF2 Puro)</button>
+          <button type="button" class="chip-preset-btn" data-blend="0.36" title="36% · D_hybrid_sf2_cinematic">36% (Cinematic D)</button>
+          <button type="button" class="chip-preset-btn" data-blend="0.65" title="65% · C_hybrid_sf2_balanced (padrão)">65% (Balanced C)</button>
+          <button type="button" class="chip-preset-btn" data-blend="1" title="100% · Chip DSP puro">100% (Chip DSP)</button>
+        </div>
+        <span id="chipRefBadge" class="chip-ref-badge hidden" title="Estado da camada de referência Chip DSP (B_studio_dsp.wav)"></span>
+      </div>
+
+      <label class="checkbox-inline" title="Ao trocar Modo, Instrumento GM ou Transpose, sintetiza o canal em RAM via tsf.h (~20 ms)">
+        <input id="autoApplyCheck" type="checkbox" checked />
+        <span>Auto-aplicar instrumento</span>
+      </label>
+    </div>
+  </section>
+
+  <section class="transport-bar" aria-label="Transporte e comparação A/B">
+    <div class="transport-buttons">
+      <button id="btnPlayPause" class="btn btn-transport" title="Play / Pause (Espaço)">▶ Play</button>
+      <button id="btnStop" class="btn btn-ghost" title="Stop">■ Stop</button>
+      <button id="btnLoop" class="btn btn-toggle active" title="Alternar Loop">⟳ Loop</button>
+    </div>
+
+    <div class="timeline">
+      <span id="timeCurrent" class="timecode">00:00.0</span>
+      <input id="seekBar" type="range" min="0" max="1000" step="1" value="0" aria-label="Posição de reprodução" />
+      <span id="timeTotal" class="timecode">00:00.0</span>
+    </div>
+
+    <div class="ab-switch" role="group" aria-label="Alternância A/B">
+      <button id="btnModeA" class="ab-btn active" title="Ouvir mixagem sintetizada em RAM via TinySoundFont (Tecla A)">
+        A · Remaster (tsf.h)
+      </button>
+      <button id="btnModeB" class="ab-btn" title="Ouvir áudio original A_original.wav (Tecla B)">
+        B · Original
+      </button>
+    </div>
+
+    <div class="meter-wrap" title="Nível de saída master (preview)">
+      <span class="meter-label">OUT</span>
+      <div class="meter-track">
+        <div id="masterMeterFill" class="meter-fill"></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="realtimeNoticeBanner" class="banner banner-realtime hidden">
+    <span id="realtimeNoticeText">Perfil padrão (default.toml) — não possui arquivo .mid próprio; ajustes salvos atuam como fallback global do jogo.</span>
+  </div>
+
+  <div id="statusBanner" class="banner banner-info hidden" role="status" aria-live="polite">
+    <span id="statusText"></span>
+    <button id="btnCloseStatus" class="btn btn-ghost btn-xs" aria-label="Fechar">✕</button>
+  </div>
+
+  <main class="mixer-shell">
+    <div class="mixer-toolbar">
+      <div class="toolbar-left">
+        <span id="audioStateBadge" class="badge">Aguardando faixa...</span>
+        <span id="soloStatusBadge" class="badge badge-solo hidden">SOLO ATIVO</span>
+      </div>
+      <div class="toolbar-right">
+        <button id="btnClearSolo" class="btn btn-ghost btn-xs">Limpar Solo</button>
+        <button id="btnUnmuteAll" class="btn btn-ghost btn-xs">Desmutar Todos</button>
+        <button id="btnResetEq" class="btn btn-ghost btn-xs">Zerar EQ</button>
+      </div>
+    </div>
+
+    <div id="mixerGrid" class="mixer-grid" aria-label="Canais do mixer"></div>
+  </main>
+
+  <footer class="footer-bar">
+    <span>Atalhos: <kbd>Espaço</kbd> Play/Pause · <kbd>A</kbd>/<kbd>B</kbd> Remaster/Original · <kbd>Ctrl+S</kbd> Salvar Perfil (.toml) · Duplo clique nos sliders para zerar</span>
+    <span id="exportMetaFooter">Síntese MIDI em tempo real via TinySoundFont (tsf.h) + TimGM6mb.sf2 — zero arquivos .wav gravados em disco.</span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

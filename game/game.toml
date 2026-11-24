@@ -277,3 +277,32 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x026A16
 kind = "game_hook"
+
+# Hooks passivos de áudio (68k → Z80 em disasm/code/sound_cmd.asm) para
+# sincronização de BGM remasterizada (ec_audio.{h,c}). Leitura puramente
+# passiva: ec_instruction_hook SEMPRE retorna 0 e nunca altera g_cpu/g_ram/Z80.
+#   $0008B8 = Sound_PlayBootSend (link a4,#0 após checks $9388/$9386 em $8A8/$8B0;
+#             4(a7) = ID; 0x00..0x0B = BGM Banco 1, >=0x18 = SFX ignorado)
+#   $000920 = Sound_Cmd0C (pause)
+#   $00092E = Sound_Cmd0D (resume)
+#   $00093C = Sound_Cmd16 (stop / fade)
+#   $000A28 = Sound_PlaySong2 (link a4,#0; 4(a7) = ID 0x00..0x04 -> BGM Banco 2: 0x0C+id)
+[[widescreen_site]]
+addr = 0x0008B8
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x000920
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x00092E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x00093C
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x000A28
+kind = "game_hook"

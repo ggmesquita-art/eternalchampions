@@ -8,6 +8,7 @@ set(GENESIS_NATIVE_IPO "OFF" CACHE STRING "" FORCE)
 option(EC_GEN_DEV_TRACE "Compila os traces de som dev (chip_ring/snd_ring, F12/--snd-dump)" OFF)
 
 find_package(SDL2 REQUIRED CONFIG)
+find_package(PNG REQUIRED)
 
 set(RECOMP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../segagenesisrecomp")
 include("${RECOMP_ROOT}/cmake/GenesisRecompGenerated.cmake")
@@ -23,7 +24,9 @@ genesisrecomp_runner_sources(RUNNER_SOURCES TRACE ON)
 
 add_executable(EternalChampionsRecomp
     ec_spec.c
+    ec_audio.c
     ec_boss.c
+    ec_hd.c
     ec_video.c
     ../neural/infer/ec_bplus_gl.c
     ../neural/infer/ec_bplus_ort.c
@@ -59,9 +62,14 @@ endif()
 
 target_link_libraries(EternalChampionsRecomp PRIVATE
     SDL2::SDL2
-    m
-    pthread
-    dl
+    PNG::PNG
 )
+if(UNIX)
+    target_link_libraries(EternalChampionsRecomp PRIVATE m pthread dl)
+endif()
+if(WIN32)
+    # SDL2main provides the WinMain entry point that calls SDL_main.
+    target_link_libraries(EternalChampionsRecomp PRIVATE SDL2::SDL2main)
+endif()
 
 genesisrecomp_runner_target(EternalChampionsRecomp)

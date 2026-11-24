@@ -129,6 +129,7 @@ struct EcBplusGl {
     BplusGl       gl;
     EcbpModel     model;
 
+    GLuint dedither_prog;
     GLuint conv_prog;
     GLuint up_prog;
     GLuint ssbo_w;
@@ -136,14 +137,17 @@ struct EcBplusGl {
     GLuint vao;
 
     GLuint tex_in;
+    GLuint tex_dedither;
     GLuint tex_feat[3];
     GLuint tex_tail;
 
+    GLint dd_u_in, dd_u_width, dd_u_height, dd_u_mode;
     GLint u_width, u_height, u_g_in, u_w_offset, u_b_offset, u_act, u_add_res, u_slope;
     GLint u_tex_in, u_tex_res;
     GLint up_u_in, up_u_tail, up_u_in_size, up_u_scale, up_u_intensity;
 
     float intensity;
+    EcBplusDeditherMode dedither_mode;
 
     GLuint   queries[BPLUS_QUERY_SLOTS];
     unsigned query_pending[BPLUS_QUERY_SLOTS];
@@ -178,6 +182,99 @@ static const GLenum s_stores[8] = {
     GL_UNPACK_SKIP_ROWS, GL_UNPACK_SWAP_BYTES, GL_UNPACK_LSB_FIRST,
     GL_UNPACK_IMAGE_HEIGHT, GL_UNPACK_SKIP_IMAGES
 };
+
+static const char s_dedither_cs[] =
+    "#version 430 core\n"
+    "layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;\n"
+    "layout(binding = 0) uniform sampler2DArray u_in;\n"
+    "layout(rgba16f, binding = 0) writeonly uniform image2DArray u_out;\n"
+    "uniform int u_width;\n"
+    "uniform int u_height;\n"
+    "uniform int u_mode;\n"
+    "vec4 fetch_clamped(int x, int y) {\n"
+    "    int cx = clamp(x, 0, u_width - 1);\n"
+    "    int cy = clamp(y, 0, u_height - 1);\n"
+    "    return texelFetch(u_in, ivec3(cx, cy, 0), 0);\n"
+    "}\n"
+    "float cdist(vec3 a, vec3 b) {\n"
+    "    vec3 d = abs(a - b);\n"
+    "    return max(d.r, max(d.g, d.b));\n"
+    "}\n"
+    "bool ceq(vec3 a, vec3 b)  { return cdist(a, b) <= 0.035; }\n"
+    "bool cneq(vec3 a, vec3 b) { return cdist(a, b) >  0.045; }\n"
+    "void main() {\n"
+    "    int x = int(gl_GlobalInvocationID.x);\n"
+    "    int y = int(gl_GlobalInvocationID.y);\n"
+    "    if (x >= u_width || y >= u_height) return;\n"
+    "    vec4 c4 = fetch_clamped(x, y);\n"
+    "    vec3 C  = c4.rgb;\n"
+    "    vec3 L  = fetch_clamped(x - 1, y).rgb;\n"
+    "    vec3 R  = fetch_clamped(x + 1, y).rgb;\n"
+    "    vec3 U  = fetch_clamped(x, y - 1).rgb;\n"
+    "    vec3 D  = fetch_clamped(x, y + 1).rgb;\n"
+    "    vec3 UL = fetch_clamped(x - 1, y - 1).rgb;\n"
+    "    vec3 UR = fetch_clamped(x + 1, y - 1).rgb;\n"
+    "    vec3 DL = fetch_clamped(x - 1, y + 1).rgb;\n"
+    "    vec3 DR = fetch_clamped(x + 1, y + 1).rgb;\n"
+    "    vec3 out_rgb = C;\n"
+    "    bool blended = false;\n"
+    "    bool q_ul = ceq(C, UL) && ceq(L, U) && cneq(C, L);\n"
+    "    bool q_ur = ceq(C, UR) && ceq(R, U) && cneq(C, R);\n"
+    "    bool q_dl = ceq(C, DL) && ceq(L, D) && cneq(C, L);\n"
+    "    bool q_dr = ceq(C, DR) && ceq(R, D) && cneq(C, R);\n"
+    "    int q_cnt = int(q_ul) + int(q_ur) + int(q_dl) + int(q_dr);\n"
+    "    if (q_cnt >= 2) {\n"
+    "        vec3 acc = vec3(0.0);\n"
+    "        if (q_ul) acc += 0.5 * (L + U);\n"
+    "        if (q_ur) acc += 0.5 * (R + U);\n"
+    "        if (q_dl) acc += 0.5 * (L + D);\n"
+    "        if (q_dr) acc += 0.5 * (R + D);\n"
+    "        out_rgb = 0.5 * C + 0.5 * (acc / float(q_cnt));\n"
+    "        blended = true;\n"
+    "    }\n"
+    "    if (!blended) {\n"
+    "        bool eq_ul = ceq(C, UL);\n"
+    "        bool eq_ur = ceq(C, UR);\n"
+    "        bool eq_dl = ceq(C, DL);\n"
+    "        bool eq_dr = ceq(C, DR);\n"
+    "        bool adj_diag = (eq_ul && eq_ur) || (eq_dl && eq_dr) ||\n"
+    "                        (eq_ul && eq_dl) || (eq_ur && eq_dr);\n"
+    "        if (adj_diag && cneq(C, L) && cneq(C, R) && cneq(C, U) && cneq(C, D)) {\n"
+    "            vec3 acc = vec3(0.0);\n"
+    "            float wsum = 0.0;\n"
+    "            if (eq_ul && eq_ur) { acc += U; wsum += 1.0; }\n"
+    "            if (eq_dl && eq_dr) { acc += D; wsum += 1.0; }\n"
+    "            if (eq_ul && eq_dl) { acc += L; wsum += 1.0; }\n"
+    "            if (eq_ur && eq_dr) { acc += R; wsum += 1.0; }\n"
+    "            out_rgb = 0.5 * C + 0.5 * (acc / wsum);\n"
+    "            blended = true;\n"
+    "        } else if (cneq(C, L) && ceq(L, R) && ceq(U, D) && ceq(L, U)) {\n"
+    "            int d_not_b = int(cneq(UL, L)) + int(cneq(UR, L)) +\n"
+    "                          int(cneq(DL, L)) + int(cneq(DR, L));\n"
+    "            if (d_not_b >= 2) {\n"
+    "                vec3 B = 0.25 * (L + R + U + D);\n"
+    "                out_rgb = 0.5 * C + 0.5 * B;\n"
+    "                blended = true;\n"
+    "            }\n"
+    "        }\n"
+    "    }\n"
+    "    if (!blended && u_mode >= 2) {\n"
+    "        if (ceq(L, R) && cneq(C, L)) {\n"
+    "            bool vc = ceq(U, C) || ceq(D, C);\n"
+    "            bool vl = ceq(UL, L) || ceq(DL, L);\n"
+    "            bool vr = ceq(UR, R) || ceq(DR, R);\n"
+    "            if (vc && vl && vr) {\n"
+    "                vec3 L2 = fetch_clamped(x - 2, y).rgb;\n"
+    "                vec3 R2 = fetch_clamped(x + 2, y).rgb;\n"
+    "                if (ceq(C, L2) || ceq(C, R2)) {\n"
+    "                    out_rgb = 0.5 * C + 0.25 * (L + R);\n"
+    "                    blended = true;\n"
+    "                }\n"
+    "            }\n"
+    "        }\n"
+    "    }\n"
+    "    imageStore(u_out, ivec3(x, y, 0), vec4(out_rgb, c4.a));\n"
+    "}\n";
 
 static const char s_conv3x3_cs[] =
     "#version 430 core\n"
@@ -648,6 +745,7 @@ static int ensure_size(EcBplusGl *ctx, unsigned w, unsigned h)
     unsigned g_c = ctx->model.channels / 4u;
     unsigned g_tail = (4u * scale * scale) / 4u;
     init_array_texture(&ctx->gl, &ctx->tex_in, GL_RGBA8, w, h, 1u);
+    init_array_texture(&ctx->gl, &ctx->tex_dedither, GL_RGBA16F, w, h, 1u);
     for (unsigned i = 0; i < 3u; ++i)
         init_array_texture(&ctx->gl, &ctx->tex_feat[i], GL_RGBA16F, w, h, g_c);
     init_array_texture(&ctx->gl, &ctx->tex_tail, GL_RGBA16F, w, h, g_tail);
@@ -810,9 +908,10 @@ EcBplusGl *ec_bplus_gl_create(SDL_Renderer *renderer, SDL_Texture *activation,
     BplusGlState st;
     state_begin(&ctx->gl, &st);
 
+    ctx->dedither_prog = link_compute_prog(&ctx->gl, s_dedither_cs);
     ctx->conv_prog = link_compute_prog(&ctx->gl, s_conv3x3_cs);
     ctx->up_prog = link_upscale_prog(&ctx->gl, s_upscale_vs, s_upscale_fs);
-    if (ctx->conv_prog && ctx->up_prog) {
+    if (ctx->dedither_prog && ctx->conv_prog && ctx->up_prog) {
         ctx->gl.GenBuffers(1, &ctx->ssbo_w);
         ctx->gl.BindBuffer(GL_SHADER_STORAGE_BUFFER, ctx->ssbo_w);
         ctx->gl.BufferData(GL_SHADER_STORAGE_BUFFER,
@@ -827,6 +926,11 @@ EcBplusGl *ec_bplus_gl_create(SDL_Renderer *renderer, SDL_Texture *activation,
         ctx->gl.BindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
         ctx->gl.GenVertexArrays(1, &ctx->vao);
+
+        ctx->dd_u_in = ctx->gl.GetUniformLocation(ctx->dedither_prog, "u_in");
+        ctx->dd_u_width = ctx->gl.GetUniformLocation(ctx->dedither_prog, "u_width");
+        ctx->dd_u_height = ctx->gl.GetUniformLocation(ctx->dedither_prog, "u_height");
+        ctx->dd_u_mode = ctx->gl.GetUniformLocation(ctx->dedither_prog, "u_mode");
 
         ctx->u_width = ctx->gl.GetUniformLocation(ctx->conv_prog, "u_width");
         ctx->u_height = ctx->gl.GetUniformLocation(ctx->conv_prog, "u_height");
@@ -848,7 +952,7 @@ EcBplusGl *ec_bplus_gl_create(SDL_Renderer *renderer, SDL_Texture *activation,
 
     state_end(&ctx->gl, &st);
 
-    if (!ctx->conv_prog || !ctx->up_prog || !ctx->ssbo_w || !ctx->ssbo_b) {
+    if (!ctx->dedither_prog || !ctx->conv_prog || !ctx->up_prog || !ctx->ssbo_w || !ctx->ssbo_b) {
         ec_bplus_gl_destroy(ctx);
         return NULL;
     }
@@ -884,12 +988,14 @@ void ec_bplus_gl_destroy(EcBplusGl *ctx)
             ctx->gl.DeleteQueries(BPLUS_QUERY_SLOTS, ctx->queries);
         }
         if (ctx->tex_in) ctx->gl.DeleteTextures(1, &ctx->tex_in);
+        if (ctx->tex_dedither) ctx->gl.DeleteTextures(1, &ctx->tex_dedither);
         for (unsigned i = 0; i < 3u; ++i)
             if (ctx->tex_feat[i]) ctx->gl.DeleteTextures(1, &ctx->tex_feat[i]);
         if (ctx->tex_tail) ctx->gl.DeleteTextures(1, &ctx->tex_tail);
         if (ctx->ssbo_w) ctx->gl.DeleteBuffers(1, &ctx->ssbo_w);
         if (ctx->ssbo_b) ctx->gl.DeleteBuffers(1, &ctx->ssbo_b);
         if (ctx->vao) ctx->gl.DeleteVertexArrays(1, &ctx->vao);
+        if (ctx->dedither_prog) ctx->gl.DeleteProgram(ctx->dedither_prog);
         if (ctx->conv_prog) ctx->gl.DeleteProgram(ctx->conv_prog);
         if (ctx->up_prog) ctx->gl.DeleteProgram(ctx->up_prog);
     }
@@ -987,6 +1093,20 @@ void ec_bplus_gl_set_intensity(EcBplusGl *ctx, float intensity)
     ctx->intensity = intensity;
 }
 
+void ec_bplus_gl_set_dedither(EcBplusGl *ctx, EcBplusDeditherMode mode)
+{
+    if (!ctx) return;
+    if (mode != EC_BPLUS_DEDITHER_OFF &&
+        mode != EC_BPLUS_DEDITHER_CBOD &&
+        mode != EC_BPLUS_DEDITHER_BOTH)
+        mode = EC_BPLUS_DEDITHER_OFF;
+    ctx->dedither_mode = mode;
+    if (mode != EC_BPLUS_DEDITHER_OFF) {
+        fprintf(stderr, "[BPLUS_GL] pre-dedither=%s enabled (native pre-upscale pass)\n",
+                mode == EC_BPLUS_DEDITHER_BOTH ? "both" : "cbod");
+    }
+}
+
 SDL_Texture *ec_bplus_gl_process(EcBplusGl *ctx, const uint32_t *argb,
                                  int width, int height, int stride_px)
 {
@@ -1047,12 +1167,28 @@ SDL_Texture *ec_bplus_gl_process(EcBplusGl *ctx, const uint32_t *argb,
                            width, height, 1, GL_BGRA, GL_UNSIGNED_BYTE, argb);
     ctx->gl.PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
+    /* Optional pre-upscale GPU de-dither pass (CBOD / SGENPT-MIX) */
+    GLuint src_tex = ctx->tex_in;
+    if (ctx->dedither_mode != EC_BPLUS_DEDITHER_OFF) {
+        ctx->gl.UseProgram(ctx->dedither_prog);
+        ctx->gl.ActiveTexture(GL_TEXTURE0);
+        ctx->gl.BindTexture(GL_TEXTURE_2D_ARRAY, ctx->tex_in);
+        ctx->gl.BindImageTexture(0, ctx->tex_dedither, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+        ctx->gl.Uniform1i(ctx->dd_u_in, 0);
+        ctx->gl.Uniform1i(ctx->dd_u_width, width);
+        ctx->gl.Uniform1i(ctx->dd_u_height, height);
+        ctx->gl.Uniform1i(ctx->dd_u_mode, (GLint)ctx->dedither_mode);
+        ctx->gl.DispatchCompute((GLuint)((width + 7) / 8), (GLuint)((height + 7) / 8), 1u);
+        ctx->gl.MemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        src_tex = ctx->tex_dedither;
+    }
+
     /* Compute passes: head -> N residual blocks -> tail */
     ctx->gl.UseProgram(ctx->conv_prog);
     ctx->gl.BindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ctx->ssbo_w);
     ctx->gl.BindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ctx->ssbo_b);
 
-    dispatch_conv(ctx, 0u, ctx->tex_in, ctx->tex_feat[0], 0u, 1, 0);
+    dispatch_conv(ctx, 0u, src_tex, ctx->tex_feat[0], 0u, 1, 0);
 
     unsigned res_idx = 0u;
     for (unsigned b = 0u; b < ctx->model.num_blocks; ++b) {
@@ -1070,7 +1206,7 @@ SDL_Texture *ec_bplus_gl_process(EcBplusGl *ctx, const uint32_t *argb,
     ctx->gl.UseProgram(ctx->up_prog);
     ctx->gl.BindVertexArray(ctx->vao);
     ctx->gl.ActiveTexture(GL_TEXTURE0);
-    ctx->gl.BindTexture(GL_TEXTURE_2D_ARRAY, ctx->tex_in);
+    ctx->gl.BindTexture(GL_TEXTURE_2D_ARRAY, src_tex);
     ctx->gl.ActiveTexture(GL_TEXTURE1);
     ctx->gl.BindTexture(GL_TEXTURE_2D_ARRAY, ctx->tex_tail);
     ctx->gl.Uniform1i(ctx->up_u_in, 0);
@@ -1114,6 +1250,8 @@ struct EcBplusGl { int unused; };
 EcBplusGl *ec_bplus_gl_create(SDL_Renderer *r, SDL_Texture *t, const char *p, double b)
 { (void)r; (void)t; (void)p; (void)b; return NULL; }
 void ec_bplus_gl_destroy(EcBplusGl *ctx) { (void)ctx; }
+void ec_bplus_gl_set_intensity(EcBplusGl *ctx, float intensity) { (void)ctx; (void)intensity; }
+void ec_bplus_gl_set_dedither(EcBplusGl *ctx, EcBplusDeditherMode mode) { (void)ctx; (void)mode; }
 SDL_Texture *ec_bplus_gl_process(EcBplusGl *ctx, const uint32_t *a, int w, int h, int s)
 { (void)ctx; (void)a; (void)w; (void)h; (void)s; return NULL; }
 int ec_bplus_gl_readback(EcBplusGl *ctx, void *a, size_t p)

@@ -147,7 +147,7 @@ def export_weight_pack(
             raise RuntimeError(f"Round-trip mismatch em {name}: max_diff={diff}")
 
     return {
-        "path": out_path.relative_to(ROOT).as_posix(),
+        "path": out_path.resolve().relative_to(ROOT).as_posix(),
         "size_bytes": len(raw),
         "sha256": sha256_file(out_path),
         "total_floats": total_floats,
@@ -358,6 +358,7 @@ def main() -> int:
     ap.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     ap.add_argument("--capture", type=Path, default=DEFAULT_CAPTURE)
     ap.add_argument("--out-png", type=Path, default=DEFAULT_OUT_PNG)
+    ap.add_argument("--no-update-manifest", action="store_true")
     args = ap.parse_args()
 
     if not args.pt.exists():
@@ -412,7 +413,7 @@ def main() -> int:
         out_u8 = np.clip(np.rint(ort_cap[0].transpose(1, 2, 0) * 255.0), 0.0, 255.0).astype(np.uint8)
         args.out_png.parent.mkdir(parents=True, exist_ok=True)
         Image.fromarray(out_u8, mode="RGBA").save(args.out_png)
-        cap_res["output_png"] = args.out_png.relative_to(ROOT).as_posix()
+        cap_res["output_png"] = args.out_png.resolve().relative_to(ROOT).as_posix()
 
         if torch.cuda.is_available():
             with torch.no_grad():
@@ -432,33 +433,34 @@ def main() -> int:
 
     ort_latency = benchmark_ort_latency(sess, provider_used)
 
-    manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
-    nm = manifest.get("neural_model", {})
-    nm.update({
-        "onnx_exported": True,
-        "onnx_note": "exported_and_verified",
-        "onnx_file": args.out_onnx.relative_to(ROOT).as_posix(),
-        "onnx_opset": opset_used,
-        "onnx_export_mode": export_mode,
-        "onnx_size_bytes": onnx_size,
-        "onnx_sha256": onnx_sha,
-        "onnx_graph": graph_info,
-        "weights_bin": weights_info["path"],
-        "weights_size_bytes": weights_info["size_bytes"],
-        "weights_sha256": weights_info["sha256"],
-        "weights_crc32": weights_info["crc32"],
-        "weights_roundtrip_max_diff": weights_info["roundtrip_max_diff"],
-        "onnx_parity": parity_info,
-        "ort_provider_used": provider_used,
-        "ort_available_providers": available_providers,
-        "ort_cuda_note": cuda_note,
-        "ort_latency": ort_latency,
-    })
-    manifest["neural_model"] = nm
-    args.manifest.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if not args.no_update_manifest:
+        manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+        nm = manifest.get("neural_model", {})
+        nm.update({
+            "onnx_exported": True,
+            "onnx_note": "exported_and_verified",
+            "onnx_file": args.out_onnx.resolve().relative_to(ROOT).as_posix(),
+            "onnx_opset": opset_used,
+            "onnx_export_mode": export_mode,
+            "onnx_size_bytes": onnx_size,
+            "onnx_sha256": onnx_sha,
+            "onnx_graph": graph_info,
+            "weights_bin": weights_info["path"],
+            "weights_size_bytes": weights_info["size_bytes"],
+            "weights_sha256": weights_info["sha256"],
+            "weights_crc32": weights_info["crc32"],
+            "weights_roundtrip_max_diff": weights_info["roundtrip_max_diff"],
+            "onnx_parity": parity_info,
+            "ort_provider_used": provider_used,
+            "ort_available_providers": available_providers,
+            "ort_cuda_note": cuda_note,
+            "ort_latency": ort_latency,
+        })
+        manifest["neural_model"] = nm
+        args.manifest.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     print(
-        f"[ONNX] {args.out_onnx.relative_to(ROOT)} | opset={opset_used} ({export_mode}) | "
+        f"[ONNX] {args.out_onnx.resolve().relative_to(ROOT)} | opset={opset_used} ({export_mode}) | "
         f"size={onnx_size} B | sha256={onnx_sha[:12]}"
     )
     print(f"[ONNX] graph ops={graph_info['op_counts']} | inputs={graph_info['inputs']} -> outputs={graph_info['outputs']}")

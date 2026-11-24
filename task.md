@@ -1,76 +1,140 @@
-# `task.md` — Fase 1: Disassembly Reconstruível (`M1`)
+# TASK.md — Fila Executável Ativa (EternalRecomp v2.0)
 
-> Fase ativa: [docs/phase-1.md](docs/phase-1.md) · Estado detalhado: [docs/PROGRESS.md](docs/PROGRESS.md) · Visão geral: [ROADMAP.md](ROADMAP.md)
-> Regra de ciclo: 1 item por iteração → validar com `tools/verify.py` → marcar `- [x]` → aguardar confirmação.
+> **Roadmap estratégico:** [`ROADMAP.md`](ROADMAP.md) · **Último log de sessão:** [`LAST_STATUS_AGY1.md`](LAST_STATUS_AGY1.md) · **Progresso histórico:** [`docs/PROGRESS.md`](docs/PROGRESS.md).
+> **Foco ativo:** Renderização Gráfica (`G`), Suporte a Shaders (`S`) e Remasterização da Trilha Sonora (`A`).
+> **Regra de validação:** Toda alteração em C/runtime exige build limpo (`cmake --build build/native -j`) + `python3 harness/ec_harness.py --quick` (e suíte `17/17` no fechamento de cada etapa) com `wram_diff=0/65536`.
 
-## Concluído anteriormente (`M0` + início da Fase 1)
+---
 
-- [x] Setup `M0`: `split.py`, `verify.py`, `vasm` 1.9d, Ghidra 12.2 + REA, `ares_cli`, `gpgx_runner` + `.ecm`, `reference/roms.toml`
-- [x] Boot, IRQ, Z80/som (`$000200–$000A7F`), `main_entry.asm` (`$002230–$0025FD`), `vdp_init.asm` (`$002786–$0027B3`), `state_table.asm` (`$0027B4–$002803`)
-- [x] Laço principal e dispatch: `main_frameloop.asm` (`$00FD24–$00FE1D`), `state_dispatch.asm` (`$00FE1E–$00FFAB`)
-- [x] Handlers dos estados 0–13 (`$002804–$00397F` em `state_handlers1.asm`, `state1_handler2.asm`, `state_handlers2.asm`, `state_handlers3.asm`)
+## 0. Pré-requisito / Checkpoint Imediato (Higiene de Git)
 
-## Fila ativa — Fase 1 (`M1`)
+- [ ] **G0.1 — Revisar e commitar o pacote validado do working tree atual** *(aguarda autorização do usuário)*:
+  - Submódulo `segagenesisrecomp/`: `runner/main.c` (Hotkey `F12` screenshot em `screenshots/` + `Shift/Ctrl+F12` preservando dump dev) e `runner/glue.c`.
+  - Repo principal: Pré-dither GPU (`neural/infer/ec_bplus_gl.{h,c}`), treino/export B+ v2 (`neural/train_espcn.py`, `neural/export_onnx.py`), Modo C (`game/ec_hd.{h,c}`, `game/ec_video.{h,c}`, `game/ec_spec.c`, `game/CMakeLists.txt`), backend CUDA ORT (`neural/infer/ec_bplus_ort.{h,c}` + `ort/`), `ROADMAP.md` e `task.md`.
+  - Decidir sobre `docs/ROADMAP.md` (cópia legada v0.1 não rastreada).
 
-- [x] Converter handlers dos estados 14–16 (`$003980–$004541`, 3.010 B) em `disasm/code/state_handlers4.asm`
-- [x] Converter handler do estado 17 (`$004542–$0056EF`, 4.526 B) em `disasm/code/state_handlers5.asm`
-- [x] Converter handlers dos estados 18–19 (`$0056F0–$006273`, 2.948 B) em `disasm/code/state_handlers6.asm`
-- [x] Converter handler do estado 20 (`$006274–$00724F`, 4.060 B) em `disasm/code/state_handlers7.asm`
-- [x] Converter handlers dos estados 21–22 (`$007250–$0081B5`, 3.942 B) em `disasm/code/state_handlers8.asm`
-- [x] Converter handler do estado 23 (`$0081B6–$008D5F`, 2.986 B) em `disasm/code/state_handlers9.asm`
-- [x] Converter handlers dos estados 24–25 (`$008D60–$009E53`, 4.340 B) em `disasm/code/state_handlers10.asm`
-- [x] Converter handler do estado 26 (`$009E54–$00A253`, 1.024 B)
-- [x] Converter handler do estado 27 (`$00A254–$00B56B`, 4.888 B)
-- [x] Converter handlers dos estados 28–39 (`$00B56C–$00C09F`, 2.868 B)
-- [x] Converter sub-rotinas do laço externo (`$002600–$002785`, 390 B)
-- [x] Converter cluster de utilitários (`$00C09E–$00FD23`: input `$C870/$CA80`, alocador `$D4CC`, escalonador `$DB14–$DC4E`, VDP/tilemap)
-- [x] Converter cluster de motor (`$00FFAC–$011ACD`) em `engine_ext.asm` e tarefas-núcleo (`$16F32`, `$172E6`, `$1FF00`)
-- [x] Converter clusters restantes de tarefas/luta/IA (`$011ACE–$05E8A3` em `obj_tasks1..4`, `menu_system`, `ai_fighters1..3`, `fight_moves1..3`, `combat_core` + `$2FCD1A–$2FF437` em `replay_system`, totalizando `373.204 B` / `364,5 KB` montados e verificados; dados não-código permanecem como blocos `incbin`)
-- [x] Mapear estrutura do lutador e estado da luta na RAM em `disasm/symbols/ram_map.toml` (dumps diferenciais GPGX)
-- [x] Arbitrar divergência do pad 6 botões (1 press no estado 9) com BlastEm/Exodus *(Resolvido com `BlastEm 1.0.0` via PTY debugger `-g -d`: `$9376=$0101` e acordo 100% entre `BlastEm 1.0.0`, `GPGX`, `ares` e `Native` em `A`, `B1`/`C1→13` e `B2`/`B3`/`C2→1`; a diferença antiga era alinhamento de frame em `State 9` caindo na janela `FCDE(15)` pós-`$9B62`; ver [docs/main_loop.md](docs/main_loop.md))*
-- [x] Mapear efeitos de HBlank/raster (VDP Reg 0 / Reg 11 per-line H-scroll) e atualizar `docs/PROGRESS.md`
-- [x] Aceitar `gpgx_runner` como referência dinâmica oficial do `M1` e avançar para `M2`–`M6` / Fase 5
+---
 
-## Fase 2 — Recompilação Estática Nativa (`M2`)
+## 1. Pilar 1 — Aperfeiçoamento da Renderização Gráfica (`Trilha G`)
 
-- [x] Gerar `game/ec_code_addrs.txt` (68.700 endereços) e `game/ec_discovery.toml` via [tools/recomp/gen_recomp_config.py](tools/recomp/gen_recomp_config.py) (inclui tabelas `$06A522`, IAs, callbacks de menu, `bra_s`/`bra_w`/`pcrel16`, continuations inline/`YIELD_APIS` e VM `$010BFE`/`$010C6E`)
-- [x] Implementar [game/game.toml](game/game.toml), [game/ec_spec.c](game/ec_spec.c) (ROM CRC32 `0x48F1A42E`, 6 botões habilitados em `ec_call_entry_point()`, telemetria, flag diagnóstica opt-in `EC_DIAG_BOSS_SANCTUARY` e carga `EC_HD_MANIFEST`) e [game/CMakeLists.txt](game/CMakeLists.txt)
-- [x] Corrigir propagação de desempilhamento de corrotinas (`_entry_split_sp_popped`) em `segagenesisrecomp/external/m68k-recomp-core/profiles/genesis/code_generator.c` e compilar `build/native/EternalChampionsRecomp` (exit `0`)
-- [x] Validar boot (`boot_600.ram`/`.vram`/`title.png`: Estado `$FD64=7`, `$FD70=532`, `$FD72=552`) e fluxo completo Título → Menu → Versus → Luta Ativa (Estados `14`, `17`, `18..27`, zero misses)
+### Etapa G1 — Laboratório Visual de Upscalers Teachers *(Próximo passo imediato — sem alterar código do jogo)*
+- [ ] **G1.1** — Capturar 4 frames nativos reais completos já com Pre-Dither `both` aplicado (`Vietnam S6`, `Salem S7`, `Sanctuary S2`, `Trident S5`) cobrindo personagens, sombras translúcidas, céu, fogo e HUD.
+- [ ] **G1.2** — Processar os 4 frames na RTX 5060 Ti com os upscalers já instalados em `F:\ComfyUI\ComfyUI\models\upscale_models\`:
+  - `4x-AnimeSharp.pth`
+  - `4x_IllustrationJaNai_V1_DAT2_190k.pth`
+  - `4x_foolhardy_Remacri.pth`
+  - `4x_NMKD-Siax_200k.pth`
+  - `4x-UltraSharpV2.safetensors`
+  - `4xNomos8kSCHAT-L.pth`
+- [ ] **G1.3** — Montar pranchas comparativas lado a lado com zoom 1:1 (lutadores, rosto/roupas, céu, chão e HUD) em `assets/video_compare/upscalers_teacher/` e comparar contra B+ v1 e B+ v2.
+- [ ] **G1.4 [GATE USUÁRIO]** — Escolher visualmente o upscaler teacher vencedor (para tela inteira / sprites e, se diferente, para planos/céus).
 
-## Fase 3 — Validação Determinística (`M3`)
+### Etapa G2 — Modo B+ v3 Full-Frame Distilled (100% da tela uniforme + 60 fps)
+- [ ] **G2.1** — Criar script de coleta de dataset full-frame (`neural/collect_dataset.py`) capturando centenas de frames reais variados (todas as 11 arenas, todos os 10 lutadores incluindo EC, poses em pé/aéreas/golpes/especiais/overkills, menus e HUD) com Pre-Dither `both`.
+- [ ] **G2.2** — Gerar targets 4× sobre todo o dataset usando o upscaler teacher aprovado em **G1.4** (sem recortes 32×32 e sem borda `NEAREST`).
+- [ ] **G2.3** — Aprimorar `neural/train_espcn.py` com perda perceptual (VGG/LPIPS ou perceptual + L1 + gradiente/SSIM) voltada para suavização real de contornos e redução da pixelação interna.
+- [ ] **G2.4** — Treinar e exportar duas variantes lado a lado (sem sobrescrever v1/v2):
+  - `assets/models/ec_bplus_v3_fast_weights.bin` (`ch=36..40`, `nb=2..3`, alvo `p50 ≤ 8–10 ms` no WSL D3D12 = 60 fps travados).
+  - `assets/models/ec_bplus_v3_hq_weights.bin` (`ch=48..56`, `nb=4..6`, foco qualidade máxima em GPU nativa).
+- [ ] **G2.5** — Validar paridade PyTorch ↔ ONNX ↔ GL Compute (`PSNR ≥ 60 dB`), `wram_diff=0/65536`, benchmark 120 frames e prancha comparativa v1 × v2 × v3.
 
-- [x] Criar suíte completa `.ecm` em [harness/movies/](harness/movies/) (`01`..`13` via [tools/harness/gen_roster_movies.py](tools/harness/gen_roster_movies.py): todos os 9 jogáveis, Eternal Champion e todas as 11 arenas + Holo-Trainer) com validação SHA-256 da ROM
-- [x] Implementar [harness/ec_harness.py](harness/ec_harness.py) (autodeterminismo nativo, tradução `.ecm`→`--input-script`, diff WRAM 64 KiB vs `gpgx_runner` com símbolos de `ram_map.toml`, validação de estado/elenco e relatório [docs/frame_data/fight_probe_summary.md](docs/frame_data/fight_probe_summary.md))
-- [x] Validar autodeterminismo nativo `0/65536` bytes + PNG idêntico e `0` misses (`floor_unsafe=0`, `dispatch_misses=0`, `interior_label_misses=0`, `floor_coverage=0`) nos 13 movies
-- [x] Paridade determinística em 2 camadas (`M3`) em toda a suíte: **Camada 1** (`Recomp` × `GENESIS_FORCE_INTERP=1`, após corrigir `on_post_reset()` em `main.c`/`ec_spec.c` e unificar ciclos via `m68k_68000_nominal_cycles()` em `m68k_interp.c`): `12/12` (`01`..`12`) com `gameplay_match=True`, `png_eq=True`, `pad=0x0101`, `$FD72` exato e `65.534/65.536` B idênticos (apenas 2 B mortos do cursor de boot `VramStream` `$FFC8B7`/`$FFC8BB`); **Camada 2** (`Native` × `GPGX`): `13/13` autodeterminismo `0/65536` + `(0,0,0,0)` misses e `12/12` acordo de estado `$FD64`/elenco/pad (diff residual `640`–`2.216` B por leitura ao vivo de `$00C00008` em `Math_RandomRange` `$CB82`; `gvdp_read_hv_counter` mantido intocado — ver [docs/phase-3.md](docs/phase-3.md) e [docs/frame_data/fight_probe_summary.md](docs/frame_data/fight_probe_summary.md))
+### Etapa G3 — Modo C Híbrido (Planos HD limpos + Fallback B+ v3)
+- [ ] **G3.1** — Adicionar controle granular `--hd-mode <off|planes|all>` em `game/ec_hd.{h,c}`, `game/ec_video.{h,c}` e `game/ec_spec.c` (permitindo usar apenas os planos/céus 4× sem o efeito colcha de retalhos de sprites parciais).
+- [ ] **G3.2** — Regerar os 27 planos de arena (`assets/hd/planes/`) passando Pre-Dither `both` **antes** do upscaler/Flux (corrigindo especificamente o grão residual do céu do Trident `86cb2ec7b0cbbdd2`).
+- [ ] **G3.3** — *(Opcional, se optar por manter sprites no Modo C)* Corrigir `enforce_silhouette()` em `tools/pipeline/comfy_upscale.py` para máscara alfa suave (anti-aliased) em vez de `NEAREST` 4×4.
 
-- [x] Corrigir travamento de fim de partida e recompilar o jogo `100%` nativo: `19` tabelas `bra_w` + slots/ponteiros de task isentos da heurística ASCII + callbacks `$36(a0)`/`$968E`/listas `bra.w` de menu em [tools/recomp/gen_recomp_config.py](tools/recomp/gen_recomp_config.py), e cobrança de ciclos de `jsr`/`bsr` antes do callee em `code_generator.c`. A Camada 1 anterior contava com o jogo parcialmente interpretado pelo floor; agora `16/16` `0/65536` B vs `GENESIS_FORCE_INTERP=1` e `17/17` zero misses (ver [docs/phase-3.md](docs/phase-3.md) §5)
-- [x] Converter o Duff's device `$05E242` em switch interno (walker do gerador + probe/seeding por mnemônico em `code_generator.c`; `INTERIOR_UNRESOLVED = 0`) e caracterizar o resíduo de temporização de `f1143` (sem efeito em WRAM; correção depende do modelo de yield do engine)
+### Etapa G4 — Otimização GPU (OpenGL Compute & CUDA ORT)
+- [ ] **G4.1** — Otimizar `neural/infer/ec_bplus_gl.c` (workgroups, uso consistente de `rgba16f`/FP16, redução de barreiras/passes) para reduzir a latência de B+ v2/v3 no WSL Mesa D3D12 e Windows.
+- [ ] **G4.2** — Evoluir `neural/infer/ec_bplus_ort.c` para suportar `--bplus-dedither` e `--bplus-intensity`, e avaliar eliminação do round-trip CPU↔GPU (GL-CUDA interop ou DirectML no Windows).
+- [ ] **G4.3** — Habilitar Modo B (`genesis_hd_gpu`) compatível com `--widescreen` quando B+ estiver desligado.
 
-## Fase 4 — Renderer `GameVideo`, Widescreen e Base Modo C (`M4`–`M6`)
+---
 
-- [x] Implementar [game/ec_video.h](game/ec_video.h) e [game/ec_video.c](game/ec_video.c) (Modo A padrão `320x224`, `--widescreen` opt-in com extensão viva de Planos A/B + Reg 11 H-scroll + VSRAM + CRAM nos estados `14, 15, 17..27`, pillarbox fora de arena e loader `EC_HD_MANIFEST` com fallback seguro)
-- [x] Validar `--widescreen 16:9` via `ec_harness.py` em todas as 12 capturas de arena (`S14, S17, S18..S27` em `398x224`, margens ativas preenchidas, Title `S7` em pillarbox `0/8736` e `0/65536` bytes divergentes na WRAM vs `320x224`)
-- [x] Documentar política por estado e tabela completa em [docs/widescreen.md](docs/widescreen.md)
-- [x] Protótipo neural B+ (`N1`): destilação PyTorch CUDA em [neural/train_espcn.py](neural/train_espcn.py) (`ECStudentESPCN4x` `82.344` params, `PSNR=23,273 dB`, `SSIM=0,8869`, `AlphaIoU=0,9996`, latência `fp16 320x224` `p50=1,1924 ms / p99=1,7751 ms`, checkpoint em `assets/models/ec_bplus_espcn4x.pt`)
-- [x] Export ONNX (`N2`) e integração em runtime `P3` (`N3`) *(**CONCLUÍDOS**: [neural/export_onnx.py](neural/export_onnx.py) → `ec_bplus_espcn4x.onnx` `opset 17` + pack `ECBP` v1 `ec_bplus_espcn4x_weights.bin` `329.408` B `det=0.0` `PSNR≥144,48 dB`; runtime C sem dependências via OpenGL 4.3+ Compute Shaders em [neural/infer/ec_bplus_gl.c](neural/infer/ec_bplus_gl.c) + [game/ec_video.c](game/ec_video.c) com `--neural-bplus`/`EC_NEURAL_BPLUS=1`, paridade `PSNR=78,603 dB` em `1280×896` e `62,973 dB` em widescreen `1592×896`, `0/65536` WRAM diff, `p50=5,34 ms / p99=6,73 ms` no WSL2 Mesa D3D12 e fallbacks verificados — ver [docs/phase-4.md](docs/phase-4.md))*
+## 2. Pilar 2 — Suporte a Shaders Modulares (`Trilha S`)
 
-## Fase 5 — Pipeline de Assets HD (`M7`) e Fase 6 — Sega CD (`M8`)
+### Etapa S1 — Engine de Cadeia de Shaders Multi-Pass (OpenGL)
+- [ ] **S1.1** — Projetar e implementar `game/ec_shader_chain.{h,c}` com pipeline FBO ping-pong em OpenGL 3.3+ encaixado no fluxo `ec_video_present_gpu()` (`game/ec_video.c`), suportando estágios pré-upscale (nativo), upscale analítico e pós-upscale (saída 4× / viewport).
+- [ ] **S1.2** — Implementar parser leve de presets `.ecshader` (subset compatível com `.glslp` do RetroArch: `shaders`, `shaderN`, `filter_linearN`, `scale_typeN`, `scaleN`, `#pragma parameter`, uniformes `Source`, `Original`, `SourceSize`, `OriginalSize`, `OutputSize`, `FrameCount`).
+- [ ] **S1.3** — Garantir fallback silencioso em headless/software (`SDL_VIDEODRIVER=dummy`) e `wram_diff=0/65536`.
 
-- [x] Expandir extrator [tools/extract/extract_assets.py](tools/extract/extract_assets.py) (CRAM `$FFFF9BB0`, SAT, tiles/planos A e B deduplicados por SHA-256 + mapas de índice em `assets/catalog/indices/` + `--preserve-hd`) para todas as capturas (`6.135` entradas: `410` sprites, `5.698` tiles, `27` planos)
-- [x] Validar carga em runtime com `EC_HD_MANIFEST=pipeline/manifest.json` (`120` quadros com `--benchmark 120`: `6135 entradas (0 approved, fallback=Modo A/B)`, exit `0`)
-- [x] Pipeline ComfyUI HD (`pipeline/workflows/` + [tools/pipeline/comfy_upscale.py](tools/pipeline/comfy_upscale.py) + [tools/pipeline/review_viewer.py](tools/pipeline/review_viewer.py)): `107` assets 4× gerados via ComfyUI `127.0.0.1:8188` (`27/27` planos + `80` sprites representativos do elenco, `min_iou >= 0.9820`) e galeria lado a lado em `assets/review/index.html`
-- [x] Curadoria e aprovação manual (`status="approved"`) dos `437` assets + retreino B+ + modos extras (`2P VS`, `Overkill`, `Tournament`) *(**`M7` CONCLUÍDO**: `437/437` aprovados + retreino B+ (`M7.2`); **`M7.3`**: `.ecm` com 2ª coluna (pad 2) e movies `14_2p_vs_rax_vs_blade_s24`, `15_tournament_roundabout_jetta_vs_xavier_s27` (`$9424=3`, arena sorteada) e `16_2p_vs_match_end_s24_to_s1` (KO final → `WINS COMPETITION` → Estado `1`); Overkill mapeado e confirmado em `17_2p_vs_overkill_trident_s24` (`$9C7C=1`); suíte `17/17` verde — ver [docs/phase-5.md](docs/phase-5.md))*
-- [ ] Expansão Sega CD / *Eternal Champions: Challenge from the Dark Side* (`M8`) *(ADIADA por decisão de escopo até concluir o cartucho Genesis; dump `.chd` e pack completo de BIOS US/EU/JP já estão em `roms/`)*
+### Etapa S2 — Biblioteca Curada de Shaders & Presets (`assets/shaders/`)
+- [ ] **S2.1** — Portar/implementar shaders base em GLSL:
+  - Pré-passe de-dither (`cbod.glsl`, `sgenpt_mix.glsl`)
+  - Upscale analítico leve para GPUs sem CUDA (`scalefx.glsl` ou `xbrz_4x.glsl` + `fsr_easu.glsl`)
+  - Pós-passe de nitidez sem halo (`cas_rcas.glsl` — AMD FidelityFX CAS/RCAS para 1440p/4K)
+  - Pós-passe CRT/Arcade (`crt_subtle.glsl` e `crt_lottes.glsl` com scanlines, máscara de fósforo e bloom/halation configuráveis)
+- [ ] **S2.2** — Criar 5 presets prontos em `assets/shaders/presets/`:
+  - `remaster-crisp.ecshader` (Pre-Dither → B+ v3 → RCAS)
+  - `remaster-crt.ecshader` (Pre-Dither → B+ v3 → CRT sutil)
+  - `lite-scalefx.ecshader` (Pre-Dither → ScaleFX/xBRZ → CAS — sem neural/CUDA)
+  - `arcade-crt-trinitron.ecshader` (Pre-Dither → CRT-Lottes + ColorLUT Trinitron)
+  - `off` (bypass)
 
-## Fase 7 — Áudio (`M9`)
+### Etapa S3 — Integração CLI, `settings.ini`, Hotkey e Benchmark
+- [ ] **S3.1** — Adicionar `--shader-preset <nome|caminho>` e `--shader-param <chave=valor>` em `game/ec_spec.c` e suporte no `settings.ini`.
+- [ ] **S3.2** — Adicionar hotkey em runtime (`F9` / `Shift+F9`) em `segagenesisrecomp/runner/main.c` para ciclar presets ao vivo com log/OSD, sem conflitar com `F7/F8` (save/load), `F10` (cold reset) e `F12` (screenshot).
+- [ ] **S3.3** — Medir latência por passe (`GL_TIME_ELAPSED`) e gerar prancha comparativa em `1080p`, `1440p` e `4K` em `assets/video_compare/shaders/`.
 
-- [x] Corrigir silêncio do recomp nativo: **Timer A do YM2612 não era emulado** no barramento ([segagenesisrecomp/runner/video/genesis_bus.c](segagenesisrecomp/runner/video/genesis_bus.c)/[genesis_bus.h](segagenesisrecomp/runner/video/genesis_bus.h)) — só Timer B (RKA). O driver Z80 do Eternal Champions programa `$24/$25` (TA=1019, TAL=5) e escreve `$27=$15` (reset flag A + habilita flag A + load/run A), depois gira em `bit 0,(hl)` no status `$4000` aguardando o overflow do Timer A — flag que nunca era setada, então o Z80 parava em `$0287` e o som morria após o frame 245. Emulação adicionada (período = `(1024−TA)×1008` ciclos master, 1 decremento por amostra FM — mesma cadência do oracle GPGX `INTERNAL_TIMER_A`), com load/run em `$27` bit 0 e flag gate em bit 2; `rb_state.c` atualizado (asserts de tamanho 24688/90600). **Validado**: WAV bit-identical entre runs (`md5` igual), fluxo de 48 s boot→título→menu→luta com áudio contínuo (DAC PCM + música, RMS 460–2150, pico 10.688), suíte completa `17/17` verde (`det=0/65536`, `gp_ok=True`, PNG iguais, Camada 2 vs GPGX inalterada na classe de ruído HV `$C00008`). **Nota honesta**: Camada 1 (Recomp × `GENESIS_FORCE_INTERP=1`) do movie `08` passou de `0/65536` para `4/65536` (estável, só nos últimos 100 quadros do fim de luta; `$FFAAFB`+`$FFE897-99`): com o Z80 vivo, o handshake CommFlag/Ack dentro do VINT agora depende do interleave 68k×Z80 — o handler interpretado roda atômico (`m68k_interp_run_handler` não faz budget-yield) enquanto o recompilado intercala com o Z80 por acesso de barramento; retries diferentes → fase de raster diferente → leituras HV divergentes no RNG do fim de luta. Era mascarado pelo Z80 congelado. Gameplay inalterado (PASS/png_eq/HP iguais). *Opcional futuro: budget-yield no handler interpretado para zerar esses 4 bytes.*
-- [ ] Extrair músicas e efeitos sonoros (trilhas do driver Z80 via YM2612/SN76489 + amostras PCM DAC) para remasterização — ainda não feito
+---
 
-## Fase 8 — Controles e Apresentação (`M10`)
+## 3. Pilar 3 — Remasterização da Trilha Sonora (`Trilha A`)
 
-- [x] Mapeamento padrão do **controle XBOX** ([segagenesisrecomp/runner/input_map.c](segagenesisrecomp/runner/input_map.c)): layout posicional estilo Sega — Genesis A/B/C (os três botões de ataque do Eternal Champions) em face X/A/B, Genesis X em Y, Y/Z nos ombros LB/RB, Mode em Back, Start em Start (P1 e P2); antes era o mapeamento "ajustado para PlayStation". Funciona plug-and-play (defaults compilados; sem `settings.ini` para sobrescrever)
-- [x] Intensidade do efeito **B+** (upscaler neural ESPCN 4× via Compute Shaders OpenGL): novo `--bplus-intensity <f>` / `EC_BPLUS_INTENSITY` ([neural/infer/ec_bplus_gl.c](neural/infer/ec_bplus_gl.c) + [game/ec_video.c](game/ec_video.c) + [game/ec_spec.c](game/ec_spec.c)) — escala o resíduo neural sobre a base bilinear (`result = clamp(base + delta × intensity)`): `0.0` = bilinear puro, `1.0` = saída exata do modelo (padrão), `>1` amplifica o detalhe (ex.: `1.5`–`2.0` para efeito mais forte); clamp `[0,4]`. **Validado** no WSL2 (`GALLIUM_DRIVER=d3d12`, GL 4.6 Mesa, `fallback=0`, capturas com md5 distintos entre `0.0` e `3.0`) e `ec_harness --quick` verde
-- [ ] *Futuro:* camada de mapeamento de controles amigável (ou menu in-game) em vez de editar `settings.ini`/defaults
+> **Diretriz da Trilha A:** Novo módulo de áudio em tempo real (`game/ec_audio.{h,c}`) com DSP custo-zero aplicado também a SFX/vozes não-MIDI do chip original (sem investimento em remasterizar sons não-MIDI) + **síntese SoundFont2 em tempo real** (`TinySoundFont` em `game/third_party/tsf.h` + `assets/soundfonts/TimGM6mb.sf2`) alimentada por observer passivo de registradores FM/PSG (`audio_mixer_set_chip_observer` em `segagenesisrecomp/runner/audio/mixer.{h,c}`) + perfis `.toml` por `bgm_id` (sem WAVs pré-renderizados no jogo) + ferramenta externa (`tools/audio/mixer_studio.py`) para ajustar mixagem (**volume** e **tipo de instrumento**) de cada canal por música.
+
+### Etapa A1 — Auditoria FM/PSG, Correção de Blade, Stems & Motor de Remasterização (`Task A1-pipeline`)
+- [x] **A1.1** — Escrever `docs/audio_remaster_architecture.md` detalhando o driver Z80 (`$000A80`), canais YM2612 (`FM0..FM5` + `DAC $2A`), SN76489 (`PSG0..PSG2` + `PSG_NOISE`), interface `sound_cmd.asm` (`$0008A8–$000A7F`), causa-raiz do bug de percussão em Blade (`chip_ring_to_midi.py:200-224`), schema dos perfis `.toml` e arquitetura de síntese SoundFont em tempo real + DSP custo-zero.
+- [x] **A1.2** — Corrigir o mapeamento em `tools/audio/chip_ring_to_midi.py` separando fielmente canais YM2612/PSG/DAC (sem desviar notas FM curtas tonais para bateria, corrigindo `03_syria_blade`) e criar `tools/audio/export_stems.py` para exportar stems MIDI/WAV isolados por canal (`fm0..fm5`, `dac`, `psg0..psg2`, `psg_noise`) e gerar perfis editáveis em `assets/audio_remaster/profiles/<track>.toml`.
+- [x] **A1.3** — Implementar `tools/audio/remaster_track.py` lendo perfil `.toml` + SoundFont (`.sf2`) para renderizar stems individuais (preview na ferramenta de mixagem) e validar os perfis `.toml` usados pelo motor em tempo real.
+
+### Etapa A2 — Ferramenta Externa de Mixagem por Instrumento & Catálogo (`Task A2-mixer-tool`)
+- [x] **A2.1** — Implementar `tools/audio/mixer_studio.py` (servidor HTTP local Python stdlib + SPA HTML/CSS/JS com Web Audio API, compatível com Windows e WSL):
+  - Seletor de música (`assets/audio_remaster/profiles/*.toml`) + alternância A/B (`Original` vs `Remaster`).
+  - Controle por canal (`FM0..FM5`, `DAC`, `PSG0..PSG3`): **volume (dB)**, **tipo/instrumento** (patches GM 0–127 categorizados, percussão, `chip`, `off`), **pan**, **mute/solo** com ajuste de volume/mix instantâneo no navegador.
+  - Ações: re-renderizar canal ao trocar instrumento e salvar perfil `.toml` em `assets/audio_remaster/profiles/`.
+- [x] **A2.2 [GATE USUÁRIO]** — Validar fluxo nas 3 faixas piloto (`Vietnam`, `Salem`, `Syria/Blade` corrigida) e ajustar mixagem via `mixer_studio.py`.
+- [x] **A2.3** — Catalogar todos os IDs BGM da ROM em perfis `.toml` dedicados em `assets/audio_remaster/profiles/` (com fallback automático em `default.toml` para faixas ainda sem perfil específico).
+
+### Etapa A3 — Síntese SoundFont em Tempo Real no Runner + DSP Custo-Zero (`Tasks A3-engine` & `A3-integration`)
+- [x] **A3.1** — Implementar módulo standalone em C11 (`game/ec_audio.{h,c}` + `game/third_party/tsf.h`, zero dependências externas novas no CMake; compatível com MSVC Windows e GCC/Clang WSL):
+  - **DSP de estúdio custo-zero** (EQ 3 bandas biquad, abertura estéreo sutil, reverb de sala Schroeder decimado e soft-limiter) aplicado sobre o barramento final (chip original + síntese SF2) — melhora BGM e todos os SFX/vozes não-MIDI sem custo adicional.
+  - **Sintetizador SoundFont2 em tempo real (`TinySoundFont` 48 kHz)** com tradutor hardware-exact YM2612 + SN76489 sub-frame via `AudioChipWriteObserver` (`audio_mixer_set_chip_observer` em `mixer.{h,c}`), perfis `.toml` por `bgm_id` (e `default_profile` fallback para savestates diretos), fade-out suave e pause/resume sem cliques, mantendo 100% dos SFX/vozes PCM `$2A` no barramento chip.
+  - Modos: `--audio-remaster off|dsp|hybrid|ost` (`off` padrão 100% autêntico).
+- [x] **A3.2** — Integrar `game/ec_audio.{h,c}` em `game/game.toml` (hooks passivos `[[widescreen_site]] kind = "game_hook"` retornando `0` em `$0008B8`, `$000920`, `$00092E`, `$00093C`, `$000A28`), `segagenesisrecomp/runner/audio/mixer.{h,c}` (`audio_mixer_set_chip_observer`), `game/ec_spec.c` (`audio_mixer_set_chip_observer()`, `audio_set_extra_source()`, flags CLI `--audio-remaster`, `--audio-sf2`, `--audio-profiles-dir`, `--audio-bgm-vol`, `--audio-sfx-vol`, `--audio-chip-blend`, `--audio-dsp-reverb`, `ec_on_post_reset`) e `game/CMakeLists.txt`.
+- [x] **A3.3** — Compilar binário e validar determinismo (`wram_diff=0/65536`, zero cliques/underruns no DRC) + modos `off`/`dsp`/`hybrid`/`ost` com captura `--wav`.
+
+### Etapa A4 — Extração Completa dos 17 MIDIs da ROM & Mixer 100% MIDI via `tsf.h` (Zero WAVs em Disco)
+- [x] **A4.1** — Adicionar suporte ao formato `GENESIS_AUDIO_APPLIEDDUMP` (`APP FM` / `APP PSG`) em `tools/audio/chip_ring_to_midi.py` e criar `tools/audio/extract_all_midis.py` para capturar automaticamente os **17 BGMs da ROM (`bgm_id 0..16`)** direto do executável nativo `build/EternalChampionsRecomp.exe` (via Music Test / fluxo de menu, áudio limpo sem SFX/vozes) gerando os 17 arquivos MIDI Tipo 1 multi-canal consolidados em `assets/audio_remaster/midi/<slug>.mid`.
+- [x] **A4.2** — Criar e compilar biblioteca nativa leve `tools/audio/tsf_midi_synth.c` → `tools/audio/tsf_midi_synth.dll` (usando o mesmo `game/third_party/tsf.h` + `assets/soundfonts/TimGM6mb.sf2` do jogo) para sintetizar canais MIDI diretamente em memória RAM (suportando `auto`, `gm`, `percussion`, `transpose`, `bank`, `program`) sem depender de FluidSynth/WSL nem gravar WAVs em disco.
+- [x] **A4.3** — Migrar `tools/audio/mixer_studio.py` e `tools/audio/mixer_ui/{index.html,style.css,app.js}` para operar 100% sobre `assets/audio_remaster/midi/*.mid` + `assets/audio_remaster/profiles/*.toml` via `tsf_midi_synth.dll` em memória (com download do `.mid` e botão principal **Salvar Perfil `.toml`**), remover completamente a pasta obsoleta `assets/audio_remaster/stems/` (zero `.wav` em disco) e atualizar `docs/audio_remaster_architecture.md`.
+- [x] **A4.4** — Revisão independente (`revisor`) + validação fim-a-fim: conferir os 17 `.mid` válidos (notas, canais, zero notas agudas espúrias `>=96`), testar síntese em memória de todos os 17 BGMs via HTTP no `mixer_studio.py`, confirmar `0` WAVs em `assets/audio_remaster/` e manter `wram_diff=0/65536` no executável do jogo.
+
+---
+
+## 4. Trilha F — Finalização, Port Windows e Backlog de Baixa Prioridade
+
+- [x] **F1 — Build Windows Nativo (x64):**
+  - Portar `neural/infer/ec_bplus_ort.c` (`dlopen` → `LoadLibraryA` / `onnxruntime.dll`).
+  - Validar `game/CMakeLists.txt` (SDL2, libpng, OpenGL, decoder de áudio) em compilação Windows nativa.
+  - Revalidar latência real de B+ v3 + Shaders em GPU nativa Windows (fora do overhead WSL Mesa D3D12).
+- [x] **F2 — CLI `--help` & Documentação Consolidada:**
+  - Implementar `--help` / `-h` em `segagenesisrecomp/runner/main.c` listando flags do runner + `g_game_spec.arg_usage`.
+  - Consolidar guia completo de flags CLI e todas as chaves de `settings.ini` em `docs/CONFIGURATION_AND_CLI.md`.
+- [ ] **F3 — PAUSE → Sair para o Menu:**
+  - Implementar mini-menu visual seguro (`RESUME / EXIT TO MENU`) no `Main_PauseLoop` via hook nativo sem patch na ROM.
+- [ ] **F4 — Itens de Baixa Prioridade & Bugfixes Pontuais:**
+  - [ ] Corrigir recarga de sprite pós-explosão no Overkill do Santuário quando o vencedor (ex.: Eternal Champion) está muito próximo do vitral no disparo.
+  - [ ] Prototipar Overkill customizado da Arena de Treino (State 14 / Holo-Trainer: robô da projeção / moving heads no centro).
+  - [ ] Validar fluxo 1P Holo-Trainer original (Estado 14 sem `--unlock-boss`) e revisar manutenção/reversão do stall DMA de `3402866`.
+  - [ ] Extração completa de movelists em `docs/movements/`.
+  - [ ] Expansão Sega CD (*Challenge from the Dark Side*, `M8` — adiada até conclusão do cartucho Genesis).
+
+---
+
+## 5. Arquivo Histórico — Marcos Concluídos (M0–M10 + Bugfix/Polish)
+
+- [x] **M0–M1:** Setup, `vasm` 1.9d, Ghidra/REA, disassembly reconstruível 100% byte-a-byte (`373.204 B`), `ram_map.toml`, arbitragem 4-vias (`BlastEm`/`GPGX`/`ares`/`Native`), mapeamento de VDP Reg 11 H-Scroll.
+- [x] **M2–M3:** Recompilação estática 100% nativa (`build/native/EternalChampionsRecomp`), suíte `17/17` `.ecm` (`det=0/65536`, `png_eq=True`, `misses=(0,0,0,0)`), correção do fim de partida e Duff's device `$05E242`.
+- [x] **M4–M6:** `ec_video.c` Modo A + Widescreen `16:9`/`21:9` (`0/65536` WRAM diff), SAT nas margens (`Microtarefa 1A`), fallback de metatiles + ancoragem de bordas + T-Rex esquerdo (`Microtarefa 1B`), HUD fixo no topo + remoção da linha preta inferior + compensação de parallax nas bordas (`Etapa 1A`, commit `939e69c`).
+- [x] **M7 / N1–N3 (v1–v2):** Extrator `6.135` entradas, `437/437` assets Flux HD aprovados, B+ v1 (`82k` GL Compute + CUDA ORT) + `--bplus-intensity`, Pré-dither GPU (`--bplus-dedither off|cbod|both`), B+ v2 Flux HD (`196k`) e infraestrutura Modo C (`ec_hd.c`).
+- [x] **M9 (base):** Timer A do YM2612 em `genesis_bus.c`, `GEN_DEV_TRACE` → VGM/MIDI, protótipo offline de 12 WAVs em `assets/audio_prototypes/` (direção de synths aprovada).
+- [x] **M10 & Bugfix (`0f0a75b`..`c4ea32c` + `89e3bee`):** Xbox 6-button, T1 (Santuário VS Best-of-N), T2 (tela preta Training / `m68k-recomp-core 2666e9f`), T3 (Savegame V2 1º load), T4 (Trident R1 EC sprites), T5 (Overkills no EC), Holo-Trainer VS Best-of-N + sem flicker P2, Energy Drain Midknight (`0x04EDD4` + sanitização saves 4/9), Overkill customizado do Vitral no Santuário, Hotkey `F12` screenshot.

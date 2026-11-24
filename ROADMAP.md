@@ -1,299 +1,182 @@
-# ROADMAP.md — EternalRecomp
+# ROADMAP.md — EternalRecomp (v2.0)
 
-> Roadmap operacional do projeto, derivado do `DESIGN.md` v0.3 (2026-11-07).
-> Status: v0.1 (2026-11-18). Os marcos M0–M8/N1–N3 citados aqui são os do DESIGN §16.
-> Cada fase lista tarefas concretas, a ferramenta local a usar e o critério de saída.
-> **Estado detalhado do projeto: `docs/PROGRESS.md` (atualizado em 2026-11-19).**
-
----
-
-## 0. Fatos verificados (2026-11-18)
-
-### 0.1 Identidade da ROM de referência
-
-Arquivo: `roms/eternal_champions_us.gen` (3.145.728 bytes = 24 Mbit, confirma §4 do DESIGN).
-
-| Campo | Valor |
-|---|---|
-| SHA-256 | `6d8bdaf8c994d9f718c8f991900c58cdf1af84e030524b57f6dda263cc4ea247` |
-| SHA-1 | `5e978217c10b679a42d7d2966a4ccb77e1715962` |
-| MD5 | `bde8b2396241aa27463ca875e604b8d3` |
-| Header | `SEGA GENESIS (C)SEGA 1993.OCT`, serial **GM MK-1145**, região **U** |
-
-→ **Resolve a questão aberta §18.1 (parcialmente):** a ROM local é a versão US. Falta só confirmar a revisão contra o banco No-Intro (é o primeiro passo da Fase 0) e gravar tudo em `reference/roms.toml`.
-
-### 0.2 Ferramentas presentes na pasta
-
-| Ferramenta | O que é | Papel no projeto |
-|---|---|---|
-| `segagenesisrecomp/` | **Genesis Recomp** (mstan): framework beta de recompilação estática de Mega Drive/Sega CD. Recompilador 68k→C (`recompiler/src/`: `m68k_decoder.c`, `code_generator.c`, `function_finder.c`…), runner com VDP/áudio/barramento/Z80 compartilhados, **fallback interpretado**, suporte a Sega CD (`feature/segacd-backend`), tools Python (`frame_wram_diff.py`, `genesis_cosim.py`, `divergence_report.py`…), integração Ghidra (`tools/ghidra/SonicAnnotationProject.java`), docs densos (VDP batching, GPU raster, Z80 static recomp, netplay). | **Base principal das Fases 2–3** e modelo de layout `game.toml`/seeds/jumptables. |
-| `ares/` | Emulador ciclo-a-ciclo em C++ (`ares/md/`: cpu, vdp, apu, opn2, mcd). **Patchado localmente**: FightingPad com máscara 0xFF (assinatura de 6 botões). | Base do **P2** (fallback previsto no DESIGN §11.6); driver headless em `tools/vendor/ares_cli/` (input programado, trace, dump de RAM). |
-| `tools/vendor/gpgx/` | **Genesis Plus GX** compilado localmente (core libretro, `genesis_plus_gx_libretro.so`), sem prints de debug. | **Referência dinâmica oficial** (harness §8) — decisão tomada após a comparação ares/GPGX. |
-| `tools/vendor/gpgx_runner/` | Loader libretro mínimo (projeto próprio): `start@N`, `dump@N,arq`, `--trace`, **filmes `.ecm`** (hash SHA-256 da ROM no cabeçalho + máscara de input por quadro, DESIGN §8). | Esqueleto do harness da Fase 3. |
-| `tools/vendor/ares_cli/` | Driver headless do núcleo do ares (projeto próprio): `--press quadro:botão`, `--trace` (estado/edge/flags por quadro), `--dump N:arq`. | Análise dinâmica da Fase 1. |
-| `StreetsOfRageProject/` | Repo do projeto homônimo. ⚠️ **Os 4 submodules (`RageDecompiler`, `MegaDriveEnvironment`, `StreetsOfRageRecompilation`, `MegaDriveEnvironmentSampleGame`) não estão inicializados** (pastas vazias). Precisa de rede: `git submodule update --init --recursive`. | Referência de arquitetura (decompiler próprio + runtime SDL3). Opcional: só se for adotado o caminho de runtime próprio (§8.3). |
-| `sonic3air-26.03.28.0-stable/` | Código-fonte do Sonic 3 A.I.R. (Oxygen engine, lemonscript, librmx). | **Modelo do produto final** (§15): lógica traduzida + engine novo + widescreen. Referência de renderer e estrutura de dados de assets. |
-| `RGen-1.0.0-compiler-sources/` | Fontes do toolchain WinLibs **GCC 14.2.0 + binutils 2.43.1 + mingw-w64 12.0.0** usado pelo RGen (compilador dos projetos de recomp). | Só para builds Windows com toolchain idêntico ao dos projetos de referência. Baixa prioridade. |
-| `rea-agents` (MCP) | Servidor REA 6.9.0 (`reverse-engineer-anything`), 255 ferramentas, Evidence determinístico. | Assistente de análise em todas as fases — ver §7. |
-| `.venv/` | Python 3.12.3 virtualenv. | Ferramentas Python do projeto (`tools/`). |
-
-### 0.3 Lacunas de toolchain (instalar na Fase 0)
-
-| Ferramenta | Uso (DESIGN) | Status |
-|---|---|---|
-| `vasmm68k_mot` | Montador da Fase 1 (§6.2) | ✅ 1.9d em `tools/vendor/vasm/` |
-| Ghidra 12.x | Análise estática (§6.2) **e provider de análise do REA** (§7) | ✅ 12.2 em `tools/vendor/` (+JDK 25) |
-| Genesis Plus GX (core libretro) | Referência do harness (§8) | ✅ compilado em `tools/vendor/gpgx/` + `gpgx_runner` |
-| Exodus / debugger MAME | Active disassembly (§6.2) | ❌ não instalado (opcional; ares/gpgx cobrem parte) |
-| Musashi (núcleo 68k) | Fallback (§7.2) — desnecessário se adotarmos o runner do Genesis Recomp (§8.3) | ❌ (desnecessário após D2) |
-
-## 0.4 Progresso da Fase 0 (2026-11-18)- [x] `git init` + `.gitignore` (`roms/`, `assets/`, `disasm/data/`, ferramentas externas)
-- [x] `reference/roms.toml` com todos os hashes + validação de header (checksum `$3630` bate)
-- [x] `tools/split.py` — gera `disasm/main.asm` (64 vetores `dc.l` + `incbin`)
-- [x] `tools/verify.py` — monta com `vasmm68k_mot` e compara byte a byte → **idêntico** ✓
-- [x] vasm 1.9d compilado em `tools/vendor/vasm/` (espelho GitHub; site oficial fora do ar)
-- [x] Ghidra 12.2 + JDK 21.0.13 em `tools/vendor/` (para o REA, §7)
-- [x] Config do REA no `opencode.json` atualizada (`GHIDRA_INSTALL_DIR` + `JAVA_HOME` 21) — **exige reiniciar a sessão/opencode para valer**
-- [x] **REA operacional na ROM** (após `/restart` do usuário + troca do JDK 21→25 via symlink): `open_binary` raw-binary m68k no Ghidra 12.2 (`68000:BE:32`), **268 funções descobertas** (cluster principal `0xC000`–`0x11000`), `analyze_function`/pseudocódigo/xrefs validados (ex.: `FUN_000006f0` = laço de espera com flag Z80 em `0xA01A60`). Primeiras hipóteses em `disasm/symbols/labels.toml`; Evidence exportado em `reference/rea/`
-- [x] Primeiro commit: `ea6b14c` (repo leve, sem as ferramentas externas)
-- [ ] Conferência da revisão No-Intro (DAT-o-MATIC bloqueia sem aceitar termos no navegador)
-- [x] M0.5 — boot em ares: `tools/vendor/ares_cli/` compila só o núcleo via CMake wrapper (sem GUI); ROM boota, RAM dumpada, input programado
-- [ ] CI de hash (GitHub Actions ou hook local)
-
-**Descobertas da Fase 1 já registradas:** Reset `$000200`, VBlank `$0006B6`, IRQ2 `$0006E2`, demais exceções `$0006DE`; HBlank aponta para `$00FF0000` (desabilitado no boot — anotar no disasm).
-
-**Fase 1 em andamento (2026-11-18, tarde):** regiões `$000200`–`$0002F9` (reset/init de hardware: TMSS, registros VDP, stub do Z80), `$0006B6`–`$00083B` (VBlank, espera de quadro com handshake Z80, aquisição/liberação de barramento, upload do driver de som, ring buffer) **convertidas em asm real** (`disasm/code/boot.asm`, `disasm/code/irq.asm`), com `verify.py` **byte a byte idêntico** ✓. Confirmações: programa do Z80 em `$000A80` (0x1886 bytes → driver de som próprio, §18.2), protocolo busreq/reset em `0xA11100`/`0xA11200`, contadores de quadro em `$FFFFFD72/76` (hipótese).
-
-**Fase 1 (noite):** tela de boot/trava de região (`$2FA–$6B5`), interface de comandos do Z80 (`$83C–$8A7`), entrada do main + laço externo (`$2230–$25FD`) e sombra VDP (`$2786–$27B3`) convertidas — tudo com hash idêntico. Esqueleto do jogo mapeado via REA (267 pseudocódigos exportados): `Main_Entry → Main_OuterLoop → FUN_0000fcde → Main_FrameLoop ($FD24)` com 7 subsistemas por flag, handshake Z80 dentro do laço, alocador em `$D4CC`, câmera/tilemap em `$C836–C83A` (`Map_GetTileAddr $1032A`). Ver `docs/main_loop.md`.
-
-**Fase 1 (madrugada):** camada de comandos do som (`$8A8–$A7F`) convertida. **`tools/vendor/ares_cli/` compilado** — driver headless do núcleo do ares (Mega Drive): roda N quadros e despeja a RAM de trabalho. Primeiro dump (600 quadros) **confirmou 12 hipóteses** (contadores, estado=7 no título, flags de subsistema, lock do Z80 balanceado). Run de 2400 quadros: estado evoluiu 7→13, câmera ativa. Descoberta: **tabela de dispatch de estados em `$27B4`** (22+ handlers espalhados por `$50–$4A9C`) — a região que o Ghidra não mapeou (despacho indireto, risco §17).
-
-**Fase 1 (dia 2):** máquina de estados convertida (`state_table.asm` com 40 handlers, `state_dispatch.asm` com FrameRun/SetState/Dispatch/PostChange/init do sistema e da câmera, `state_handlers1.asm` + `state1_handler2.asm` com o estado 1 completo). **ares_cli com input programável** (`--press quadro:botão`, FightingPad de 6 botões) e `--trace` por quadro. Mapa dinâmico: boot→**7**(título)→Start→**9**(menu)→Start→**1**(setup). Estado 1 não progride no ares — depende da detecção de pad (`$9CB0`), suspeita de diferença no handshake de 6 botões do ares (comparar com Genesis Plus GX). Escritores de `$FD64`: menu→7/13, boot→7/9/1 (via State_SetState), `$2FE59C`→29, restore via `$9B66`.
-
-**Fase 1 (dia 2, noite — GPGX vira referência dinâmica):** `tools/vendor/gpgx_runner/` construído (loader libretro mínimo: `retro_input_poll` registrado, RAM dump com byte-swap, `start@N`/`dump@N`/`--trace`). ⚠️ Bug corrigido: `JOYPAD_START` errado (7=RIGHT) invalidou as primeiras comparações. Com input correto: **máquina de estados idêntica nos dois emuladores sem input** (0→7→0→9→13→7→13, ~44 quadros de defasagem); 9→13 é **timer de attract**. Divergência real só com input no estado 9: ares+Start→**9→1**, GPGX+Start→ignorado→13. Mecanismo: handler $3256 tem 2 saídas — bit 7 ($0080) da borda do pad (→estado 1) vs `$FD61` bit7 da tarefa de input (→estado 13); a diferença está no protocolo de 6 botões (ares instantâneo vs GPGX ciclo-a-ciclo). `Main_FrameLoop` ($FD24) **convertido** (hash ok): incrementa `$FD70`, lê pads (Sub_C870) quando estado≠7 e `$FD69` bit7, chama subsistemas por bits de `$FD69`, sincroniza com o Z80 quando `$9B32`≠0. **Contadores corrigidos**: `$FD70` = contador do laço (único writer), `$FD72–FD75` = contador 32-bit do VBlank (`$FD74` = low word), `$FD76` = flag de VBlank consumida por quadro. **Input mapeado e verificado no GPGX**: Sub_CA80 (TH toggling + detecção de 6 botões) → Sub_C870 (tabelas $9274/$92B4/$92A4 = identidade) → FD58/5A estado, FD54/56 borda, FD50/52 anterior (dump com Start: FD58=$0080). **Estado 9 ($3256) e menu ($36B2) decodificados** (docs/main_loop.md); escalonador cooperativo mapeado ($DB14 yield/$DB4A dispatch/$DC10 volta, tarefa de input $1FF00). Handlers 2–7 em conversão por subagente. *(Nota do dia 3: as conclusões de divergência desta entrada foram refinadas — ver entrada do dia 3.)*
-
-**Fase 1 (dia 3 — conversão 8–13, .ecm, divergência refinada):** handlers dos **estados 2–7** ($2ADC–$313A, seleção de personagem + título) e **8–13** ($313A–$397F, menu-init + menu) convertidos por subagentes — hash byte a byte ✓. Estados 11/12 = apelidos de 1/13; estado 10 termina em `jmp $200`. `gpgx_runner` ganhou o formato **`.ecm`** (DESIGN §8: hash SHA-256 da ROM no cabeçalho + 1 máscara de input por quadro, verificação de hash, replay idêntico). `ares_cli`: trace estendido (edge/FD61/$9CCA/$9CB6 por quadro) + `--dump N:arq`. **Divergência ares/GPGX refinada**: com **2+ presses** os emuladores **concordam** (9→1 em 1033 vs 1034); com 1 press único o ares captura a borda (→1) e o GPGX perde (→13 attract). No quadro do pressionar a RAM é idêntica nos dois — a diferença está na oscilação intra-quadro do contador do FightingPad vs a estabilidade do MK-1653-50. Questão em aberto: qual bate com hardware real (referendar com BlastEm/Exodus).
+> **Estado:** Reconstruído em **2026-11-23** a partir do histórico verificado (`docs/PROGRESS.md`, `docs/BUG_QUEUE.md`, commits até `939e69c` / `segagenesisrecomp@89e3bee`, working tree gráfico/áudio atual e `LAST_STATUS_AGY1.md`).
+> **Fila executável ativa:** [`task.md`](task.md) (TASK.md) · **Arquitetura base:** [`DESIGN.md`](DESIGN.md) · **Widescreen:** [`docs/widescreen.md`](docs/widescreen.md).
+> **Foco estratégico atual:** **(1) Aperfeiçoamento da Renderização Gráfica**, **(2) Suporte a Shaders Modulares** e **(3) Remasterização da Trilha Sonora**, preservando `0/65536` bytes de divergência na WRAM e 100% de fidelidade de gameplay/hitboxes.
 
 ---
 
-## 1. Decisões estratégicas (gates)
+## 1. Linha de Base Consolidada (O que já está pronto e validado)
 
-| # | Decisão | Quando | Recomendação |
+Toda a fundação de engenharia reversa, recompilação nativa, determinismo e polimento de gameplay foi concluída:
+
+| Marco | Escopo | Estado | Evidência / Referência |
 |---|---|---|---|
-| D1 | Revisão da ROM de referência | Fase 0 | Fixar a US local; conferir revisão no No-Intro e gravar em `reference/roms.toml`. |
-| D2 | **Adotar o Genesis Recomp como motor das Fases 2–3** em vez de escrever transpilador + runner + fallback próprios (DESIGN §7 descreve a construção própria) | Fim da Fase 1 | **Adotar.** O framework já entrega recompilador, runner, fallback e ferramentas de cosim que o DESIGN prevê construir; o uso privado (§3) permite. O trabalho do projeto vira a *integração do jogo* (game.toml, seeds, spec de vídeo, harness), não a infraestrutura. Fallback: caminho próprio do DESIGN com Musashi. |
-| D3 | Runtime próprio (MegaDriveEnvironment do SoR) vs runner do Genesis Recomp | M2 | Runner do Genesis Recomp primeiro (chega ao M2 mais rápido). Reavaliar no M4 se os modos B/C pedirem outra arquitetura (§18.4). |
-| D4 | VDP do modo A | M2 | O do runner do Genesis Recomp (mesma base do harness → resposta natural à §18.9). ares fica como segunda opinião de precisão. |
-| D5 | Base do P2 (emulador com camadas) | N2 | **ares** (local, é o fallback oficial do DESIGN §11.6). clownmdemu só se for baixado depois e passar no teste empírico. |
-| D6 | Formato dos assets HD (§18.5) | M5 | Definir durante o PoC de 1 personagem: começar com PNG por quadro + manifesto; migrar para atlas se a memória pedir. |
-| D7 | GPU mínima e tamanho da rede (§18.8, §18.7) | N1 | Medir no P1 antes de fixar. |
+| **M0–M1** | Setup, `vasm` 1.9d, Ghidra/REA, disassembly byte-a-byte (`373.204 B` de código 68k) | ✅ Concluído | `tools/verify.py` idêntico à ROM US `GM MK-1145` (CRC32 `0x48F1A42E`) |
+| **M2–M3** | Recompilação estática 100% nativa (`EternalChampionsRecomp`) + harness determinístico `.ecm` | ✅ Concluído | `17/17` filmes `.ecm`: `det=0/65536`, `png_eq=True`, `misses=(0,0,0,0)`; arbitragem 4-vias (`BlastEm`/`GPGX`/`ares`/`Native`) |
+| **M4–M6** | Renderer `GameVideo`, Widescreen `16:9` (`398×224`) / `21:9` (`512×224`), SAT nas margens, metatiles completos, HUD fixo, fim da linha preta (`y>=216`), compensação de parallax nas bordas e T-Rex ancorado | ✅ Concluído | `game/ec_video.c` (`c4ea32c`, `939e69c`); `wram_diff=0/65536` em todas as arenas |
+| **M7 (v1)** | Extrator (`6.135` entradas), pipeline ComfyUI Flux HD (`437/437` aprovados), Modo C (`game/ec_hd.c`) | ✅ Infra pronta *(qualidade visual em revisão)* | Funcional em runtime, porém recortes 32×32 + silhueta `NEAREST` geram inconsistência visual → evoluir na **Trilha G** |
+| **N1–N3** | Neural B+ v1 (`82k`, GL Compute + CUDA ORT), `--bplus-intensity`, Pré-dither GPU (`--bplus-dedither off\|cbod\|both`) e B+ v2 Flux HD (`196k`) | ✅ Base operacional *(evolução em curso)* | `neural/infer/ec_bplus_{gl,ort}.c`; Pre-Dither `+0.07 ms` async; B+ v2 `p50=17.86 ms` WSL D3D12 → otimizar e destilar v3 na **Trilha G** |
+| **M9 (base)** | Emulação de Timer A do YM2612 (áudio nativo contínuo), `GEN_DEV_TRACE` → VGM/MIDI, protótipo offline A/B/C/D (3 arenas × 4 variantes) | ✅ Base + direção estética aprovada | `assets/audio_prototypes/` (synths aprovados; falta equalização por canal e ajuste de percussão em Blade → **Trilha A**) |
+| **M10 & Bugfix** | Xbox 6-button plug-and-play, `--unlock-boss` completo (EC jogável + Overkills no EC + Santuário VS + Overkill do Vitral + Holo-Trainer VS sem flicker P2), Savegame V2 (`ECRB2sav`) 1º load corrigido, Energy Drain Midknight corrigido, Hotkey `F12` screenshot | ✅ Concluído | Commits `0f0a75b`..`939e69c` + `segagenesisrecomp@89e3bee` (+ `F12` e pacote gráfico no working tree atual) |
+
+### Invariantes inegociáveis do projeto
+1. **Gameplay e física intocados:** nenhuma melhoria gráfica, shader ou motor de áudio pode alterar a simulação 68k/Z80 — todo avanço exige `wram_diff = 0/65536` e regressão verde em `python3 harness/ec_harness.py`.
+2. **Jogo base 100% autêntico por padrão:** todos os recursos de remasterização (widescreen, B+, shaders, Modo C, áudio remasterizado, `--unlock-boss`) são **opt-in** via CLI / `settings.ini`, com fallback automático seguro para modo nativo em ambientes headless/software.
+3. **Sem motor paralelo de gameplay:** o visual HD opera estritamente sobre as coordenadas, flips, prioridades e máscaras reais do VDP, sem duplicar lógica de câmera ou hitboxes.
 
 ---
 
-## 2. Visão geral das fases
+## 2. Visão Geral das Frentes Prioritárias (v2.0)
 
 ```
-Fase 0 (setup, M0) ──► Fase 1 (disasm, M1) ──► Fase 2 (recomp, M2) ──► Fase 3 (harness, M3)
-                                                                              │
-        Trilha neural: N1 (P1 shader) ──► N2 (P2 ares+layers) ──► N3 (P3 runtime)  (paralela, §11.6)
-                                                                              ▼
-                          Fase 4 (renderer B/C + widescreen, M4–M6) ──► Fase 5 (assets HD, M7) ──► Fase 6 (Sega CD, M8)
+ [G0] Checkpoint / Commit da base atual (Pre-Dither + B+ v2 + Modo C + F12)
+                      │
+      ┌───────────────┼───────────────────────────────┐
+      ▼               ▼                               ▼
+  TRILHA G        TRILHA S                        TRILHA A
+  Renderização    Suporte a Shaders               Remasterização da
+  Gráfica HD      Modulares (GPU)                 Trilha Sonora
+  ────────────    ────────────────                ─────────────────
+  G1 Teacher Lab  S1 Engine Multi-Pass            A1 Auditoria FM/PSG
+       │             + Parser Presets                + Fix Blade + Stems
+       ▼               │                               │
+  G2 B+ v3 Full   S2 Biblioteca Curada                 ▼
+     Frame (Fast     (RCAS, CRT, ScaleFX,         A2 Captura Completa
+     & HQ, 60fps)    De-Dither, Hotkey)              + Mixagem por Canal
+       │               │                               │
+       ▼               ▼                               ▼
+  G3 Modo C       S3 CLI / settings.ini           A3 Engine de Áudio
+     Híbrido         + Bench 1080p/4K                no Runner (DSP +
+     (Planos HD)       │                             Híbrido / OST Loop)
+       │               │                               │
+  G4 Otimização        │                               │
+     GL/CUDA           │                               │
+      └───────────────┴───────────────┬───────────────┘
+                                      ▼
+                    TRILHA F — Finalização & Entrega
+                    F1 Build Windows Nativo (x64 + revalidação GPU)
+                    F2 --help + Documentação CLI / settings.ini
+                    F3 Pause → Sair para Menu + Polimento Final
+                    F4 Backlog de Baixa Prioridade (Holo Overkill,
+                       bugfixes pontuais, Movelist, Sega CD M8)
 ```
 
-Caminho crítico: **M1 e M3 decidem o projeto** (DESIGN §16). A trilha neural avança em paralelo desde o dia 1 e não depende do disassembly.
+---
+
+## 3. Detalhamento dos 3 Pilares Prioritários
+
+### PILAR 1 — Trilha G: Aperfeiçoamento da Renderização Gráfica
+
+**Diagnóstico atual (por que o visual ainda não está no nível final):**
+- O Modo C atual (`437` assets em `assets/hd/`) gera efeito "colcha de retalhos": cobre só parte dos quadros de luta, sprites foram gerados em recortes isolados de `32×32` sem pré-dither e `enforce_silhouette()` aplica máscara `NEAREST` (mantendo escadinha 4×4), enquanto alguns planos/céus ficaram excelentes.
+- O B+ v1 (`82k` params) foi destilado de DAT2 antigo sem pré-dither; o B+ v2 (`196k` params, Flux HD) melhorou muito a suavidade mas roda a `p50 = 17.86 ms` no WSL Mesa D3D12 (acima do orçamento de `16.67 ms` para 60 fps) e ainda herdou o dataset de recortes antigos.
+- O backend CUDA ORT (`ec_bplus_ort.c`) hoje faz ida-e-volta CPU↔GPU (`p50 = 13.20 ms`) e não suporta `--bplus-dedither` nem `--bplus-intensity != 1.0`.
+
+**Fases da Trilha G:**
+1. **G0 — Checkpoint & Higiene do Repositório:** revisar e commitar (após confirmação) o estado validado no working tree (`F12`, Pre-Dither GPU, B+ v2, Modo C infra) para garantir baseline limpo para trabalho paralelo.
+2. **G1 — Laboratório Comparativo de Upscalers Teachers (Passo 1 imediato):**
+   - Capturar 4 frames completos reais já com Pre-Dither `both` aplicado (`Vietnam S6`, `Salem S7`, `Sanctuary S2`, `Trident S5`).
+   - Processar na RTX 5060 Ti contra os upscalers já presentes em `F:\ComfyUI\ComfyUI\models\upscale_models\`:
+     `4x-AnimeSharp.pth`, `4x_IllustrationJaNai_V1_DAT2_190k.pth`, `4x_foolhardy_Remacri.pth`, `4x_NMKD-Siax_200k.pth`, `4x-UltraSharpV2.safetensors`, `4xNomos8kSCHAT-L.pth`.
+   - Gerar pranchas lado a lado com zoom 1:1 (lutadores, rosto/roupas, céu, chão/sombras, HUD) em `assets/video_compare/upscalers_teacher/`.
+   - **Gate Visual:** escolha do estilo vencedor pelo usuário antes de gerar dataset em massa.
+3. **G2 — Destilação Modo B+ v3 em Tela Inteira (Uniformidade Total + 60 fps):**
+   - Capturar dataset diversificado de centenas de frames reais completos com Pre-Dither `both` cobrindo todas as 11 arenas, os 10 lutadores (incluindo Eternal Champion), golpes/aéreos/especiais/overkills, telas de seleção e HUD.
+   - Gerar ground truth 4× com o teacher aprovado em G1 (sem recortes 32×32, sem borda `NEAREST`).
+   - Treinar em `neural/train_espcn.py` com função de perda orientada a suavidade/redução perceptual de pixels (L1 + perceptual LPIPS/VGG + gradiente/SSIM):
+     - **`ec_bplus_v3_fast`** (`ch=36..40`, `nb=2..3`, meta `≤ 8–10 ms` no WSL D3D12 = **60 fps travados**).
+     - **`ec_bplus_v3_hq`** (`ch=48..56`, `nb=4..6`, foco qualidade máxima em GPU nativa Windows / CUDA).
+   - Validar paridade PyTorch ↔ GL Compute (`PSNR ≥ 60 dB`), zero WRAM diff e comparativo ao vivo.
+4. **G3 — Refinamento do Modo C (`ec_hd.c`) — Modo Híbrido "Planos HD + B+ v3":**
+   - Adicionar controles granulares (`--hd-mode off|planes|all`) em `game/ec_hd.c` e `game/ec_spec.c` para permitir usar os planos/céus 4× espetaculares sem depender de sprites parciais.
+   - Regerar os 27 planos de arena com Pre-Dither aplicado **antes** do upscaler/Flux (eliminando o grão residual do céu do Trident `86cb2ec7b0cbbdd2`).
+   - Opcional (se aprovado): atualizar `enforce_silhouette()` em `tools/pipeline/comfy_upscale.py` para borda alfa suave (anti-aliased) em vez de `NEAREST`.
+5. **G4 — Otimização GPU, CUDA Zero-Copy & Modo B Widescreen:**
+   - Otimizar shaders de `neural/infer/ec_bplus_gl.c` (tuning de workgroup, empacotamento FP16/`rgba16f` e fusão de passes) para reduzir o p50 do B+ v3 no WSL e no Windows.
+   - Evoluir `neural/infer/ec_bplus_ort.c` para evitar cópia CPU↔GPU onde suportado (ou DirectML/Win32 nativo) e alinhar suporte a `--bplus-dedither` + `--bplus-intensity`.
+   - Avaliar ativação do Modo B (`genesis_hd_gpu`) em `--widescreen` como alternativa pixel-crisp pura.
 
 ---
 
-## 3. Fase 0 — Setup e esqueleto → M0
+### PILAR 2 — Trilha S: Implementação de Suporte a Shaders Modulares
 
-**Critério (M0):** repositório criado, `split.py` e `verify.py` funcionando, CI com hash.
+**Objetivo:** Permitir cadeia de shaders pós-processamento e upscale analítico em OpenGL (estilo RetroArch `.glslp`/`.slangp` enxuto), atendendo tanto **GPUs sem CUDA / máquinas leves** quanto **usuários de Neural B+ em 1440p/4K** (ex.: RCAS/CAS + CRT sutil no passe final).
 
-1. `git init` na raiz; `.gitignore` com `roms/` e `assets/` inteiros (DESIGN §3).
-2. Criar `reference/roms.toml` com os hashes do §0.1; criar `reference/` com notas de hardware.
-3. Verificar a revisão da ROM no banco No-Intro (US, `Eternal Champions (USA)`); registrar revisão/CRC32.
-4. Instalar `vasmm68k_mot` (apt ou download do vasm).
-5. **M0.5 — Teste de boot em ares:** compilar `ares` (CMake está pronto) e rodar a ROM até a tela de título. Confirma que o dump está íntegro e que ares servirá de referência dinâmica. *(Também mitiga o risco "clownmdemu/ares imprecisa" — é o teste empírico do DESIGN §11.6 feito com o que está local.)*
-6. Escrever `tools/split.py` (gera `disasm/` todo em `dc.w`/`incbin` a partir da ROM) e `tools/verify.py` (monta com vasm e compara byte a byte). Primeiro build **já tem que bater o hash** (§6.1).
-7. CI mínimo (GitHub Actions local runner): `python tools/verify.py` no push.
-8. **REA:** configurar Ghidra 12.x + `GHIDRA_INSTALL_DIR` e validar o fluxo da §7.1.
-9. *(Opcional)* Inicializar submodules do StreetsOfRageProject para estudo do RageDecompiler e do MegaDriveEnvironment.
-
-**Saída:** repo verde, ROM íntegra e identificada, ares rodando o jogo.
-
----
-
-## 4. Fase 1 — Disassembly reconstruível → M1
-
-**Critério (M1):** 100% do código alcançável marcado como código, hash idêntico, mapa de RAM cobrindo a estrutura do lutador e o estado da luta.
-
-Ordem de trabalho (prioridades do DESIGN §6.4):
-
-1. **Pontos de entrada:** vetor de reset `0x000004`, autovetores de interrupção, VBlank/HBlank → converter essas regiões para código real, uma por vez, com `verify.py` a cada passo (§6.1).
-2. **Laço principal + leitura de controle** (padrão de polling do VBlank — essencial para o §7.3 depois).
-3. **Estrutura do lutador na RAM:** usar **ares (debugger, watchpoints)** + dumps diferenciais para localizar posição, estado, quadro de animação, vida, hitboxes. Gravar em `ram_map.toml` com confiança `confirmed`/`hypothesis` (§6.3). *(REA entra aqui — ver §7.2.)*
-4. Máquina de estados de golpes e tabelas de animação; **tabelas de ponteiros tipadas** (§6.3 — mitigação do risco de despacho indireto, DESIGN §17).
-5. Formato de metasprites (montagem de um quadro a partir de sprites de hardware).
-6. Cenários: tilemaps dos planos A/B, scroll, paletas.
-7. IA da CPU.
-8. Driver de som: só a interface 68k↔Z80 (§12) — responde a §18.2.
-
-**Ferramentas:** Ghidra (+REA) para estática; ares (ou Exodus, se instalado) para dinâmica; vasm + `verify.py` como gate de hash; LLMs para propor nomes/comentários (`; ?` até confirmação, §14).
-
-**Fase 1 também responde §18.3:** mapear efeitos de HBlank/raster (impacta o renderer depois).
+**Fases da Trilha S:**
+1. **S1 — Engine de Cadeia de Shaders Multi-Pass (`game/ec_shader_chain.{h,c}`):**
+   - Pipeline GPU modular encaixado em `ec_video_present_gpu()` (`game/ec_video.c`) com 3 ganchos claros:
+     1. **Pre-pass (nativo `320×224` / `398×224`)**: de-dither (`cbod`, `sgenpt-mix`, `mdapt`).
+     2. **Upscale pass (alternativo ao Neural B+)**: shaders analíticos 2×/4× (`ScaleFX`, `xBRZ`, `FSR EASU`).
+     3. **Post-pass (sobre saída 4× ou nativa)**: `AMD FidelityFX CAS/RCAS`, `CRT` (scanlines, máscara de fósforo, curvatura opcional, halation/bloom sutil) e ColorLUT.
+   - Parser de presets em texto simples (`.ecshader` / subset compatível com `.glslp`): número de passes, caminho do `.glsl`, `filter_linear`, `scale_type` (`source`/`viewport`/`absolute`), `scale`, e uniformes padrão (`Source`, `Original`, `SourceSize`, `OriginalSize`, `OutputSize`, `FrameCount`) + parâmetros customizáveis (`#pragma parameter`).
+   - Ping-pong de FBOs/texturas GL sem readback para CPU, com fallback limpo se o driver não suportar GL 3.3+ ou em modo headless.
+2. **S2 — Biblioteca Curada de Shaders e Presets (`assets/shaders/`):**
+   - `remaster-crisp.ecshader`: Pre-Dither (`both`) → B+ v3 → **RCAS/CAS** (nitidez cinematográfica para 1440p/4K sem halos).
+   - `remaster-crt.ecshader`: Pre-Dither (`both`) → B+ v3 → **CRT sutil** (scanlines finas + máscara leve + bloom discreto).
+   - `lite-scalefx.ecshader`: Pre-Dither (`both`) → **ScaleFX / xBRZ** → **CAS** (alternativa leve de alta qualidade para GPUs sem CUDA/neural).
+   - `arcade-crt-trinitron.ecshader`: Pre-Dither (`both`) → **CRT-Lottes / CRT-Geom** + ColorLUT Trinitron (fidelidade arcade 1993).
+   - `off`: bypass total.
+3. **S3 — Integração CLI, `settings.ini`, Hotkey em Runtime e Validação:**
+   - Flags `--shader-preset <nome|caminho>` e `--shader-param <chave=valor>` em `game/ec_spec.c` + persistência em `settings.ini`.
+   - Atalho em runtime (ex.: `F9` / `Shift+F9`) para alternar presets ao vivo com notificação discreta no OSD/stderr (sem quebrar `F12` screenshot nem F7/F8 save/load).
+   - Medição de latência por passe via `GL_TIME_ELAPSED` e prancha comparativa em `1080p`, `1440p` e `4K` (`assets/video_compare/shaders/`).
 
 ---
 
-## 5. Fase 2 — Recompilação estática → M2
+### PILAR 3 — Trilha A: Remasterização da Trilha Sonora
 
-**Critério (M2):** executável nativo chega à tela de título (VDP modo A, fallback permitido).
+**Situação atual:**
+- Protótipo offline de 3 arenas (`01_vietnam_midknight`, `02_salem_xavier`, `03_syria_blade`) validado em `assets/audio_prototypes/` (48 kHz estéreo, -16.5 dBFS RMS).
+- **Feedback do usuário:** a pegada de synths híbridos (`C`/`D`) está aprovada; é necessário:
+  1. Explicar detalhadamente como o mapeamento de canais/elementos funciona.
+  2. Permitir **equalização e balanceamento individual por instrumento/elemento**.
+  3. Corrigir o falso-positivo de percussão em **Syria/Blade** (um elemento tonal/rítmico foi classificado como bateria fora do ritmo).
 
-Caminho recomendado (decisão D2): usar o **Genesis Recomp**.
-
-1. Estudar o fluxo do `sonicthehedgehog/` como exemplo mínimo de integração: `game.toml`, `sonic1.disasm_seeds.toml`, `sonic1.disasm_jumptables.toml`, `sonic1.disasm_subs.toml`, `sonic1_spec.c`, `sonic1_video.c`.
-2. Compilar o recompilador (`cmake -S recompiler -B build/recompiler && cmake --build ...` → `GenesisRecomp.exe`).
-3. Criar o projeto `eternalchampions/` (repo próprio ou pasta no nosso): `game.toml` com identidade da ROM (hashes do §0.1), seeds = código mapeado na Fase 1, jumptables tipadas.
-4. Gerar o C (`GenesisRecomp.exe rom --game game.toml --output-dir generated`), ligar ao runner, escrever o adaptador de boot (verificação de ROM, frame execution, integração de título).
-5. **Laços de espera de VBlank:** registrar no `game.toml`/spec os padrões de polling descobertos na Fase 1 para virarem `end_frame()` (§7.3).
-6. Manter o **fallback interpretado** ligado; jogar e alimentar o ciclo de descoberta de endereços (o framework já traz isso).
-7. Validar contra ares: boot → título → seleção → primeira luta.
-
-**Saída:** jogo nativo até a tela de título, fallback permitido. (M2 não exige a luta completa — o M3 exige.)
-
----
-
-## 6. Fase 3 — Harness e determinismo → M3
-
-**Critério (M3):** suíte de movies 100% idêntica à referência, zero fallback no modo arcade.
-
-1. Instalar Genesis Plus GX (core libretro) — referência do DESIGN §8.
-2. Formato `.ecm` (cabeçalho: hash da ROM + seed + estado inicial; 1 linha de input por quadro, bitmask de 12 botões).
-3. Gravação/replay de input no nosso runner; amostragem no `end_frame()` (§13).
-4. Diff de RAM de 64 KiB ao fim de cada quadro vs referência, com nomes do `ram_map.toml`. *(Os `tools/*.py` do Genesis Recomp — `frame_wram_diff.py`, `divergence_report.py`, `genesis_cosim.py` — servem de base ou de referência de design.)*
-5. Suíte de CI: cada personagem × cada arena, finalizações, treino, IA em dificuldades variadas.
-6. **Ciclo de descoberta:** zerar `missing_addresses.log` no modo arcade (§7.1) — jogar, recompilar, repetir.
-7. Exportar frame data (startup/active/recovery/hitboxes) para `docs/frame_data/` — documentação + teste de regressão.
-
-**Saída:** determinismo total + base pronta para o renderer (e para rollback/netplay no futuro, §18.6).
+**Fases da Trilha A:**
+1. **A1 — Auditoria Elemento-a-Elemento do Driver Z80 & Correção do Mapeamento (Blade + Pilotos):**
+   - Documentar em `docs/audio_remaster_architecture.md` a anatomia real do driver Z80 (`$000A80`) e dos canais YM2612 (6 canais FM + DAC `$2A`) + SN76489 (3 tons + ruído), incluindo a separação entre BGM e SFX em `disasm/code/sound_cmd.asm` (`$0008A8–$000A7F`).
+   - Auditar canal por canal `03_syria_blade` (e `vietnam`/`salem`) no `chip_ring`, identificando exatamente qual canal/patch foi confundido com percussão em Blade e corrigindo o classificador em `tools/audio/`.
+   - Exportar **stems isolados** por canal/papel (ex.: `bass`, `pad`, `lead`, `arp`, `perc_fm`, `perc_dac`, `psg_tone`, `psg_noise`) + gerar arquivo de receita editável por faixa (`assets/audio_remaster/profiles/<track>.toml`) com ganho, EQ (low/mid/high), pan, patch SoundFont/synth e regra de percussão independentes.
+2. **A2 — Pipeline de Produção de Todas as Faixas & Revisão A/B:**
+   - Catalogar a tabela completa de IDs musicais da ROM (Título, Seleção/Menu, 9 Arenas principais, Santuário/Boss, Holo-Trainer, Overkill, Vitória/Finais/Créditos) via `snd_ring.txt` + `chip_ring_to_vgm.py`.
+   - Criar ferramenta determinística `tools/audio/remaster_track.py` (lendo o perfil `.toml` da faixa + SoundFont(s) de alta qualidade / synths dedicados + cadeia DSP de masterização) para iterar rapidamente a equalização individual com o usuário.
+   - Validar de ouvido com o usuário primeiro as 3 faixas piloto refinadas, depois produzir o pacote completo de faixas remasterizadas com **pontos exatos de loop** (intro + loop sem clique).
+3. **A3 — Engine de Áudio Remasterizado em Tempo Real no Runner (`game/ec_audio.{h,c}` + `segagenesisrecomp/runner/audio/`):**
+   - Implementar interceptação passiva dos comandos BGM no barramento 68k→Z80 (`sound_cmd.asm` — leitura pura, zero alteração de estado/timing do Z80 → `0/65536` WRAM diff).
+   - Implementar dois módulos combináveis na saída do host (antes/integrado ao `recomp_audio_drc.h`):
+     - **DSP de Estúdio em tempo real (`--audio-dsp`):** EQ musical, controle de médios FM, abertura estéreo controlada e reverb de sala leve aplicados ao YM2612+PSG (beneficia inclusive SFX e modo autêntico).
+     - **Player Híbrido / OST Sincronizado (`--audio-remaster off|dsp|hybrid|ost`):** reproduz a faixa remasterizada 48 kHz (OGG/FLAC/WAV com loop sample-accurate, pausa sincronizada com `$FD68`, fade-out sincronizado com comandos Z80) em camada paralela (`hybrid` somando sobre o chip original) ou substituição limpa da BGM preservando 100% dos SFX e vozes DAC originais (via mute seletivo de canais musicais ou ducking limpo).
+   - Controles via CLI e `settings.ini` (`audio_mode`, `audio_bgm_vol`, `audio_sfx_vol`, `audio_chip_blend`, `audio_dsp_reverb`) + regressão determinística 17/17.
 
 ---
 
-## 7. Fase 4 — Renderer → M4 → M6
+## 4. Trilha F — Finalização, Port Windows e Backlog de Baixa Prioridade
 
-**Critérios:** M4 = renderer B com escala arbitrária e shaders, paridade visual com o modo A. M6 = todas as arenas em 16:9.
+Itens deliberadamente mantidos no final do ciclo para não atrasar os 3 pilares principais:
 
-1. Modo A (emulado) como referência — já existe do M2.
-2. Modo B: ler estado do VDP (planos A/B, window, sprites, paletas, scroll) e montar a cena na GPU (§9). Referência: docs do Genesis Recomp (`ENGINE_VDP_BATCHING.md`, `ENGINE_GPU_RASTER.md`, `ENGINE_RASTER_FUSION.md`) e o renderer do S3AIR (Oxygen) como modelo.
-3. Modo C: manifesto `hash → asset HD` (§9.1) — protótipo com 1 personagem e 1 arena (M5).
-4. Widescreen por arena (M6): decisões em `docs/widescreen.md` (§9.2); referência: `WIDESCREEN_ISSUES.md` do Genesis Recomp e as soluções do S3AIR.
-5. Interpolação de quadros (§9.3): só no final, desligada por padrão.
-
----
-
-## 8. Fase 5 — Pipeline de assets HD → M7
-
-**Critério (M7):** elenco e arenas completos, assets `approved`.
-
-1. Extrator de quadros de sprite (metasprite + paleta + contexto), deduplicação por hash (§10.1) — **usa o P2/emulador com camadas da trilha neural**, como o DESIGN prevê.
-2. Upscale com consistência temporal: folha de referência HD por personagem → img2img/IP-Adapter/ControlNet com seed fixa (§10.2).
-3. Upscale sobre índices/luminância, não sobre cor final (paletas dinâmicas); mapas de região por índice.
-4. Workflows ComfyUI versionados em `pipeline/workflows/`; manifesto com workflow/modelo/seed/versão.
-5. Visualizador lado a lado; status `generated → reviewed → approved`.
+| ID | Item | Escopo técnico | Prioridade |
+|---|---|---|---|
+| **F1** | **Compilação Nativa Windows (x64)** | Portar `ec_bplus_ort.c` (`dlopen` → `LoadLibraryA` / `onnxruntime.dll`), validar `libpng`/SDL2/OpenGL/FluidSynth ou decoder OGG/WAV no Windows (MSVC/MinGW), revalidar latência real de B+ v3 e Shaders fora do WSL Mesa D3D12 (meta `≤ 4 ms`). | Média (após G2/S2) |
+| **F2** | **CLI `--help` & Documentação Completa** | Implementar `--help`/`-h` em `segagenesisrecomp/runner/main.c` exibindo runner + `g_game_spec.arg_usage`; consolidar referência completa de CLI e `settings.ini`. | Baixa (finalização) |
+| **F3** | **PAUSE → Sair para o Menu** | Mini-menu visual seguro (`RESUME / EXIT TO MENU`) no `Main_PauseLoop` via hook nativo chamando fade + `State_SetState(1)` sem patch de ROM. | Baixa (finalização) |
+| **F4.1** | **Overkill da Arena de Treino (State 14)** | Protótipo temático opcional sob `--unlock-boss` (robô de projeção / moving heads desintegrando ou eletrocutando no centro da arena). | Baixa |
+| **F4.2** | **Bugfixes Pontuais Restantes** | (a) Recarga de sprite pós-explosão no Santuário quando vencedor está muito próximo do vitral; (b) reproduzir eventual bug no Overkill da Jetta (`docs/BUG_QUEUE.md`); (c) auditar Estado 14 1P original e stall DMA de `3402866`. | Baixa |
+| **F4.3** | **Extras de Longo Prazo** | Extração completa de movelists (`docs/movements/`), menu in-game amigável (controles/shaders/áudio) e Expansão Sega CD (*Challenge from the Dark Side*, `M8`). | Futuro |
 
 ---
 
-## 9. Fase 6 — Sega CD → M8
+## 5. Plano de Orquestração Paralela (Orca DAG)
 
-**Critério (M8):** port de *Challenge from the Dark Side* reaproveitando o runtime.
+As 3 trilhas principais têm fronteiras de arquivo bem isoladas na maior parte do trabalho, permitindo execução em paralelo via workers Orca com pontos de sincronização explícitos:
 
-O Genesis Recomp já tem pipeline Sega CD (`feature/segacd-backend`, `docs/SEGA_CD_SETUP.md`, `SEGA_CD_RECOMP_HANDOFF.md`): segundo 68000, Z80, streaming de CD. Só entra depois do M7; sem tarefas agora.
-
----
-
-## 10. Trilha paralela — Upscale neural (N1 → N3)
-
-Independente da recompilação (§11.6). **Começa já.**
-
-- **N1 — P1 em shader:** rede de bootstrap (ESPCN/FSRCNN pequena) compilada para shaders multi-pass no RetroArch; comparar com integer scaling e Anime4K. Fixa arquitetura, tamanho, GPU mínima (D7) e orçamento. Ferramentas: `neural/train` (PyTorch) → pesos embutidos em shader.
-- **N2 — P2 em ares:** fork do `ares/md/vdp` para exportar camadas separadas (planos A/B, sprites por prioridade, window) + frontend próprio com inferência por camada e cache (§11.3); orçamento ≤ 2 ms p99 (§11.4); **extrator de dataset da §10.1 funcionando** (alimenta a Fase 5 antes do M3!). O ponto de corte em ares: o `DAC` calcula pixels de A, B e sprites separados antes da composição (DESIGN §11.6).
-- **N3 — P3 no runtime:** integrar o B+ ao renderer (após M4); retreino com assets `approved`.
-
----
-
-## 11. Onde o rea-agents entra (estado verificado em 2026-11-18)
-
-### 11.1 Diagnóstico feito
-
-| Checagem | Resultado |
-|---|---|
-| `binary_session` | Servidor `rea-agents` 6.9.0 ativo; **nenhum provider de análise nativo configurado** (Ghidra ❌ sem `GHIDRA_INSTALL_DIR`; Hopper ❌; IDA ❌; Kuna ❌). |
-| `open_binary` na ROM | ❌ `unsupported binary format` — o inventário de artefatos do REA só reconhece ELF/PE/Mach-O/APK etc.; **ROM crua de Mega Drive não abre sem um provider como Ghidra**. |
-| `inspect_byte_entropy` na ROM | ✅ Funcionou: entropia média 6,25 (código/gráficos sem regiões comprimidas), SHA-256 confirmado. Útil para perfil de regiões código/dados. |
-| Ferramentas sem provider | ✅ Disponíveis já: entropia, inventário de arquivos, `capture_process_scenario` (rodar comandos com Evidence), comparações de artefatos. |
-
-### 11.2 Plano de uso do REA no projeto
-
-1. **T0 (Fase 0):** instalar **Ghidra 12.x** (≥12.1) e definir `GHIDRA_INSTALL_DIR`. Depois, tentar `open_binary` da ROM como **raw binary com processador 68000** (Ghidra suporta; a aceitação pelo REA é empírica). 
-   - Se abrir: a Fase 1 ganha `list_procedures`, `analyze_function`, `procedure_pseudo_code`, `xrefs`, `list_strings`, `search_bytes`, `read_bytes`, `set_address_name`/`set_comment` (anotações que viram labels/`; ?` no disasm), `binary_overview`, `decompile_all`.
-   - Se não abrir: usar o caminho próprio do framework (`tools/ghidra/SonicAnnotationProject.java`, que o Genesis Recomp já traz) fora do REA, e usar o REA nos **artefatos derivados**.
-2. **Durante a Fase 1:** fluxo assistido — REA propõe funções/limites/xrefs → anotação vira `disasm/` → **`verify.py` (hash) decide**, conforme §2.6 e §14.
-3. **Fases 2–4:** REA nos **binários ELF/PE do projeto** (recompilador, runner, jogo recompilado): `inspect_binary_layout`, `inspect_native_exports`, `inspect_binary_hardening`, unwind/crash (`inspect_elf_*`), comparação de builds (`match_native_functions`, `compare_functions`) — útil para depurar o gerado e medir otimizações.
-4. **Trilha neural:** `inspect_model_artifact` (ONNX) para auditar o modelo exportado; comparação de saídas (`compare_artifacts`) nos testes de regressão visual.
-5. **Prática:** exportar `export_evidence_bundle` para `reference/rea/` ao fim de cada sessão grande (rastro reproduzível, sem binários da ROM no git — apenas metadados/evidence).
-
----
-
-## 11.5 Ambiente de desenvolvimento (WSL2, verificado)
-
-- **Host:** WSL2, kernel `6.18.58.1-microsoft-standard-WSL2`, 15 GiB RAM visíveis.
-- **GPU:** NVIDIA **RTX 5060 Ti** (driver 616.56) com `nvidia-smi` funcional no WSL → **CUDA disponível** para PyTorch/ONNX Runtime. Atenção: Blackwell (sm_120) exige torch ≥ 2.8 com wheels cu128+.
-- **Gráficos:** `/dev/dxg` + Mesa (dzn) — SDL3/renderer funcionam via WSLg, mas Vulkan/OpenGL são traduzidos sobre DX12. Medições de performance (orçamento de 2 ms do N2, 60 fps) precisam ser revalidadas em build Windows nativo.
-- **Interop Windows:** `cmd.exe`/`powershell.exe` acessíveis → ferramentas Windows (Exodus, RetroArch, release `GenesisRecomp.exe`) podem ser chamadas do WSL. Preferir mesmo assim builds Linux nativos do que compila de fonte.
-- **Limitações conhecidas:** gamepads/arcade sticks não passam por padrão (usar `usbipd-win`); áudio via WSLg tem latência maior; **não colocar repo/builds em `/mnt/c`** (9p é lento) — manter em `/home/...` como está.
-
-## 12. Primeiras ações (esta semana)
-
-1. `git init` + `.gitignore` + `reference/roms.toml` (hashes do §0.1). *(~1h)*
-2. Instalar `vasm`; escrever `tools/split.py` + `tools/verify.py`; primeiro build com hash idêntico. *(~1 dia)*
-3. Compilar `ares` e rodar a ROM até a tela de título (M0.5). *(~2h)*
-4. Instalar Ghidra 12.x + configurar REA; testar `open_binary` da ROM (§11.2.1). *(~2h, incerto)*
-5. Compilar o recompilador do Genesis Recomp e rodar o exemplo Sonic 1 de ponta a ponta (só para dominar o fluxo). *(~2h)*
-6. Decidir D2 (adotar framework vs construir próprio) — recomendado: adotar.
-
----
-
-## 13. Ordem de execução e dependências
-
-```
-M0 ──► M1 ──────────────► M2 ──► M3 ──► M4 ──► M5 ──► M6 ──► M7 ──► M8
-        │                 │      │      │
-        └─ (REA+Ghidra, ares, LLMs)
-        N1 ──────────────► N2 ──────────────────────► N3 (após M4)
-              (N2 alimenta o dataset da Fase 5 antes mesmo do M3)
-```
-
-- **M1 e M3 são os gates críticos** (§16). N1/N2 correm em paralelo e são independentes.
-- O P2/N2 é **também** a ferramenta de extração da Fase 5 — por isso começar cedo.
-
-## 14. Riscos-chave com mitigação no roadmap
-
-| Risco (DESIGN §17) | Mitigação no roadmap |
-|---|---|
-| Despacho indireto intenso | Tabelas de ponteiros tipadas na Fase 1 (tarefa 4.4) + ciclo de descoberta do framework (Fase 3.6) |
-| Timing fino do VDP | Mapear raster/HBlank já na Fase 1 (§4.8) |
-| Emulador impreciso para o jogo (P2) | Teste empírico em ares logo no M0.5 |
-| Framework não encaixar no jogo (D2/D3) | Fallback: caminho próprio do DESIGN (Musashi + runtime SDL3, com referência no SoR) |
-| Escopo infinito | Marcos sequenciais com critério de saída mensurável (§16) |
-
-## 15. Questões abertas do DESIGN — status
-
-| # | Questão | Status no roadmap |
+| Worker / Frente | Escopo Exclusivo (sem conflito) | Ponto de Convergência (Merge) |
 |---|---|---|
-| 1 | Revisão da ROM | Resolvida em 0.1 + verificação No-Intro na Fase 0.3 |
-| 2 | Driver de som | Fase 1, tarefa 4.8 |
-| 3 | HBlank/raster | Fase 1, tarefa 4.8 |
-| 4 | Runtime próprio vs reaproveitar | D3, decidir no M2 |
-| 5 | Formato dos assets HD | D6, decidir no M5 |
-| 6 | Modos opcionais (rollback etc.) | Avaliar após M3 (Fase 3.7) |
-| 7 | Modelo único vs por camada | D7, medir no N1 |
-| 8 | GPU mínima | D7, medir no N1 |
-| 9 | VDP do modo A | D4 — o do runner (mesma base do harness) |
+| **Worker G (Gráficos ML/Assets)** | `neural/train_espcn.py`, `neural/export_onnx.py`, `tools/pipeline/`, `assets/video_compare/`, `assets/models/` | `game/ec_video.c`, `game/ec_hd.c`, `game/ec_spec.c` (apenas após G1/G2 aprovados) |
+| **Worker S (Shaders GPU)** | `assets/shaders/`, `game/ec_shader_chain.{h,c}` (novos arquivos) | Integração curta em `game/ec_video.c`, `game/ec_spec.c`, `game/CMakeLists.txt`, `segagenesisrecomp/runner/main.c` |
+| **Worker A (Áudio & Remaster)** | `tools/audio/`, `docs/audio_remaster_architecture.md`, `assets/audio_remaster/`, `game/ec_audio.{h,c}` (novos arquivos) | Gancho de leitura Z80 em `game/ec_spec.c` / `segagenesisrecomp/runner/main.c` + `game/CMakeLists.txt` |
+
+**Gates obrigatórios antes de qualquer merge na branch principal:**
+1. **Gate Visual/Auditivo:** aprovação do usuário nas pranchas (`G1`, `G2`, `S3`) e amostras WAV (`A1`, `A2`).
+2. **Gate de Build:** `cmake --build build/native -j` sem erros nem warnings novos.
+3. **Gate de Determinismo:** `python3 harness/ec_harness.py` (ou `--quick` durante iterações e suíte `17/17` no fechamento de cada trilha) com `det=0/65536`, `wram_diff=0/65536` e `misses=(0,0,0,0)`.

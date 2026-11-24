@@ -11,11 +11,13 @@
  */
 
 #include "ec_video.h"
+#include "ec_hd.h"
 #include "ec_bplus_gl.h"
 #include "ec_bplus_ort.h"
 #include "genesis_runtime.h"
 #include "genesis_dac.h"
 #include "genesis_vdp.h"
+#include "video/genesis_machine.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -44,6 +46,8 @@ static double     s_bplus_intensity = 1.0;
 enum { EC_BPLUS_BACKEND_AUTO = 0, EC_BPLUS_BACKEND_GL = 1, EC_BPLUS_BACKEND_CUDA = 2 };
 static int        s_bplus_backend = EC_BPLUS_BACKEND_AUTO;
 static int        s_bplus_backend_cli_set = 0;
+static EcBplusDeditherMode s_bplus_dedither = EC_BPLUS_DEDITHER_OFF;
+static int        s_bplus_dedither_cli_set = 0;
 static EcBplusGl *s_bplus_gl = NULL;
 static EcBplusOrt *s_bplus_ort = NULL;
 static int        s_bplus_checked = 0;
@@ -168,7 +172,7 @@ static uint16_t ec_lookup_layer_tile(uint16_t pl, int line, int sx, int hs, uint
 static void ec_fetch_plane_pixel(const GVDP *v, uint16_t base, uint16_t pl,
                                  int line, int sx, int hs, int wt, int ht,
                                  int px, int py, int im2,
-                                 uint8_t *idx, int *opaque, int *hi)
+                                 uint8_t *idx, int *opaque, int *hi, int *streamed)
 {
     int shift      = im2 ? 4 : 3;
     int fy_mask    = (1 << shift) - 1;
@@ -179,9 +183,11 @@ static void ec_fetch_plane_pixel(const GVDP *v, uint16_t base, uint16_t pl,
     px &= (wpx - 1);
     py &= (hpx - 1);
 
-    uint16_t nt = (uint16_t)(base + (uint16_t)(((py >> shift) * wt + (px >> 3)) * 2));
-    uint16_t e  = ec_vram16(v, nt);
-    e = ec_lookup_layer_tile(pl, line, sx, hs, e);
+    uint16_t nt  = (uint16_t)(base + (uint16_t)(((py >> shift) * wt + (px >> 3)) * 2));
+    uint16_t raw = ec_vram16(v, nt);
+    uint16_t e   = ec_lookup_layer_tile(pl, line, sx, hs, raw);
+    if (streamed)
+        *streamed = (e != raw);
     int ti      = e & 0x07FF;
     int fx      = px & 7;
     int fy      = py & fy_mask;
@@ -203,6 +209,7 @@ typedef struct {
     uint8_t hi[GVDP_MAX_WIDTH];
     uint8_t sh[GVDP_MAX_WIDTH];
     uint8_t hl[GVDP_MAX_WIDTH];
+    uint8_t link[GVDP_MAX_WIDTH];
 } EcMarginSprites;
 
 static int     s_frame_had_display = 0;
@@ -445,9 +452,10 @@ static void ec_eval_full_sprites_line(const GVDP *v, int line, int left, int x0,
                         ms->sh[ox] = 1;
                         ms->hi[ox] = (uint8_t)pri;
                     } else {
-                        ms->idx[ox] = (uint8_t)(pal * 16 + nib);
-                        ms->op[ox]  = 1;
-                        ms->hi[ox]  = (uint8_t)pri;
+                        ms->idx[ox]  = (uint8_t)(pal * 16 + nib);
+                        ms->op[ox]   = 1;
+                        ms->hi[ox]   = (uint8_t)pri;
+                        ms->link[ox] = (uint8_t)link;
                     }
                 }
             }
@@ -489,7 +497,7 @@ static void ec_fetch_window_pixel(const GVDP *v, uint16_t base_w, int win_wt, in
     *idx    = (uint8_t)(((e >> 13) & 3u) * 16u + (unsigned)nib);
 }
 
-static void ec_render_ws_scanline_impl(const GVDP *v, int bg_line, int native_w, int left, int x0,
+static void ec_render_ws_scanline_impl(const GVDP *v, int out_line, int bg_line, int native_w, int left, int x0,
                                        int width, int force_display, const EcMarginSprites *ms,
                                        uint32_t *out, int *out_any_plane_opaque)
 {
@@ -536,6 +544,7 @@ static void ec_render_ws_scanline_impl(const GVDP *v, int bg_line, int native_w,
     int window_y       = (int)(wy & 0x1Fu) * 8;
     int window_h_right = (wx & 0x80u) != 0;
     int window_v_in    = (wy & 0x80u) ? (rline >= window_y) : (rline < window_y);
+    int hd_rec         = ec_hd_frame_active();
 
     int any_opaque = 0;
     for (int ox = 0; ox < width; ++ox) {
@@ -551,12 +560,17 @@ static void ec_render_ws_scanline_impl(const GVDP *v, int bg_line, int native_w,
 
         uint8_t idx_a = 0, idx_b = 0;
         int op_a = 0, op_b = 0, hi_a = 0, hi_b = 0;
+        int st_a = 0, st_b = 0, is_win = 0;
+        int px_a = sx - hs_a_adj, py_a = bg_line + va;
+        int px_b = sx - hs_b_adj, py_b = bg_line + vb;
         int window_h_in = window_h_right ? (sx >= window_x) : (sx < window_x);
-        if (sx >= 0 && sx < native_w && (window_h_in || window_v_in))
+        if (sx >= 0 && sx < native_w && (window_h_in || window_v_in)) {
+            is_win = 1;
             ec_fetch_window_pixel(v, base_w, win_wt, ht, sx, bg_line, im2, &idx_a, &op_a, &hi_a);
-        else
-            ec_fetch_plane_pixel(v, base_a, 0u, bg_line, sx, hs_a_adj, wt, ht, sx - hs_a_adj, bg_line + va, im2, &idx_a, &op_a, &hi_a);
-        ec_fetch_plane_pixel(v, base_b, 2u, bg_line, sx, hs_b_adj, wt, ht, sx - hs_b_adj, bg_line + vb, im2, &idx_b, &op_b, &hi_b);
+        } else {
+            ec_fetch_plane_pixel(v, base_a, 0u, bg_line, sx, hs_a_adj, wt, ht, px_a, py_a, im2, &idx_a, &op_a, &hi_a, &st_a);
+        }
+        ec_fetch_plane_pixel(v, base_b, 2u, bg_line, sx, hs_b_adj, wt, ht, px_b, py_b, im2, &idx_b, &op_b, &hi_b, &st_b);
         if (op_a || op_b)
             any_opaque = 1;
 
@@ -567,12 +581,13 @@ static void ec_render_ws_scanline_impl(const GVDP *v, int bg_line, int native_w,
         int s_hl = ms ? (ms->hl[ox] != 0) : 0;
 
         uint8_t cidx = backdrop;
-        if      (s_op && s_hi) cidx = s_idx;
-        else if (op_a && hi_a) cidx = idx_a;
-        else if (op_b && hi_b) cidx = idx_b;
-        else if (s_op)         cidx = s_idx;
-        else if (op_a)         cidx = idx_a;
-        else if (op_b)         cidx = idx_b;
+        int win_layer = EC_HD_LAYER_NONE;
+        if      (s_op && s_hi) { cidx = s_idx; win_layer = EC_HD_LAYER_SPRITE; }
+        else if (op_a && hi_a) { cidx = idx_a; win_layer = is_win ? EC_HD_LAYER_NONE : EC_HD_LAYER_PLANE_A; }
+        else if (op_b && hi_b) { cidx = idx_b; win_layer = EC_HD_LAYER_PLANE_B; }
+        else if (s_op)         { cidx = s_idx; win_layer = EC_HD_LAYER_SPRITE; }
+        else if (op_a)         { cidx = idx_a; win_layer = is_win ? EC_HD_LAYER_NONE : EC_HD_LAYER_PLANE_A; }
+        else if (op_b)         { cidx = idx_b; win_layer = EC_HD_LAYER_PLANE_B; }
 
         int level = GENESIS_DAC_NORMAL;
         if (sh_mode) {
@@ -589,6 +604,16 @@ static void ec_render_ws_scanline_impl(const GVDP *v, int bg_line, int native_w,
                 level = GENESIS_DAC_NORMAL;
         }
 
+        if (hd_rec) {
+            int bg_layer = EC_HD_LAYER_NONE, bg_px = 0, bg_py = 0, bg_st = 0;
+            if      (op_a && hi_a && !is_win) { bg_layer = EC_HD_LAYER_PLANE_A; bg_px = px_a; bg_py = py_a; bg_st = st_a; }
+            else if (op_b && hi_b)            { bg_layer = EC_HD_LAYER_PLANE_B; bg_px = px_b; bg_py = py_b; bg_st = st_b; }
+            else if (op_a && !is_win)         { bg_layer = EC_HD_LAYER_PLANE_A; bg_px = px_a; bg_py = py_a; bg_st = st_a; }
+            else if (op_b)                    { bg_layer = EC_HD_LAYER_PLANE_B; bg_px = px_b; bg_py = py_b; bg_st = st_b; }
+            int spr_lnk = (ms && s_op) ? (int)ms->link[ox] : -1;
+            ec_hd_record_pixel(out_line, ox, win_layer, bg_layer, bg_px, bg_py, bg_st, spr_lnk, level);
+        }
+
         out[ox] = genesis_dac_cram_to_argb(v->cram[cidx & 63u], level);
     }
     *out_any_plane_opaque = any_opaque;
@@ -599,7 +624,7 @@ static void ec_render_ws_scanline(const GVDP *v, int line, int native_w, int lef
                                   uint32_t *out)
 {
     int any_plane_opaque = 0;
-    ec_render_ws_scanline_impl(v, line, native_w, left, x0, width, force_display, ms, out, &any_plane_opaque);
+    ec_render_ws_scanline_impl(v, line, line, native_w, left, x0, width, force_display, ms, out, &any_plane_opaque);
     if (line >= 200 && any_plane_opaque)
         s_last_floor_line = line;
     if (line >= 216 && force_display && !any_plane_opaque) {
@@ -609,7 +634,7 @@ static void ec_render_ws_scanline(const GVDP *v, int line, int native_w, int lef
         if (src_line > s_last_floor_line)
             src_line = s_last_floor_line;
         int dummy = 0;
-        ec_render_ws_scanline_impl(v, src_line, native_w, left, x0, width, force_display, ms, out, &dummy);
+        ec_render_ws_scanline_impl(v, line, src_line, native_w, left, x0, width, force_display, ms, out, &dummy);
     }
 }
 
@@ -740,6 +765,8 @@ static void ec_video_scanline_lazy(const GVDP *vdp, int line, int native_w,
         if (line == 0)
             ec_refresh_frame_hud_sat(vdp);
         int x0 = ec_compute_viewport_x0(line, native_w, width);
+        if (line == 0 && ec_hd_is_active())
+            ec_hd_begin_frame(vdp, ec_ram16(0xFD64u), width, 224, left, x0, s_sat_is_hud);
         int force_display = (line >= 216 && s_frame_had_display && ec_ram16(0x9B32u) != 0u) ? 1 : 0;
         EcMarginSprites ms;
         ec_eval_full_sprites_line(vdp, line, left, x0, width, force_display, &ms);
@@ -764,56 +791,12 @@ static void ec_video_scanline_lazy(const GVDP *vdp, int line, int native_w,
 
 int ec_video_load_hd_manifest(const char *path)
 {
-    if (!path || !*path) return -1;
-    FILE *fp = fopen(path, "rb");
-    if (!fp) {
-        fprintf(stderr, "[EC_VIDEO] HD manifest não encontrado: %s (fallback Modo A/B ativo)\n", path);
+    int total = ec_hd_load_manifest(path);
+    if (total < 0)
         return -1;
-    }
-    if (fseek(fp, 0, SEEK_END) != 0) {
-        fclose(fp);
-        return -1;
-    }
-    long sz = ftell(fp);
-    if (sz < 0 || sz > 16L * 1024L * 1024L || fseek(fp, 0, SEEK_SET) != 0) {
-        fclose(fp);
-        return -1;
-    }
-    char *buf = (char *)malloc((size_t)sz + 1u);
-    if (!buf) {
-        fclose(fp);
-        return -1;
-    }
-    size_t nread = fread(buf, 1, (size_t)sz, fp);
-    fclose(fp);
-    buf[nread] = '\0';
-
-    int total = 0;
-    int approved = 0;
-    const char *p = buf;
-    while ((p = strstr(p, "\"original_png\"")) != NULL) {
-        total++;
-        p += 14;
-    }
-    p = buf;
-    while ((p = strstr(p, "\"status\"")) != NULL) {
-        const char *q = p + 8;
-        while (*q == ' ' || *q == '\t' || *q == '\r' || *q == '\n') q++;
-        if (*q == ':') {
-            q++;
-            while (*q == ' ' || *q == '\t' || *q == '\r' || *q == '\n') q++;
-            if (strncmp(q, "\"approved\"", 10) == 0)
-                approved++;
-        }
-        p = q;
-    }
-    free(buf);
-
     s_hd_loaded = 1;
-    s_hd_total_entries = total;
-    s_hd_approved_entries = approved;
-    fprintf(stderr, "[EC_VIDEO] HD manifest '%s': %d entradas (%d approved, fallback=Modo A/B)\n",
-            path, total, approved);
+    s_hd_total_entries = ec_hd_total_entries();
+    s_hd_approved_entries = ec_hd_approved_entries();
     return total;
 }
 
@@ -864,6 +847,50 @@ void ec_video_set_bplus_backend(const char *backend)
                 backend);
 }
 
+static int ec_parse_dedither_mode(const char *mode, EcBplusDeditherMode *out)
+{
+    if (!mode || !*mode || !out)
+        return 0;
+    if (strcmp(mode, "off") == 0 || strcmp(mode, "0") == 0 || strcmp(mode, "none") == 0) {
+        *out = EC_BPLUS_DEDITHER_OFF;
+        return 1;
+    }
+    if (strcmp(mode, "cbod") == 0 || strcmp(mode, "cb") == 0 ||
+        strcmp(mode, "checkerboard") == 0 || strcmp(mode, "1") == 0) {
+        *out = EC_BPLUS_DEDITHER_CBOD;
+        return 1;
+    }
+    if (strcmp(mode, "both") == 0 || strcmp(mode, "sgenpt") == 0 ||
+        strcmp(mode, "on") == 0 || strcmp(mode, "2") == 0) {
+        *out = EC_BPLUS_DEDITHER_BOTH;
+        return 1;
+    }
+    return 0;
+}
+
+void ec_video_set_bplus_dedither(const char *mode)
+{
+    EcBplusDeditherMode parsed = EC_BPLUS_DEDITHER_OFF;
+    if (ec_parse_dedither_mode(mode, &parsed)) {
+        s_bplus_dedither = parsed;
+        s_bplus_dedither_cli_set = 1;
+    } else {
+        fprintf(stderr, "[EC_VIDEO] --bplus-dedither desconhecido '%s' (off|cbod|both)\n",
+                mode ? mode : "");
+    }
+}
+
+static EcBplusDeditherMode ec_resolve_bplus_dedither(void)
+{
+    if (s_bplus_dedither_cli_set)
+        return s_bplus_dedither;
+    const char *env = getenv("EC_BPLUS_DEDITHER");
+    EcBplusDeditherMode parsed = EC_BPLUS_DEDITHER_OFF;
+    if (env && *env && ec_parse_dedither_mode(env, &parsed))
+        return parsed;
+    return s_bplus_dedither;
+}
+
 static int ec_resolve_bplus_backend(void)
 {
     if (s_bplus_backend_cli_set)
@@ -880,12 +907,17 @@ static int ec_resolve_bplus_backend(void)
     return EC_BPLUS_BACKEND_AUTO;
 }
 
-static int ec_video_present_gpu_enabled(void)
+static int ec_bplus_is_enabled(void)
 {
     if (s_bplus_cli_set)
         return s_bplus_enabled;
     const char *env = getenv("EC_NEURAL_BPLUS");
     return (env && (strcmp(env, "1") == 0 || strcmp(env, "on") == 0));
+}
+
+static int ec_video_present_gpu_enabled(void)
+{
+    return ec_bplus_is_enabled() || ec_hd_is_active();
 }
 
 static const char *ec_resolve_bplus_model_path(void)
@@ -981,46 +1013,65 @@ static struct SDL_Texture *ec_video_present_gpu(
     (void)raster;
     if (!ec_video_present_gpu_enabled())
         return NULL;
-    if (!s_bplus_checked) {
-        s_bplus_checked = 1;
-        const char *wpath = ec_resolve_bplus_model_path();
-        const char *opath = ec_resolve_bplus_onnx_path();
-        double budget = ec_resolve_bplus_budget_ms();
-        float intensity = (float)ec_resolve_bplus_intensity();
-        int backend = ec_resolve_bplus_backend();
-        int want_cuda = backend == EC_BPLUS_BACKEND_CUDA || backend == EC_BPLUS_BACKEND_AUTO;
-        int want_gl = backend == EC_BPLUS_BACKEND_GL || backend == EC_BPLUS_BACKEND_AUTO;
 
-        if (want_cuda && intensity == 1.0f) {
-            s_bplus_ort = ec_bplus_ort_create(renderer, activation, opath, budget);
-            if (!s_bplus_ort && backend == EC_BPLUS_BACKEND_CUDA)
-                fprintf(stderr, "[EC_VIDEO] Mode B+ CUDA unavailable; retaining Modo A/B fallback\n");
-        } else if (want_cuda) {
-            if (backend == EC_BPLUS_BACKEND_CUDA)
-                fprintf(stderr, "[EC_VIDEO] CUDA backend requires intensity=1.0 (got %.3f); using GL\n",
-                        intensity);
+    struct SDL_Texture *base_tex = NULL;
+    if (ec_bplus_is_enabled()) {
+        if (!s_bplus_checked) {
+            s_bplus_checked = 1;
+            const char *wpath = ec_resolve_bplus_model_path();
+            const char *opath = ec_resolve_bplus_onnx_path();
+            double budget = ec_resolve_bplus_budget_ms();
+            float intensity = (float)ec_resolve_bplus_intensity();
+            EcBplusDeditherMode dedither = ec_resolve_bplus_dedither();
+            int backend = ec_resolve_bplus_backend();
+            int want_cuda = backend == EC_BPLUS_BACKEND_CUDA || backend == EC_BPLUS_BACKEND_AUTO;
+            int want_gl = backend == EC_BPLUS_BACKEND_GL || backend == EC_BPLUS_BACKEND_AUTO;
+
+            if (want_cuda && intensity == 1.0f && dedither == EC_BPLUS_DEDITHER_OFF) {
+                s_bplus_ort = ec_bplus_ort_create(renderer, activation, opath, budget);
+                if (!s_bplus_ort && backend == EC_BPLUS_BACKEND_CUDA)
+                    fprintf(stderr, "[EC_VIDEO] Mode B+ CUDA unavailable; retaining Modo A/B fallback\n");
+            } else if (want_cuda) {
+                want_gl = 1;
+                if (backend == EC_BPLUS_BACKEND_CUDA) {
+                    if (dedither != EC_BPLUS_DEDITHER_OFF)
+                        fprintf(stderr, "[EC_VIDEO] CUDA backend does not support --bplus-dedither; using GL\n");
+                    else
+                        fprintf(stderr, "[EC_VIDEO] CUDA backend requires intensity=1.0 (got %.3f); using GL\n",
+                                intensity);
+                }
+            }
+
+            if (!s_bplus_ort && want_gl) {
+                s_bplus_gl = ec_bplus_gl_create(renderer, activation, wpath, budget);
+                if (!s_bplus_gl)
+                    fprintf(stderr, "[EC_VIDEO] Mode B+ unavailable; retaining Modo A/B fallback\n");
+            }
+
+            if (s_bplus_ort)
+                ec_bplus_ort_set_intensity(s_bplus_ort, intensity);
+            if (s_bplus_gl) {
+                ec_bplus_gl_set_intensity(s_bplus_gl, intensity);
+                ec_bplus_gl_set_dedither(s_bplus_gl, dedither);
+            }
         }
-
-        if (!s_bplus_ort && want_gl) {
-            s_bplus_gl = ec_bplus_gl_create(renderer, activation, wpath, budget);
-            if (!s_bplus_gl)
-                fprintf(stderr, "[EC_VIDEO] Mode B+ unavailable; retaining Modo A/B fallback\n");
-        }
-
         if (s_bplus_ort)
-            ec_bplus_ort_set_intensity(s_bplus_ort, intensity);
-        if (s_bplus_gl)
-            ec_bplus_gl_set_intensity(s_bplus_gl, intensity);
+            base_tex = ec_bplus_ort_process(s_bplus_ort, argb, width, height, stride_px);
+        else if (s_bplus_gl)
+            base_tex = ec_bplus_gl_process(s_bplus_gl, argb, width, height, stride_px);
     }
-    if (s_bplus_ort)
-        return ec_bplus_ort_process(s_bplus_ort, argb, width, height, stride_px);
-    if (s_bplus_gl)
-        return ec_bplus_gl_process(s_bplus_gl, argb, width, height, stride_px);
-    return NULL;
+
+    if (ec_hd_is_active()) {
+        return ec_hd_composite_gpu(renderer, activation, base_tex,
+                                   argb, width, height, stride_px,
+                                   &g_machine.vdp, ec_ram16(0xFD64u));
+    }
+    return base_tex;
 }
 
 static void ec_video_present_gpu_destroy(void)
 {
+    ec_hd_destroy_gpu();
     if (s_bplus_ort) {
         EcBplusOrtMetrics m;
         ec_bplus_ort_metrics(s_bplus_ort, &m);

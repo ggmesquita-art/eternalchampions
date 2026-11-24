@@ -9,6 +9,13 @@
  *   HBlank IRQ4 = NULL (confirmado inativo na Fase 1 §5.7; usa VDP Reg 11 H-scroll)
  */
 
+#if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
+#include "audio.h"
+#include "audio/mixer.h"
+#include "ec_audio.h"
 #include "ec_boss.h"
 #include "ec_video.h"
 #include "game_spec.h"
@@ -20,6 +27,8 @@
 extern int      game_dispatch_table_size(void);
 extern uint32_t game_dispatch_table_addr(int i);
 
+#include <ctype.h>
+#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -44,9 +53,102 @@ static uint32_t spec_ram32(unsigned a)
 static int s_boot_init_done = 0;
 static int s_diag_boss_sanctuary = 0;
 
+/* Host-only audio remaster config state (never touches 68k/Z80/WRAM). */
+static int      s_audio_mode_cli         = 0;
+static int      s_audio_sf2_cli          = 0;
+static int      s_audio_profiles_dir_cli = 0;
+static int      s_audio_bgm_vol_cli      = 0;
+static int      s_audio_sfx_vol_cli      = 0;
+static int      s_audio_blend_cli        = 0;
+static int      s_audio_reverb_cli       = 0;
+static char     s_audio_sf2_path[1024]   = "";
+static char     s_audio_profiles_dir[1024] = "";
+static uint16_t s_audio_last_pause_flag  = 0;
+
+static char *ec_ini_trim(char *s)
+{
+    while (*s && isspace((unsigned char)*s))
+        ++s;
+    size_t n = strlen(s);
+    while (n > 0 && isspace((unsigned char)s[n - 1]))
+        s[--n] = '\0';
+    return s;
+}
+
+static int ec_parse_double_strict(const char *val, double *out)
+{
+    if (!val || !*val || !out)
+        return 0;
+    char *end = NULL;
+    double v = strtod(val, &end);
+    if (end == val || *end != '\0' || !isfinite(v))
+        return 0;
+    *out = v;
+    return 1;
+}
+
+/* Optional [ec.audio] section in runner settings.ini (CLI flags take precedence). */
+static void ec_load_settings(const char *settings_path)
+{
+    if (!settings_path || !*settings_path)
+        return;
+    FILE *fp = fopen(settings_path, "r");
+    if (!fp)
+        return;
+
+    int in_audio_section = 0;
+    char line_buf[1280];
+    while (fgets(line_buf, (int)sizeof(line_buf), fp) != NULL) {
+        char *line = ec_ini_trim(line_buf);
+        if (!*line || *line == ';' || *line == '#')
+            continue;
+        if (*line == '[') {
+            in_audio_section = (strcmp(line, "[ec.audio]") == 0);
+            continue;
+        }
+        if (!in_audio_section)
+            continue;
+        char *eq = strchr(line, '=');
+        if (!eq)
+            continue;
+        *eq = '\0';
+        char *key = ec_ini_trim(line);
+        char *val = ec_ini_trim(eq + 1);
+        if (!*key || !*val)
+            continue;
+
+        double dv = 0.0;
+        if (strcmp(key, "remaster") == 0 && !s_audio_mode_cli) {
+            (void)ec_audio_set_mode_str(val);
+        } else if (strcmp(key, "sf2") == 0 && !s_audio_sf2_cli) {
+            snprintf(s_audio_sf2_path, sizeof(s_audio_sf2_path), "%s", val);
+        } else if (strcmp(key, "profiles_dir") == 0 && !s_audio_profiles_dir_cli) {
+            snprintf(s_audio_profiles_dir, sizeof(s_audio_profiles_dir), "%s", val);
+        } else if (strcmp(key, "bgm_vol") == 0 && !s_audio_bgm_vol_cli && ec_parse_double_strict(val, &dv)) {
+            ec_audio_set_bgm_vol((float)dv);
+        } else if (strcmp(key, "sfx_vol") == 0 && !s_audio_sfx_vol_cli && ec_parse_double_strict(val, &dv)) {
+            ec_audio_set_sfx_vol((float)dv);
+        } else if (strcmp(key, "chip_blend") == 0 && !s_audio_blend_cli && ec_parse_double_strict(val, &dv)) {
+            ec_audio_set_chip_blend((float)dv);
+        } else if (strcmp(key, "dsp_reverb") == 0 && !s_audio_reverb_cli && ec_parse_double_strict(val, &dv)) {
+            ec_audio_set_dsp_reverb((float)dv);
+        }
+    }
+    fclose(fp);
+}
+
+static void ec_on_state_loaded(void)
+{
+    /* Clear host-side BGM/DSP playback buffers after savestate/rewind load. */
+    ec_audio_reset();
+    s_audio_last_pause_flag = 0;
+}
+
 static void ec_on_post_reset(void)
 {
     ec_boss_reset();
+    ec_audio_reset();
+    s_audio_last_pause_flag = 0;
     if (s_boot_init_done)
         return;
     s_boot_init_done = 1;
@@ -69,6 +171,65 @@ static void ec_on_post_reset(void)
     const char *manifest = getenv("EC_HD_MANIFEST");
     if (manifest && *manifest)
         (void)ec_video_load_hd_manifest(manifest);
+
+    /* Host-side audio remaster / studio DSP initialization (default: off). */
+    ec_audio_init();
+
+    if (!s_audio_mode_cli) {
+        const char *env_mode = getenv("EC_AUDIO_REMASTER");
+        if (env_mode && *env_mode) {
+            if (!ec_audio_set_mode_str(env_mode))
+                fprintf(stderr, "[EC-AUDIO] EC_AUDIO_REMASTER invalido: '%s'\n", env_mode);
+        }
+    }
+    if (!s_audio_sf2_cli) {
+        const char *env_sf2 = getenv("EC_AUDIO_SF2");
+        if (env_sf2 && *env_sf2)
+            snprintf(s_audio_sf2_path, sizeof(s_audio_sf2_path), "%s", env_sf2);
+    }
+    if (!s_audio_profiles_dir_cli) {
+        const char *env_profiles = getenv("EC_AUDIO_PROFILES_DIR");
+        if (env_profiles && *env_profiles)
+            snprintf(s_audio_profiles_dir, sizeof(s_audio_profiles_dir), "%s", env_profiles);
+    }
+
+    EcAudioMode audio_mode = ec_audio_get_mode();
+    if (s_audio_sf2_path[0] != '\0') {
+        if (!ec_audio_load_soundfont(s_audio_sf2_path))
+            fprintf(stderr, "[EC-AUDIO] aviso: falha ao carregar SoundFont '%s' (degradando para DSP)\n",
+                    s_audio_sf2_path);
+    } else if (audio_mode == EC_AUDIO_MODE_HYBRID || audio_mode == EC_AUDIO_MODE_OST) {
+        static const char *const k_default_sf2s[] = {
+            "assets/soundfonts/TimGM6mb.sf2",
+            "../assets/soundfonts/TimGM6mb.sf2"
+        };
+        int loaded = 0;
+        for (size_t i = 0; i < sizeof(k_default_sf2s) / sizeof(k_default_sf2s[0]); ++i) {
+            if (ec_audio_load_soundfont(k_default_sf2s[i])) {
+                loaded = 1;
+                break;
+            }
+        }
+        if (!loaded)
+            fprintf(stderr, "[EC-AUDIO] aviso: SoundFont default nao encontrado (degradando para DSP)\n");
+    }
+
+    if (s_audio_profiles_dir[0] != '\0') {
+        if (ec_audio_load_profiles_dir(s_audio_profiles_dir) < 0)
+            fprintf(stderr, "[EC-AUDIO] aviso: falha ao carregar perfis '%s'\n", s_audio_profiles_dir);
+    } else if (audio_mode == EC_AUDIO_MODE_HYBRID || audio_mode == EC_AUDIO_MODE_OST) {
+        static const char *const k_default_profile_dirs[] = {
+            "assets/audio_remaster/profiles",
+            "../assets/audio_remaster/profiles"
+        };
+        for (size_t i = 0; i < sizeof(k_default_profile_dirs) / sizeof(k_default_profile_dirs[0]); ++i) {
+            if (ec_audio_load_profiles_dir(k_default_profile_dirs[i]) >= 0)
+                break;
+        }
+    }
+
+    audio_mixer_set_chip_observer(ec_audio_on_chip_write);
+    audio_set_extra_source(ec_audio_mix_callback);
 }
 
 static void ec_call_entry_point(void)
@@ -80,6 +241,15 @@ static void ec_call_entry_point(void)
 static void ec_call_vblank(void)
 {
     ec_boss_vblank();
+
+    /* Passive safety net on State_ChangedFlag ($FFFFFD68): 0x0080 = Main_PauseLoop.
+     * Resume is driven by Sound_Cmd0D ($00092E) because Main_PauseLoop restores
+     * $FD68 to $FFFF while still paused before checking Start. */
+    uint16_t pause_flag = spec_ram16(0xFD68u);
+    if (pause_flag == 0x0080u && s_audio_last_pause_flag != 0x0080u)
+        ec_audio_on_bgm_pause(1);
+    s_audio_last_pause_flag = pause_flag;
+
     if (s_diag_boss_sanctuary) {
         uint16_t st = spec_ram16(0xFD64u);
         if (st == 18u) {
@@ -101,6 +271,55 @@ static void ec_call_vblank(void)
         }
     }
     recomp_call_addr(0x0006B6u);
+}
+
+/*
+ * Purely passive 68k->Z80 sound-command observer + boss hook dispatcher.
+ * Audio hook PCs NEVER mutate g_cpu, g_ram, or g_machine and ALWAYS return 0.
+ *
+ * Confirmed against disasm/code/sound_cmd.asm and disasm/code/menu_system.asm:
+ *   $0008B8 (Sound_PlayBootSend, link a4,#0): reached from $0008A8/$0008B0
+ *     after $9388/$9386 guards; 4(a7) holds uint32_t id (0x00..0x0B = Bank 1
+ *     BGM; >=0x18 = SFX/voices ignored so BGM keeps playing).
+ *   $000A28 (Sound_PlaySong2, link a4,#0): 4(a7) holds Bank 2 song id
+ *     (0x00..0x04), mapped to unified Sound Test ID 0x0C + id (12..16).
+ *   $000920 (Sound_Cmd0C): pause.
+ *   $00092E (Sound_Cmd0D): resume.
+ *   $00093C (Sound_Cmd16): stop / fade.
+ */
+static int ec_instruction_hook(uint32_t pc)
+{
+    switch (pc) {
+    case 0x0008B8u: {
+        uint32_t sp = g_cpu.A[7] & 0xFFFFFFu;
+        if (sp >= 0xFF0000u && sp + 8u <= 0x1000000u) {
+            uint32_t raw_id = spec_ram32(sp + 4u) & 0xFFu;
+            if (raw_id <= 0x0Bu)
+                ec_audio_on_bgm_play(raw_id);
+        }
+        return 0;
+    }
+    case 0x000A28u: {
+        uint32_t sp = g_cpu.A[7] & 0xFFFFFFu;
+        if (sp >= 0xFF0000u && sp + 8u <= 0x1000000u) {
+            uint32_t raw_id = spec_ram32(sp + 4u) & 0xFFu;
+            ec_audio_on_bgm_play(0x0Cu + raw_id);
+        }
+        return 0;
+    }
+    case 0x000920u:
+        ec_audio_on_bgm_pause(1);
+        return 0;
+    case 0x00092Eu:
+        ec_audio_on_bgm_pause(0);
+        return 0;
+    case 0x00093Cu:
+        ec_audio_on_bgm_stop(1);
+        return 0;
+    default:
+        break;
+    }
+    return ec_boss_instruction_hook(pc);
 }
 
 static int ec_handle_arg(const char *key, const char *val)
@@ -125,17 +344,15 @@ static int ec_handle_arg(const char *key, const char *val)
         return 2;
     }
     if (strcmp(key, "--bplus-budget-ms") == 0 && val && *val) {
-        char *end = NULL;
-        double v = strtod(val, &end);
-        if (end != val && *end == '\0' && v >= 0.0) {
+        double v = 0.0;
+        if (ec_parse_double_strict(val, &v) && v >= 0.0) {
             ec_video_set_bplus_budget_ms(v);
             return 2;
         }
     }
     if (strcmp(key, "--bplus-intensity") == 0 && val && *val) {
-        char *end = NULL;
-        double v = strtod(val, &end);
-        if (end != val && *end == '\0' && v >= 0.0) {
+        double v = 0.0;
+        if (ec_parse_double_strict(val, &v) && v >= 0.0) {
             ec_video_set_bplus_intensity(v);
             return 2;
         }
@@ -143,6 +360,64 @@ static int ec_handle_arg(const char *key, const char *val)
     if (strcmp(key, "--bplus-backend") == 0 && val && *val) {
         ec_video_set_bplus_backend(val);
         return 2;
+    }
+    if (strcmp(key, "--bplus-dedither") == 0 && val && *val) {
+        ec_video_set_bplus_dedither(val);
+        return 2;
+    }
+    if (strcmp(key, "--audio-remaster") == 0 && val && *val) {
+        if (ec_audio_set_mode_str(val)) {
+            s_audio_mode_cli = 1;
+        } else {
+            fprintf(stderr, "[EC-AUDIO] --audio-remaster invalido: '%s' (use off|dsp|hybrid|ost)\n", val);
+        }
+        return 2;
+    }
+    if (strcmp(key, "--audio-sf2") == 0 && val && *val) {
+        snprintf(s_audio_sf2_path, sizeof(s_audio_sf2_path), "%s", val);
+        s_audio_sf2_cli = 1;
+        return 2;
+    }
+    if (strcmp(key, "--audio-profiles-dir") == 0 && val && *val) {
+        snprintf(s_audio_profiles_dir, sizeof(s_audio_profiles_dir), "%s", val);
+        s_audio_profiles_dir_cli = 1;
+        return 2;
+    }
+    if (strcmp(key, "--audio-manifest") == 0 && val && *val) {
+        fprintf(stderr, "[EC-AUDIO] aviso: --audio-manifest obsoleto; o modulo usa sintese em tempo real (--audio-sf2 + --audio-profiles-dir)\n");
+        return 2;
+    }
+    if (strcmp(key, "--audio-bgm-vol") == 0 && val && *val) {
+        double v = 0.0;
+        if (ec_parse_double_strict(val, &v)) {
+            ec_audio_set_bgm_vol((float)v);
+            s_audio_bgm_vol_cli = 1;
+            return 2;
+        }
+    }
+    if (strcmp(key, "--audio-sfx-vol") == 0 && val && *val) {
+        double v = 0.0;
+        if (ec_parse_double_strict(val, &v)) {
+            ec_audio_set_sfx_vol((float)v);
+            s_audio_sfx_vol_cli = 1;
+            return 2;
+        }
+    }
+    if (strcmp(key, "--audio-chip-blend") == 0 && val && *val) {
+        double v = 0.0;
+        if (ec_parse_double_strict(val, &v)) {
+            ec_audio_set_chip_blend((float)v);
+            s_audio_blend_cli = 1;
+            return 2;
+        }
+    }
+    if (strcmp(key, "--audio-dsp-reverb") == 0 && val && *val) {
+        double v = 0.0;
+        if (ec_parse_double_strict(val, &v)) {
+            ec_audio_set_dsp_reverb((float)v);
+            s_audio_reverb_cli = 1;
+            return 2;
+        }
     }
     return 0;
 }
@@ -312,7 +587,8 @@ static void ec_fill_frame_record(uint8_t game_data[256])
 
 const GameSpec g_game_spec = {
     .video                 = &g_ec_video,
-    .video_default           = "off",
+    .video_default         = "off",
+    .load_settings         = ec_load_settings,
     .display_name          = "Eternal Champions",
     .short_name            = "EC",
     .expected_rom_crc32    = 0x48F1A42Eu,
@@ -329,9 +605,10 @@ const GameSpec g_game_spec = {
     .call_vblank           = ec_call_vblank,
     .call_hblank           = NULL,
     .on_post_reset         = ec_on_post_reset,
+    .on_state_loaded       = ec_on_state_loaded,
     .handle_arg            = ec_handle_arg,
-    .arg_usage             = "--hd-manifest <path> | --neural-bplus | --bplus-model <bin> | --bplus-backend <auto|cuda|gl> | --bplus-budget-ms <ms> | --bplus-intensity <f> | --unlock-boss",
-    .instruction_hook      = ec_boss_instruction_hook,
+    .arg_usage             = "--hd-manifest <path> | --neural-bplus | --bplus-model <bin> | --bplus-backend <auto|cuda|gl> | --bplus-budget-ms <ms> | --bplus-intensity <f> | --bplus-dedither <off|cbod|both> | --unlock-boss | --audio-remaster <off|dsp|hybrid|ost> | --audio-sf2 <path> | --audio-profiles-dir <dir> | --audio-bgm-vol <f> | --audio-sfx-vol <f> | --audio-chip-blend <f> | --audio-dsp-reverb <f>",
+    .instruction_hook      = ec_instruction_hook,
     .rb_state_save         = ec_boss_rb_state_save,
     .rb_state_load         = ec_boss_rb_state_load,
     .fill_frame_record     = ec_fill_frame_record,

@@ -1,0 +1,1 @@
+.\build\EternalChampionsRecomp.exe roms\eternal_champions_us.gen --unlock-boss --widescreen fit --target-fps 60 --pacing fiber --neural-bplus --bplus-backend cuda --bplus-dedither both --bplus-intensity 0  --bplus-model .\assets\models\ec_bplus_v2_flux_weights.bin

@@ -25,6 +25,12 @@ typedef struct EcBplusMetrics {
     int      time_elapsed_available;
 } EcBplusMetrics;
 
+typedef enum EcBplusDeditherMode {
+    EC_BPLUS_DEDITHER_OFF  = 0,
+    EC_BPLUS_DEDITHER_CBOD = 1, /* 2x2 checkerboard de-dither (pseudo-transparency & gradients) */
+    EC_BPLUS_DEDITHER_BOTH = 2, /* 2x2 checkerboard + vertical-line SGENPT-MIX de-dither */
+} EcBplusDeditherMode;
+
 EcBplusGl   *ec_bplus_gl_create(SDL_Renderer *renderer, SDL_Texture *activation,
                                 const char *weights_path, double budget_ms);
 void         ec_bplus_gl_destroy(EcBplusGl *ctx);
@@ -32,6 +38,9 @@ void         ec_bplus_gl_destroy(EcBplusGl *ctx);
  * bilinear base. 1.0 = exact model output (default); 0.0 = pure bilinear;
  * >1.0 exaggerates the neural detail. Clamped to [0, 4]. */
 void         ec_bplus_gl_set_intensity(EcBplusGl *ctx, float intensity);
+/* Pre-upscale GPU de-dither pass on the native frame before the neural CNN
+ * and bilinear residual base. Default is EC_BPLUS_DEDITHER_OFF. */
+void         ec_bplus_gl_set_dedither(EcBplusGl *ctx, EcBplusDeditherMode mode);
 /* Runs 4x ECStudentESPCN4x on GPU and returns borrowed SDL_Texture* (ARGB8888 target),
  * or NULL on fallback (invalid state, budget overrun, or unavailable GL 4.3+). */
 SDL_Texture *ec_bplus_gl_process(EcBplusGl *ctx, const uint32_t *argb,

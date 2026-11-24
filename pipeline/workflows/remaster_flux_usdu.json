@@ -1,0 +1,105 @@
+{
+  "_meta": {
+    "workflow": "remaster_flux_usdu",
+    "workflow_version": "1.0",
+    "description": "Flux.1 Dev fp8 + Ultimate SD Upscale: GAN 4x pre-upscale (4x-UltraSharp) + tiled diffusion denoise 0.3 (tile 1024, seam fix) + silhouette enforcement by the pipeline tool",
+    "model": "flux1-dev-fp8.safetensors",
+    "upscaler": "4x-UltraSharp.pth",
+    "default_seed": 19931211,
+    "scale": 4
+  },
+  "prompt": {
+    "1": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": "__INPUT_IMAGE__"
+      }
+    },
+    "2": {
+      "class_type": "UpscaleModelLoader",
+      "inputs": {
+        "model_name": "4x-UltraSharp.pth"
+      }
+    },
+    "3": {
+      "class_type": "ImageUpscaleWithModel",
+      "inputs": {
+        "upscale_model": ["2", 0],
+        "image": ["1", 0]
+      }
+    },
+    "4": {
+      "class_type": "DualCLIPLoader",
+      "inputs": {
+        "clip_name1": "clip_l.safetensors",
+        "clip_name2": "t5xxl_fp8_e4m3fn.safetensors",
+        "type": "flux"
+      }
+    },
+    "5": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "flux1-dev-fp8.safetensors",
+        "weight_dtype": "fp8_e4m3fn"
+      }
+    },
+    "6": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "ae.safetensors"
+      }
+    },
+    "7": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "detailed retro video game arena background, crisp clean edges, vibrant colors, rich hand-drawn texture, high detail 16-bit style art",
+        "clip": ["4", 0]
+      }
+    },
+    "8": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "blurry, lowres, jpeg artifacts, watermark, text, logo, deformed, oversaturated, washed out, photorealistic photo",
+        "clip": ["4", 0]
+      }
+    },
+    "9": {
+      "class_type": "UltimateSDUpscale",
+      "inputs": {
+        "image": ["3", 0],
+        "model": ["5", 0],
+        "positive": ["7", 0],
+        "negative": ["8", 0],
+        "vae": ["6", 0],
+        "upscale_by": 1.0,
+        "seed": 19931211,
+        "steps": 20,
+        "cfg": 1.0,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 0.3,
+        "upscale_model": ["2", 0],
+        "mode_type": "Linear",
+        "tile_width": 1024,
+        "tile_height": 1024,
+        "mask_blur": 8,
+        "tile_padding": 32,
+        "seam_fix_mode": "Half Tile",
+        "seam_fix_denoise": 0.3,
+        "seam_fix_width": 64,
+        "seam_fix_mask_blur": 16,
+        "seam_fix_padding": 16,
+        "force_uniform_tiles": true,
+        "tiled_decode": false,
+        "batch_size": 1
+      }
+    },
+    "10": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": ["9", 0],
+        "filename_prefix": "__OUTPUT_PREFIX__"
+      }
+    }
+  }
+}
