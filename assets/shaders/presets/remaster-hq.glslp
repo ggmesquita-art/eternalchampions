@@ -1,0 +1,22 @@
+# remaster-hq: neural B+ v3 HQ (4x, engine runs it BEFORE the chain) + FSR EASU upscale to viewport + moderate RCAS.
+# Heavier model than remaster-crisp: best quality on strong GPUs. Use: --shader-preset remaster-hq
+# Keys starting with ec_ are Eternal Champions extensions; RetroArch ignores them.
+ec_bplus = "../../models/ec_bplus_v3_hq_weights.bin"
+ec_bplus_dedither = both
+ec_bplus_intensity = 1.0
+
+shaders = 2
+
+shader0 = ../libretro/fsr/shaders/fsr-pass0.glsl
+filter_linear0 = true
+scale_type0 = viewport
+scale0 = 1.0
+wrap_mode0 = "clamp_to_edge"
+
+shader1 = ../libretro/fsr/shaders/fsr-pass1.glsl
+filter_linear1 = true
+scale_type1 = source
+scale1 = 1.0
+wrap_mode1 = "clamp_to_edge"
+
+FSR_SHARPENING = 0.4

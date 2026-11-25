@@ -71,7 +71,7 @@
 #define EC_DEFAULT_HYBRID_BLEND 0.65f
 #define EC_DEFAULT_OST_BLEND    0.18f
 #define EC_DEFAULT_DSP_REVERB   0.18f
-#define EC_CHIP_DSP_GAIN        1.75f
+#define EC_CHIP_DSP_GAIN        1.75f   /* medido: ver docs/CONFIGURATION_AND_CLI.md (limiter) */
 #define EC_SF2_MAKEUP_GAIN      0.25f
 
 #define EC_FADE_IN_SEC          0.010
@@ -82,6 +82,8 @@
 #define EC_SF2_SAMPLE_RATE      48000
 #define EC_SF2_MAX_VOICES       96
 #define EC_SF2_BUF_MAX          2048u
+#define EC_TL_MUTE              100     /* TL >= 100 (75 dB) = canal efetivamente mudo */
+#define EC_TL_DB_PER_STEP_LIN   0.018f  /* mesma curva de ec_ym_tl_to_vel */
 #define EC_EVENT_CAP            8192u
 #define EC_MAX_PROFILES         64u
 #define EC_DEFAULT_FRAME_CYCLES 895780u
@@ -151,15 +153,28 @@ typedef struct {
     uint8_t  mul[4];
     uint8_t  ar[4];
     uint8_t  rr[4];
-    int      sounding;
+    int      sounding;       /* nota SF2 ativa */
+    int      keyed;          /* key-on ativo no hardware (independente de sounding) */
+    uint8_t  known;          /* bits EC_KN_*: registradores ja reescritos desde o reset */
+    float    ref_gain;       /* ganho linear TL no note-on (referencia p/ fades) */
+    float    cur_ratio;      /* razao de volume TL atual aplicada ao canal MIDI */
     int      active_tsf_ch;
     int      active_note;
     int      is_perc;
 } EcFmChan;
 
+/* Bits de "registrador conhecido": o shadow so e confiavel depois que o driver
+ * reescreve o patch (alg + 4 TL) e a frequencia do canal. */
+#define EC_KN_FNUM_LO  0x01u
+#define EC_KN_FNUM_HI  0x02u
+#define EC_KN_ALG      0x04u
+#define EC_KN_TL0      0x08u   /* TL op0..op3 = 0x08,0x10,0x20,0x40 */
+#define EC_KN_ALL      0x7Fu
+
 typedef struct {
     uint16_t period;
     uint8_t  vol;
+    uint8_t  period_known;   /* bit0 = low nibble escrito, bit1 = high escrito */
     int      sounding;
     int      active_note;
 } EcPsgToneChan;
@@ -225,8 +240,10 @@ typedef struct {
     EcAudioMode           mode;
     float                 bgm_vol;
     float                 sfx_vol;
-    float                 chip_blend;
-    int                   chip_blend_custom;
+    float                 chip_blend_user;      /* settings.ini / env: default do usuario */
+    int                   has_chip_blend_user;
+    float                 chip_blend_cli;       /* --audio-chip-blend: override explicito */
+    int                   has_chip_blend_cli;
     float                 dsp_reverb;
 
     /* TinySoundFont synth + profiles */
@@ -234,6 +251,7 @@ typedef struct {
     int                   tsf_cur_bank[EC_CH_COUNT];
     int                   tsf_cur_prog[EC_CH_COUNT];
     int                   chan_silenced[EC_CH_COUNT];
+    float                 chan_base_vol[EC_CH_COUNT];   /* volume linear do perfil (0 se silenciado) */
 
     EcTrackProfile        default_profile;
     int                   default_profile_ready;
@@ -243,6 +261,7 @@ typedef struct {
 
     /* Observer queue (written on emulation thread before audio_flush) */
     uint8_t               obs_addr[2];
+    int                   obs_addr_valid[2];   /* 0 apos reset/troca de modo: dados sem endereco sao descartados */
     EcChipEvent           events[EC_EVENT_CAP];
     size_t                ev_count;
     uint32_t              frame_end_cycle;
@@ -253,6 +272,7 @@ typedef struct {
     int                   has_bgm_id;
     int                   synth_active;
     int                   paused;
+    int                   need_resync;   /* re-emitir notes `keyed` no proximo mix (pausa/turbo/perfil) */
     int                   fading_out;
     float                 fade_env;
     float                 pause_env;
@@ -266,8 +286,6 @@ static EcAudioState s_audio = {
     .mode              = EC_AUDIO_MODE_OFF,
     .bgm_vol           = 1.0f,
     .sfx_vol           = 1.0f,
-    .chip_blend        = EC_DEFAULT_HYBRID_BLEND,
-    .chip_blend_custom = 0,
     .dsp_reverb        = EC_DEFAULT_DSP_REVERB,
     .fade_env          = 0.0f,
     .pause_env         = 1.0f,
@@ -787,7 +805,7 @@ static void ec_init_builtin_default_profile(EcTrackProfile *p)
     p->bgm_id         = -1;
     p->master_gain_db = 0.0f;
     p->chip_blend     = EC_DEFAULT_HYBRID_BLEND;
-    p->has_chip_blend = 1;
+    p->has_chip_blend = 0;   /* so vale se o .toml definir chip_blend */
 
     for (int i = 0; i < 6; ++i) {
         p->channels[EC_CH_FM0 + i].mode      = EC_CHAN_MODE_AUTO;
@@ -893,6 +911,17 @@ static int ec_parse_profile_toml(const char *path, const char *filename, EcTrack
     char line_buf[2048];
     while (fgets(line_buf, (int)sizeof(line_buf), fp) != NULL) {
         char *line = line_buf;
+        {
+            size_t raw_len = strlen(line_buf);
+            if (raw_len > 0 && line_buf[raw_len - 1] != '\n' && !feof(fp)) {
+                /* linha maior que o buffer: descarta o resto e ignora a linha inteira */
+                int c;
+                while ((c = fgetc(fp)) != '\n' && c != EOF) {
+                }
+                fprintf(stderr, "[EC-AUDIO] aviso: linha muito longa em '%s' ignorada\n", path);
+                continue;
+            }
+        }
         if (first_line) {
             first_line = 0;
             if ((unsigned char)line[0] == 0xEFu &&
@@ -1011,22 +1040,33 @@ static int ec_parse_profile_toml(const char *path, const char *filename, EcTrack
     return 1;
 }
 
-static void ec_store_loaded_profile(const EcTrackProfile *prof, const char *filename)
+/* Retorna 1 se o perfil foi armazenado. Somente `default.toml` define o default;
+ * perfis de faixa sem bgm_id valido (>= 0) sao ignorados com aviso. */
+static int ec_store_loaded_profile(const EcTrackProfile *prof, const char *filename)
 {
-    if (ec_strcasecmp(filename, "default.toml") == 0 || prof->bgm_id < 0) {
+    if (ec_strcasecmp(filename, "default.toml") == 0) {
         s_audio.default_profile = *prof;
+        s_audio.default_profile.bgm_id = -1;
         s_audio.default_profile_ready = 1;
-        return;
+        return 1;
+    }
+    if (prof->bgm_id < 0) {
+        fprintf(stderr, "[EC-AUDIO] aviso: perfil '%s' sem bgm_id valido (>= 0) ignorado\n", filename);
+        return 0;
     }
     for (size_t i = 0; i < s_audio.profile_count; ++i) {
         if (s_audio.profiles[i].bgm_id == prof->bgm_id) {
             s_audio.profiles[i] = *prof;
-            return;
+            return 1;
         }
     }
     if (s_audio.profile_count < EC_MAX_PROFILES) {
         s_audio.profiles[s_audio.profile_count++] = *prof;
+        return 1;
     }
+    fprintf(stderr, "[EC-AUDIO] aviso: limite de %u perfis atingido; '%s' ignorado\n",
+            (unsigned)EC_MAX_PROFILES, filename);
+    return 0;
 }
 
 static const EcTrackProfile *ec_find_profile_for_bgm(uint32_t bgm_id)
@@ -1071,6 +1111,9 @@ static void ec_synth_reset_chip_state(void)
 
     s_audio.obs_addr[0] = 0u;
     s_audio.obs_addr[1] = 0u;
+    s_audio.obs_addr_valid[0] = 0;   /* latch de endereco desconhecido: dados sem endereco */
+    s_audio.obs_addr_valid[1] = 0;   /* (ex.: stream DAC $2A) nao viram eventos */
+    s_audio.need_resync = 0;
     s_audio.ev_count = 0u;
     s_audio.frame_end_cycle = EC_DEFAULT_FRAME_CYCLES;
 }
@@ -1094,7 +1137,7 @@ static void ec_tsf_set_bank_preset_safe(int ch, int bank, int prog)
     s_audio.tsf_cur_prog[ch] = prog;
 }
 
-static void ec_apply_active_profile(void)
+static void ec_apply_active_profile(int resync)
 {
     ec_ensure_default_profile();
     const EcTrackProfile *prof = s_audio.active_profile;
@@ -1125,14 +1168,15 @@ static void ec_apply_active_profile(void)
                         cp->mode == EC_CHAN_MODE_CHIP ||
                         cp->mode == EC_CHAN_MODE_OFF) ? 1 : 0;
         s_audio.chan_silenced[c] = silenced;
+        s_audio.chan_base_vol[c] = silenced
+            ? 0.0f
+            : powf(10.0f, ec_clampf(cp->volume_db, -60.0f, 24.0f) / 20.0f);
 
         if (!s_audio.tsf) {
             continue;
         }
 
-        float vol_lin = silenced
-            ? 0.0f
-            : powf(10.0f, ec_clampf(cp->volume_db, -60.0f, 24.0f) / 20.0f);
+        float vol_lin = s_audio.chan_base_vol[c];
         float tsf_pan = ec_clampf(0.5f + 0.5f * cp->pan, 0.0f, 1.0f);
 
         (void)tsf_channel_set_volume(s_audio.tsf, c, vol_lin);
@@ -1156,6 +1200,12 @@ static void ec_apply_active_profile(void)
         } else {
             ec_tsf_set_bank_preset_safe(c, 0, 0);
         }
+    }
+
+    /* Troca de perfil: notas `keyed` no hardware voltam a soar com o novo perfil
+     * (feito no proximo mix, a partir do shadow). */
+    if (resync && s_audio.tsf) {
+        s_audio.need_resync = 1;
     }
 }
 
@@ -1275,7 +1325,7 @@ static int ec_ym_calc_raw_note(const EcFmChan *ch, double mul_factor)
 
 static float ec_ym_tl_to_vel(int min_tl)
 {
-    float v = powf(10.0f, -(float)min_tl * 0.018f);
+    float v = powf(10.0f, -(float)min_tl * EC_TL_DB_PER_STEP_LIN);
     return ec_clampf(v, 0.14f, 1.0f);
 }
 
@@ -1317,6 +1367,139 @@ static float ec_psg_vol_to_vel(uint8_t vol)
 static int ec_can_emit_notes(int register_only)
 {
     return (s_audio.tsf != NULL && !register_only && !s_audio.paused && !s_audio.fading_out);
+}
+
+/* Ganho linear associado a uma atenuacao TL (0.75 dB/passo ~ 0.018 decadas/passo,
+ * mesma curva de ec_ym_tl_to_vel, mas sem o piso 0.14: usado para fades). */
+static float ec_tl_gain(int tl)
+{
+    if (tl >= EC_TL_MUTE) {
+        return 0.0f;
+    }
+    if (tl < 0) {
+        tl = 0;
+    }
+    return powf(10.0f, -(float)tl * EC_TL_DB_PER_STEP_LIN);
+}
+
+static int ec_fm_carrier_min_tl(const EcFmChan *ch)
+{
+    int alg = (int)(ch->alg & 0x07u);
+    int min_tl = 127;
+    for (int i = 0; i < k_ym_carrier_count[alg]; ++i) {
+        int s = k_ym_carrier_slots[alg][i];
+        if ((int)ch->tl[s] < min_tl) {
+            min_tl = (int)ch->tl[s];
+        }
+    }
+    return min_tl;
+}
+
+/* Volume do canal MIDI = volume do perfil * razao (fade do driver via TL). */
+static void ec_set_chan_ratio(int tsf_ch, float ratio)
+{
+    if (s_audio.tsf) {
+        (void)tsf_channel_set_volume(s_audio.tsf, tsf_ch, s_audio.chan_base_vol[tsf_ch] * ratio);
+    }
+}
+
+/* Inicia a nota SF2 de um canal FM `keyed` a partir do shadow (key-on, retomada
+ * de pausa/turbo/troca de perfil, ou TL/fnum que tornam o canal audivel). */
+static void ec_fm_start_note(int g, int register_only)
+{
+    EcFmChan *ch = &s_audio.chip.fm[g];
+    if (ch->sounding || !ch->keyed || ch->known != EC_KN_ALL) {
+        return;
+    }
+    if (g == 5 && s_audio.chip.dac_enabled) {
+        return;
+    }
+    if (!ec_can_emit_notes(register_only) || s_audio.chan_silenced[EC_CH_FM0 + g]) {
+        return;
+    }
+
+    const EcTrackProfile *prof = s_audio.active_profile ? s_audio.active_profile : &s_audio.default_profile;
+    const EcChanProfile *cp = &prof->channels[EC_CH_FM0 + g];
+
+    int min_tl = 32;
+    double mul_factor = 1.0;
+    uint8_t carrier_ar = 31u;
+    uint8_t carrier_rr = 7u;
+    int is_noise_perc = 0;
+    ec_ym_analyze_patch(ch, &min_tl, &mul_factor, &carrier_ar, &carrier_rr, &is_noise_perc);
+
+    if (min_tl >= EC_TL_MUTE) {
+        return; /* canal efetivamente mudo (< -75 dB): nao dispara nota no SF2 */
+    }
+    float vel = ec_ym_tl_to_vel(min_tl);
+
+    if (is_noise_perc && cp->mode == EC_CHAN_MODE_AUTO) {
+        const EcChanProfile *dac_cp = &prof->channels[EC_CH_DAC];
+        if (!s_audio.chan_silenced[EC_CH_DAC]) {
+            int pnote = (carrier_rr < 6u) ? 46 : 42;
+            int dac_prog = (dac_cp->mode == EC_CHAN_MODE_PERCUSSION || dac_cp->mode == EC_CHAN_MODE_GM)
+                ? dac_cp->program : 0;
+            ec_tsf_set_bank_preset_safe(EC_CH_DAC, 128, dac_prog);
+            ec_set_chan_ratio(EC_CH_DAC, 1.0f);
+            (void)tsf_channel_note_on(s_audio.tsf, EC_CH_DAC, pnote, vel);
+            s_audio.synth_active = 1;
+            ch->sounding = 1;
+            ch->active_tsf_ch = EC_CH_DAC;
+            ch->active_note = pnote;
+            ch->is_perc = 1;
+        }
+        return;
+    }
+
+    int raw_note = ec_ym_calc_raw_note(ch, mul_factor);
+    if (raw_note < 12 || raw_note > 120) {
+        return;
+    }
+
+    int note = raw_note;
+    if (cp->mode == EC_CHAN_MODE_AUTO || cp->mode == EC_CHAN_MODE_GM) {
+        note = ec_clamp_i(raw_note + cp->transpose, 0, 127);
+    }
+
+    if (cp->mode == EC_CHAN_MODE_AUTO) {
+        ec_tsf_set_bank_preset_safe(EC_CH_FM0 + g, 0, ec_ym_auto_preset(note, carrier_ar));
+    } else if (cp->mode == EC_CHAN_MODE_GM) {
+        ec_tsf_set_bank_preset_safe(EC_CH_FM0 + g, cp->bank, cp->program);
+    } else if (cp->mode == EC_CHAN_MODE_PERCUSSION) {
+        ec_tsf_set_bank_preset_safe(EC_CH_FM0 + g, 128, cp->program);
+    }
+
+    ec_set_chan_ratio(EC_CH_FM0 + g, 1.0f);
+    (void)tsf_channel_note_on(s_audio.tsf, EC_CH_FM0 + g, note, vel);
+    s_audio.synth_active = 1;
+    ch->sounding = 1;
+    ch->active_tsf_ch = EC_CH_FM0 + g;
+    ch->active_note = note;
+    ch->is_perc = 0;
+    ch->ref_gain = ec_tl_gain(min_tl);
+    ch->cur_ratio = 1.0f;
+}
+
+/* Escrita de TL: fades do driver (TL dos carriers) viram volume da voz SF2. */
+static void ec_fm_tl_update(int g, int register_only)
+{
+    EcFmChan *ch = &s_audio.chip.fm[g];
+    if (!ch->keyed || !ec_can_emit_notes(register_only)) {
+        return;
+    }
+    if (!ch->sounding) {
+        ec_fm_start_note(g, register_only); /* pode ter ficado mudo por TL alto */
+        return;
+    }
+    if (ch->is_perc || ch->ref_gain <= 0.0f) {
+        return;
+    }
+    float ratio = ec_tl_gain(ec_fm_carrier_min_tl(ch)) / ch->ref_gain;
+    ratio = ec_clampf(ratio, 0.0f, 4.0f);
+    if (fabsf(ratio - ch->cur_ratio) > 0.004f) {
+        ec_set_chan_ratio(ch->active_tsf_ch, ratio);
+        ch->cur_ratio = ratio;
+    }
 }
 
 static void ec_process_fm_event(uint8_t port, uint8_t val, int register_only)
@@ -1364,81 +1547,17 @@ static void ec_process_fm_event(uint8_t port, uint8_t val, int register_only)
             ch->sounding = 0;
         }
 
-        if (g == 5 && s_audio.chip.dac_enabled) {
-            return;
+        ch->keyed = (slot_mask != 0u) ? 1 : 0;
+        if (ch->keyed) {
+            ec_fm_start_note(g, register_only);
         }
-
-        if (slot_mask == 0u || !ec_can_emit_notes(register_only)) {
-            return;
-        }
-
-        const EcTrackProfile *prof = s_audio.active_profile ? s_audio.active_profile : &s_audio.default_profile;
-        const EcChanProfile *cp = &prof->channels[EC_CH_FM0 + g];
-        if (s_audio.chan_silenced[EC_CH_FM0 + g]) {
-            return;
-        }
-
-        int min_tl = 32;
-        double mul_factor = 1.0;
-        uint8_t carrier_ar = 31u;
-        uint8_t carrier_rr = 7u;
-        int is_noise_perc = 0;
-        ec_ym_analyze_patch(ch, &min_tl, &mul_factor, &carrier_ar, &carrier_rr, &is_noise_perc);
-
-        float vel = ec_ym_tl_to_vel(min_tl);
-
-        if (is_noise_perc && cp->mode == EC_CHAN_MODE_AUTO) {
-            const EcChanProfile *dac_cp = &prof->channels[EC_CH_DAC];
-            if (!s_audio.chan_silenced[EC_CH_DAC]) {
-                int pnote = (carrier_rr < 6u) ? 46 : 42;
-                int dac_prog = (dac_cp->mode == EC_CHAN_MODE_PERCUSSION || dac_cp->mode == EC_CHAN_MODE_GM)
-                    ? dac_cp->program : 0;
-                ec_tsf_set_bank_preset_safe(EC_CH_DAC, 128, dac_prog);
-                (void)tsf_channel_note_on(s_audio.tsf, EC_CH_DAC, pnote, vel);
-                if (!s_audio.synth_active) {
-                    s_audio.synth_active = 1;
-                }
-                ch->sounding = 1;
-                ch->active_tsf_ch = EC_CH_DAC;
-                ch->active_note = pnote;
-                ch->is_perc = 1;
-            }
-            return;
-        }
-
-        int raw_note = ec_ym_calc_raw_note(ch, mul_factor);
-        if (raw_note < 12 || raw_note > 120) {
-            return;
-        }
-
-        int note = raw_note;
-        if (cp->mode == EC_CHAN_MODE_AUTO || cp->mode == EC_CHAN_MODE_GM) {
-            note = ec_clamp_i(raw_note + cp->transpose, 0, 127);
-        }
-
-        if (cp->mode == EC_CHAN_MODE_AUTO) {
-            int auto_prog = ec_ym_auto_preset(note, carrier_ar);
-            ec_tsf_set_bank_preset_safe(EC_CH_FM0 + g, 0, auto_prog);
-        } else if (cp->mode == EC_CHAN_MODE_GM) {
-            ec_tsf_set_bank_preset_safe(EC_CH_FM0 + g, cp->bank, cp->program);
-        } else if (cp->mode == EC_CHAN_MODE_PERCUSSION) {
-            ec_tsf_set_bank_preset_safe(EC_CH_FM0 + g, 128, cp->program);
-        }
-
-        (void)tsf_channel_note_on(s_audio.tsf, EC_CH_FM0 + g, note, vel);
-        if (!s_audio.synth_active) {
-            s_audio.synth_active = 1;
-        }
-        ch->sounding = 1;
-        ch->active_tsf_ch = EC_CH_FM0 + g;
-        ch->active_note = note;
-        ch->is_perc = 0;
         return;
     }
 
     if (reg >= 0xA4u && reg <= 0xA6u) {
         int g = part * 3 + (int)(reg - 0xA4u);
         s_audio.chip.fm[g].msb_latch = val;
+        s_audio.chip.fm[g].known |= EC_KN_FNUM_HI;
         return;
     }
 
@@ -1447,6 +1566,7 @@ static void ec_process_fm_event(uint8_t port, uint8_t val, int register_only)
         EcFmChan *ch = &s_audio.chip.fm[g];
         ch->fnum  = (uint16_t)(((uint16_t)(ch->msb_latch & 0x07u) << 8) | (uint16_t)val);
         ch->block = (uint8_t)((ch->msb_latch >> 3) & 0x07u);
+        ch->known |= EC_KN_FNUM_LO;
 
         const EcTrackProfile *prof = s_audio.active_profile ? s_audio.active_profile : &s_audio.default_profile;
         const EcChanProfile *cp = &prof->channels[EC_CH_FM0 + g];
@@ -1467,20 +1587,23 @@ static void ec_process_fm_event(uint8_t port, uint8_t val, int register_only)
                     ? ec_clamp_i(raw_note + cp->transpose, 0, 127)
                     : raw_note;
 
-                if (abs(new_note - ch->active_note) >= 1) {
+                if (new_note != ch->active_note && min_tl < EC_TL_MUTE) {
                     tsf_channel_note_off(s_audio.tsf, ch->active_tsf_ch, ch->active_note);
                     if (cp->mode == EC_CHAN_MODE_AUTO) {
                         int auto_prog = ec_ym_auto_preset(new_note, carrier_ar);
                         ec_tsf_set_bank_preset_safe(EC_CH_FM0 + g, 0, auto_prog);
                     }
                     float vel = ec_ym_tl_to_vel(min_tl);
+                    ec_set_chan_ratio(ch->active_tsf_ch, 1.0f);
                     (void)tsf_channel_note_on(s_audio.tsf, ch->active_tsf_ch, new_note, vel);
-                    if (!s_audio.synth_active) {
-                        s_audio.synth_active = 1;
-                    }
+                    s_audio.synth_active = 1;
                     ch->active_note = new_note;
+                    ch->ref_gain = ec_tl_gain(min_tl);
+                    ch->cur_ratio = 1.0f;
                 }
             }
+        } else if (ch->keyed && !ch->sounding) {
+            ec_fm_start_note(g, register_only);
         }
         return;
     }
@@ -1488,6 +1611,7 @@ static void ec_process_fm_event(uint8_t port, uint8_t val, int register_only)
     if (reg >= 0xB0u && reg <= 0xB2u) {
         int g = part * 3 + (int)(reg - 0xB0u);
         s_audio.chip.fm[g].alg = val & 0x07u;
+        s_audio.chip.fm[g].known |= EC_KN_ALG;
         return;
     }
 
@@ -1500,6 +1624,8 @@ static void ec_process_fm_event(uint8_t port, uint8_t val, int register_only)
         } else if (reg >= 0x40u && reg <= 0x4Eu) {
             int op_slot = (int)((reg - 0x40u) >> 2);
             s_audio.chip.fm[g].tl[op_slot] = val & 0x7Fu;
+            s_audio.chip.fm[g].known |= (uint8_t)(EC_KN_TL0 << op_slot);
+            ec_fm_tl_update(g, register_only);
         } else if (reg >= 0x50u && reg <= 0x5Eu) {
             int op_slot = (int)((reg - 0x50u) >> 2);
             s_audio.chip.fm[g].ar[op_slot] = val & 0x1Fu;
@@ -1508,6 +1634,57 @@ static void ec_process_fm_event(uint8_t port, uint8_t val, int register_only)
             s_audio.chip.fm[g].rr[op_slot] = val & 0x0Fu;
         }
     }
+}
+
+/* Dispara nota de tom PSG a partir do shadow (retrigger por volume ou resync). */
+static void ec_psg_tone_on(int ch_idx, uint8_t vol, int register_only)
+{
+    EcPsgToneChan *tch = &s_audio.chip.psg_tone[ch_idx];
+    int tsf_ch = EC_CH_PSG0 + ch_idx;
+
+    if (vol >= 15u || tch->period_known != 3u ||
+        !ec_can_emit_notes(register_only) || s_audio.chan_silenced[tsf_ch]) {
+        return;
+    }
+    int raw_note = ec_psg_calc_raw_note(tch->period);
+    if (raw_note < 12 || raw_note > 120) {
+        return;
+    }
+
+    const EcTrackProfile *prof = s_audio.active_profile ? s_audio.active_profile : &s_audio.default_profile;
+    const EcChanProfile *cp = &prof->channels[tsf_ch];
+    int note = (cp->mode == EC_CHAN_MODE_AUTO || cp->mode == EC_CHAN_MODE_GM)
+        ? ec_clamp_i(raw_note + cp->transpose, 0, 127)
+        : raw_note;
+
+    if (tch->sounding) {
+        tsf_channel_note_off(s_audio.tsf, tsf_ch, tch->active_note);
+        tch->sounding = 0;
+    }
+
+    (void)tsf_channel_note_on(s_audio.tsf, tsf_ch, note, ec_psg_vol_to_vel(vol));
+    s_audio.synth_active = 1;
+    tch->sounding = 1;
+    tch->active_note = note;
+}
+
+static void ec_psg_noise_on(uint8_t vol, int register_only)
+{
+    if (vol >= 15u || !ec_can_emit_notes(register_only) || s_audio.chan_silenced[EC_CH_PSG_NOISE]) {
+        return;
+    }
+    if (s_audio.chip.psg_noise_sounding) {
+        tsf_channel_note_off(s_audio.tsf, EC_CH_PSG_NOISE, s_audio.chip.psg_noise_note);
+        s_audio.chip.psg_noise_sounding = 0;
+    }
+
+    uint8_t rate_bits = s_audio.chip.psg_noise_ctrl & 0x03u;
+    int dnote = (rate_bits == 0u) ? 42 : ((rate_bits == 1u) ? 46 : 38);
+
+    (void)tsf_channel_note_on(s_audio.tsf, EC_CH_PSG_NOISE, dnote, ec_psg_vol_to_vel(vol));
+    s_audio.synth_active = 1;
+    s_audio.chip.psg_noise_sounding = 1;
+    s_audio.chip.psg_noise_note = dnote;
 }
 
 static void ec_psg_handle_tone_vol(int ch_idx, uint8_t prev_vol, uint8_t new_vol, int register_only)
@@ -1525,39 +1702,12 @@ static void ec_psg_handle_tone_vol(int ch_idx, uint8_t prev_vol, uint8_t new_vol
         return;
     }
 
-    if (!ec_can_emit_notes(register_only) || s_audio.chan_silenced[tsf_ch]) {
-        return;
-    }
-
     int jump_up = (prev_vol >= new_vol) ? ((int)(prev_vol - new_vol) >= 3) : 0;
     int retrigger = (!tch->sounding) || (prev_vol == 15u) || jump_up;
     if (!retrigger) {
         return;
     }
-
-    int raw_note = ec_psg_calc_raw_note(tch->period);
-    if (raw_note < 12 || raw_note > 120) {
-        return;
-    }
-
-    const EcTrackProfile *prof = s_audio.active_profile ? s_audio.active_profile : &s_audio.default_profile;
-    const EcChanProfile *cp = &prof->channels[tsf_ch];
-    int note = (cp->mode == EC_CHAN_MODE_AUTO || cp->mode == EC_CHAN_MODE_GM)
-        ? ec_clamp_i(raw_note + cp->transpose, 0, 127)
-        : raw_note;
-
-    if (tch->sounding) {
-        tsf_channel_note_off(s_audio.tsf, tsf_ch, tch->active_note);
-        tch->sounding = 0;
-    }
-
-    float vel = ec_psg_vol_to_vel(new_vol);
-    (void)tsf_channel_note_on(s_audio.tsf, tsf_ch, note, vel);
-    if (!s_audio.synth_active) {
-        s_audio.synth_active = 1;
-    }
-    tch->sounding = 1;
-    tch->active_note = note;
+    ec_psg_tone_on(ch_idx, new_vol, register_only);
 }
 
 static void ec_psg_handle_noise_vol(uint8_t prev_vol, uint8_t new_vol, int register_only)
@@ -1572,30 +1722,35 @@ static void ec_psg_handle_noise_vol(uint8_t prev_vol, uint8_t new_vol, int regis
         return;
     }
 
-    if (!ec_can_emit_notes(register_only) || s_audio.chan_silenced[EC_CH_PSG_NOISE]) {
-        return;
-    }
-
     int jump_up = (prev_vol >= new_vol) ? ((int)(prev_vol - new_vol) >= 3) : 0;
     if (s_audio.chip.psg_noise_sounding && prev_vol != 15u && !jump_up) {
         return;
     }
+    ec_psg_noise_on(new_vol, register_only);
+}
 
-    if (s_audio.chip.psg_noise_sounding) {
-        tsf_channel_note_off(s_audio.tsf, EC_CH_PSG_NOISE, s_audio.chip.psg_noise_note);
-        s_audio.chip.psg_noise_sounding = 0;
+/* Re-emite note-on para canais com key-on/volume ativo no hardware (`keyed`) que
+ * nao estao soando no SF2, a partir do shadow. Usado apos pausa, turbo e troca de
+ * perfil. */
+static void ec_resync_keyed(void)
+{
+    if (!ec_can_emit_notes(0)) {
+        return;
     }
-
-    uint8_t rate_bits = s_audio.chip.psg_noise_ctrl & 0x03u;
-    int dnote = (rate_bits == 0u) ? 42 : ((rate_bits == 1u) ? 46 : 38);
-    float vel = ec_psg_vol_to_vel(new_vol);
-
-    (void)tsf_channel_note_on(s_audio.tsf, EC_CH_PSG_NOISE, dnote, vel);
-    if (!s_audio.synth_active) {
-        s_audio.synth_active = 1;
+    for (int g = 0; g < 6; ++g) {
+        if (s_audio.chip.fm[g].keyed && !s_audio.chip.fm[g].sounding) {
+            ec_fm_start_note(g, 0);
+        }
     }
-    s_audio.chip.psg_noise_sounding = 1;
-    s_audio.chip.psg_noise_note = dnote;
+    for (int i = 0; i < 3; ++i) {
+        EcPsgToneChan *t = &s_audio.chip.psg_tone[i];
+        if (t->vol < 15u && !t->sounding) {
+            ec_psg_tone_on(i, t->vol, 0);
+        }
+    }
+    if (s_audio.chip.psg_noise_vol < 15u && !s_audio.chip.psg_noise_sounding) {
+        ec_psg_noise_on(s_audio.chip.psg_noise_vol, 0);
+    }
 }
 
 static void ec_process_psg_event(uint8_t val, int register_only)
@@ -1622,6 +1777,7 @@ static void ec_process_psg_event(uint8_t val, int register_only)
             if (ch < 3u) {
                 s_audio.chip.psg_tone[ch].period =
                     (uint16_t)((s_audio.chip.psg_tone[ch].period & 0x3F0u) | (uint16_t)data4);
+                s_audio.chip.psg_tone[ch].period_known |= 1u;
             } else {
                 s_audio.chip.psg_noise_ctrl = val & 0x07u;
             }
@@ -1647,8 +1803,10 @@ static void ec_process_psg_event(uint8_t val, int register_only)
     if (ch < 3u) {
         EcPsgToneChan *tch = &s_audio.chip.psg_tone[ch];
         tch->period = (uint16_t)((tch->period & 0x00Fu) | ((uint16_t)(val & 0x3Fu) << 4));
+        tch->period_known |= 2u;
 
-        if (tch->vol < 15u && ec_can_emit_notes(register_only) && !s_audio.chan_silenced[EC_CH_PSG0 + (int)ch]) {
+        if (tch->vol < 15u && tch->period_known == 3u &&
+            ec_can_emit_notes(register_only) && !s_audio.chan_silenced[EC_CH_PSG0 + (int)ch]) {
             int raw_note = ec_psg_calc_raw_note(tch->period);
             if (raw_note >= 12 && raw_note <= 120) {
                 const EcTrackProfile *prof = s_audio.active_profile ? s_audio.active_profile : &s_audio.default_profile;
@@ -1656,21 +1814,14 @@ static void ec_process_psg_event(uint8_t val, int register_only)
                 int note = (cp->mode == EC_CHAN_MODE_AUTO || cp->mode == EC_CHAN_MODE_GM)
                     ? ec_clamp_i(raw_note + cp->transpose, 0, 127)
                     : raw_note;
-                float vel = ec_psg_vol_to_vel(tch->vol);
 
                 if (!tch->sounding) {
-                    (void)tsf_channel_note_on(s_audio.tsf, EC_CH_PSG0 + (int)ch, note, vel);
-                    if (!s_audio.synth_active) {
-                        s_audio.synth_active = 1;
-                    }
-                    tch->sounding = 1;
-                    tch->active_note = note;
+                    ec_psg_tone_on((int)ch, tch->vol, register_only);
                 } else if (cp->mode != EC_CHAN_MODE_PERCUSSION && tch->active_note != note) {
                     tsf_channel_note_off(s_audio.tsf, EC_CH_PSG0 + (int)ch, tch->active_note);
-                    (void)tsf_channel_note_on(s_audio.tsf, EC_CH_PSG0 + (int)ch, note, vel);
-                    if (!s_audio.synth_active) {
-                        s_audio.synth_active = 1;
-                    }
+                    (void)tsf_channel_note_on(s_audio.tsf, EC_CH_PSG0 + (int)ch, note,
+                                              ec_psg_vol_to_vel(tch->vol));
+                    s_audio.synth_active = 1;
                     tch->active_note = note;
                 }
             }
@@ -1689,21 +1840,26 @@ static void ec_process_chip_event(const EcChipEvent *ev, int register_only)
     }
 }
 
+/* Precedencia do blend chip/SF2 (hybrid/ost):
+ *   1. --audio-chip-blend (override explicito da CLI)
+ *   2. chip_blend do perfil da faixa (.toml)
+ *   3. chip_blend do settings.ini / EC_AUDIO_* (default do usuario)
+ *   4. default do modo (hybrid 0.65, ost 0.18) */
 static float ec_effective_chip_blend(void)
 {
     if (s_audio.mode == EC_AUDIO_MODE_DSP || s_audio.mode == EC_AUDIO_MODE_OFF || !s_audio.tsf) {
         return 1.0f;
     }
-    if (s_audio.chip_blend_custom) {
-        return s_audio.chip_blend;
-    }
-    if (s_audio.mode == EC_AUDIO_MODE_OST) {
-        return EC_DEFAULT_OST_BLEND;
+    if (s_audio.has_chip_blend_cli) {
+        return s_audio.chip_blend_cli;
     }
     if (s_audio.active_profile && s_audio.active_profile->has_chip_blend) {
         return s_audio.active_profile->chip_blend;
     }
-    return EC_DEFAULT_HYBRID_BLEND;
+    if (s_audio.has_chip_blend_user) {
+        return s_audio.chip_blend_user;
+    }
+    return (s_audio.mode == EC_AUDIO_MODE_OST) ? EC_DEFAULT_OST_BLEND : EC_DEFAULT_HYBRID_BLEND;
 }
 
 /* ---- Public API ---------------------------------------------------------- */
@@ -1723,10 +1879,12 @@ void ec_audio_init(void)
     s_audio.chip_duck    = 1.0f;
 
     if (s_audio.tsf) {
-        ec_apply_active_profile();
+        ec_apply_active_profile(0);
     }
 }
 
+/* Nao ha hook de saida no GameSpec do runner: o SO libera o SoundFont no exit.
+ * Esta funcao existe para testes/hosts que reinicializam o modulo. */
 void ec_audio_shutdown(void)
 {
     if (s_audio.tsf) {
@@ -1740,8 +1898,10 @@ void ec_audio_shutdown(void)
     s_audio.mode                  = EC_AUDIO_MODE_OFF;
     s_audio.bgm_vol               = 1.0f;
     s_audio.sfx_vol               = 1.0f;
-    s_audio.chip_blend            = EC_DEFAULT_HYBRID_BLEND;
-    s_audio.chip_blend_custom     = 0;
+    s_audio.chip_blend_user       = 0.0f;
+    s_audio.has_chip_blend_user   = 0;
+    s_audio.chip_blend_cli        = 0.0f;
+    s_audio.has_chip_blend_cli    = 0;
     s_audio.dsp_reverb            = EC_DEFAULT_DSP_REVERB;
     s_audio.profile_count         = 0u;
     s_audio.default_profile_ready = 0;
@@ -1756,25 +1916,44 @@ void ec_audio_shutdown(void)
     s_audio.chip_duck             = 1.0f;
 }
 
+/* Reset completo (power-on / reset do console): descarta a musica atual com
+ * rampa (fade-out) em vez de corte seco. */
 void ec_audio_reset(void)
 {
     ec_ensure_default_profile();
-    ec_dsp_clear_buffers(&s_audio.dsp);
-    ec_synth_reset_chip_state();
+    ec_synth_reset_chip_state();   /* shadow -> desconhecido */
 
     s_audio.current_bgm_id = 0u;
     s_audio.has_bgm_id     = 0;
     s_audio.active_profile = &s_audio.default_profile;
-    s_audio.synth_active   = 0;
     s_audio.paused         = 0;
-    s_audio.fading_out     = 0;
-    s_audio.fade_env       = 0.0f;
-    s_audio.pause_env      = 1.0f;
-    s_audio.chip_duck      = 1.0f;
+    if (s_audio.synth_active && s_audio.fade_env > 0.0f) {
+        s_audio.fading_out = 1;    /* rampa EC_FADE_OUT_SEC no mix callback */
+    } else {
+        s_audio.synth_active = 0;
+        s_audio.fading_out   = 0;
+        s_audio.fade_env     = 0.0f;
+    }
 
     if (s_audio.tsf) {
-        ec_apply_active_profile();
+        ec_apply_active_profile(0);   /* note_off_all (release natural) + canais */
     }
+}
+
+/* Load de savestate/rewind: o estado de hardware e substituido, mas a musica do
+ * estado carregado costuma continuar. Preserva bgm_id/perfil/envelopes; o runner
+ * nao expoe leitura dos registradores do YM2612/PSG, entao o shadow vira
+ * "desconhecido" e as notas so voltam depois que o driver reescrever patch (alg+TL)
+ * e frequencia de cada canal (e novo key-on). */
+void ec_audio_on_state_loaded(void)
+{
+    ec_ensure_default_profile();
+    ec_synth_reset_chip_state();
+    if (s_audio.tsf) {
+        tsf_note_off_all(s_audio.tsf);   /* release natural, sem corte seco */
+    }
+    s_audio.paused     = 0;
+    s_audio.fading_out = 0;
 }
 
 int ec_audio_set_mode_str(const char *mode_str)
@@ -1808,12 +1987,14 @@ int ec_audio_set_mode_str(const char *mode_str)
         ec_clear_sounding_flags();
     } else if ((next == EC_AUDIO_MODE_HYBRID || next == EC_AUDIO_MODE_OST) &&
                (prev == EC_AUDIO_MODE_OFF || prev == EC_AUDIO_MODE_DSP)) {
+        /* Em off/dsp o observer nao registra nada: shadow desatualizado. */
+        ec_synth_reset_chip_state();
         ec_ensure_default_profile();
         s_audio.active_profile = s_audio.has_bgm_id
             ? ec_find_profile_for_bgm(s_audio.current_bgm_id)
             : &s_audio.default_profile;
         if (s_audio.tsf) {
-            ec_apply_active_profile();
+            ec_apply_active_profile(0);
         }
     }
     return 1;
@@ -1852,12 +2033,13 @@ int ec_audio_load_soundfont(const char *sf2_path)
         tsf_close(s_audio.tsf);
     }
     s_audio.tsf = loaded;
+    ec_synth_reset_chip_state();   /* sem tsf o observer nao registrava: shadow desconhecido */
 
     ec_ensure_default_profile();
     s_audio.active_profile = s_audio.has_bgm_id
         ? ec_find_profile_for_bgm(s_audio.current_bgm_id)
         : &s_audio.default_profile;
-    ec_apply_active_profile();
+    ec_apply_active_profile(0);
     return 1;
 }
 
@@ -1908,8 +2090,9 @@ int ec_audio_load_profiles_dir(const char *profiles_dir)
         }
         EcTrackProfile prof;
         if (ec_parse_profile_toml(full_path, fd.cFileName, &prof)) {
-            ec_store_loaded_profile(&prof, fd.cFileName);
-            ++loaded_count;
+            if (ec_store_loaded_profile(&prof, fd.cFileName)) {
+                ++loaded_count;
+            }
         }
     } while (FindNextFileA(h, &fd));
 
@@ -1934,8 +2117,9 @@ int ec_audio_load_profiles_dir(const char *profiles_dir)
         }
         EcTrackProfile prof;
         if (ec_parse_profile_toml(full_path, ent->d_name, &prof)) {
-            ec_store_loaded_profile(&prof, ent->d_name);
-            ++loaded_count;
+            if (ec_store_loaded_profile(&prof, ent->d_name)) {
+                ++loaded_count;
+            }
         }
     }
 
@@ -1946,10 +2130,20 @@ int ec_audio_load_profiles_dir(const char *profiles_dir)
         ? ec_find_profile_for_bgm(s_audio.current_bgm_id)
         : &s_audio.default_profile;
     if (s_audio.tsf) {
-        ec_apply_active_profile();
+        ec_apply_active_profile(1);
     }
 
     return loaded_count;
+}
+
+static float ec_set_clamped(const char *name, float v, float lo, float hi)
+{
+    float c = ec_clampf(v, lo, hi);
+    if (c != v) {
+        fprintf(stderr, "[EC-AUDIO] aviso: %s=%g fora de [%g, %g]; ajustado para %g\n",
+                name, (double)v, (double)lo, (double)hi, (double)c);
+    }
+    return c;
 }
 
 void ec_audio_set_bgm_vol(float vol)
@@ -1957,7 +2151,7 @@ void ec_audio_set_bgm_vol(float vol)
     if (!isfinite(vol)) {
         return;
     }
-    s_audio.bgm_vol = ec_clampf(vol, 0.0f, 2.0f);
+    s_audio.bgm_vol = ec_set_clamped("bgm_vol", vol, 0.0f, 2.0f);
 }
 
 void ec_audio_set_sfx_vol(float vol)
@@ -1965,16 +2159,27 @@ void ec_audio_set_sfx_vol(float vol)
     if (!isfinite(vol)) {
         return;
     }
-    s_audio.sfx_vol = ec_clampf(vol, 0.0f, 2.0f);
+    s_audio.sfx_vol = ec_set_clamped("sfx_vol", vol, 0.0f, 2.0f);
 }
 
+/* Default do usuario (settings.ini / env): so vale se o perfil nao definir chip_blend. */
 void ec_audio_set_chip_blend(float blend)
 {
     if (!isfinite(blend)) {
         return;
     }
-    s_audio.chip_blend = ec_clampf(blend, 0.0f, 1.0f);
-    s_audio.chip_blend_custom = 1;
+    s_audio.chip_blend_user     = ec_set_clamped("chip_blend", blend, 0.0f, 1.0f);
+    s_audio.has_chip_blend_user = 1;
+}
+
+/* Override explicito (--audio-chip-blend): vence perfil e defaults. */
+void ec_audio_set_chip_blend_override(float blend)
+{
+    if (!isfinite(blend)) {
+        return;
+    }
+    s_audio.chip_blend_cli     = ec_set_clamped("--audio-chip-blend", blend, 0.0f, 1.0f);
+    s_audio.has_chip_blend_cli = 1;
 }
 
 void ec_audio_set_dsp_reverb(float amount)
@@ -1982,7 +2187,7 @@ void ec_audio_set_dsp_reverb(float amount)
     if (!isfinite(amount)) {
         return;
     }
-    s_audio.dsp_reverb = ec_clampf(amount, 0.0f, 1.0f);
+    s_audio.dsp_reverb = ec_set_clamped("dsp_reverb", amount, 0.0f, 1.0f);
 }
 
 void ec_audio_on_bgm_play(uint32_t bgm_id)
@@ -1997,7 +2202,8 @@ void ec_audio_on_bgm_play(uint32_t bgm_id)
     s_audio.active_profile = ec_find_profile_for_bgm(bgm_id);
     if (s_audio.tsf &&
         (s_audio.mode == EC_AUDIO_MODE_HYBRID || s_audio.mode == EC_AUDIO_MODE_OST)) {
-        ec_apply_active_profile();
+        /* Musica nova: o driver reescreve os canais; nao ressuscitar notas da anterior. */
+        ec_apply_active_profile(0);
     }
 }
 
@@ -2007,6 +2213,9 @@ void ec_audio_on_bgm_pause(int paused)
     if (next_paused && !s_audio.paused && s_audio.tsf) {
         tsf_note_off_all(s_audio.tsf);
         ec_clear_sounding_flags();
+    }
+    if (!next_paused && s_audio.paused) {
+        s_audio.need_resync = 1;   /* canais ainda em key-on voltam a soar */
     }
     s_audio.paused = next_paused;
 }
@@ -2053,6 +2262,7 @@ void ec_audio_on_chip_write(uint8_t port, uint8_t value,
             tsf_note_off_all(s_audio.tsf);
             ec_clear_sounding_flags();
             s_audio.ev_count = 0u;
+            s_audio.need_resync = 1;   /* turbo: re-emitir `keyed` no proximo mix */
         }
         s_audio.frame_end_cycle = frame_end_cycle;
         return;
@@ -2060,14 +2270,19 @@ void ec_audio_on_chip_write(uint8_t port, uint8_t value,
 
     if (port == 0u) {
         s_audio.obs_addr[0] = value;
+        s_audio.obs_addr_valid[0] = 1;
         if (value == 0x2Au) {
             /* Discard $2A address writes so DAC PCM bursts do not consume event slots */
             return;
         }
     } else if (port == 2u) {
         s_audio.obs_addr[1] = value;
-    } else if (port == 1u && s_audio.obs_addr[0] == 0x2Au) {
-        /* Discard DAC PCM stream bytes so voices/SFX never flood the buffer */
+        s_audio.obs_addr_valid[1] = 1;
+    } else if (port == 1u && (!s_audio.obs_addr_valid[0] || s_audio.obs_addr[0] == 0x2Au)) {
+        /* Discard DAC PCM stream bytes (and data with unknown address latch after
+         * reset/state load) so voices/SFX never become register events */
+        return;
+    } else if (port == 3u && !s_audio.obs_addr_valid[1]) {
         return;
     }
 
@@ -2076,6 +2291,7 @@ void ec_audio_on_chip_write(uint8_t port, uint8_t value,
             ec_process_chip_event(&s_audio.events[i], 1);
         }
         s_audio.ev_count = 0u;
+        s_audio.need_resync = 1;
     }
 
     {
@@ -2129,6 +2345,11 @@ void ec_audio_mix_callback(int16_t *mix_stereo, size_t frames, double rate)
         ec_ensure_default_profile();
         const EcTrackProfile *prof = s_audio.active_profile ? s_audio.active_profile : &s_audio.default_profile;
         sf2_master_gain = powf(10.0f, prof->master_gain_db / 20.0f);
+
+        if (s_audio.need_resync && ec_can_emit_notes(0)) {
+            s_audio.need_resync = 0;
+            ec_resync_keyed();
+        }
 
         long long raw_sf2 = llround((double)frames * ((double)EC_SF2_SAMPLE_RATE / rate));
         if (raw_sf2 < 1) {
@@ -2251,6 +2472,9 @@ void ec_audio_mix_callback(int16_t *mix_stereo, size_t frames, double rate)
             }
         }
 
+        if (!isfinite(sf2_l)) sf2_l = 0.0f;
+        if (!isfinite(sf2_r)) sf2_r = 0.0f;
+
         /* 5. Smooth chip ducking envelope (1.0 when SF2 inactive -> blend_min when active) */
         float target_duck = 1.0f - (1.0f - blend_min) * sf2_presence;
         if (s_audio.chip_duck < target_duck) {
@@ -2271,6 +2495,8 @@ void ec_audio_mix_callback(int16_t *mix_stereo, size_t frames, double rate)
         float out_r = chip_r * (chip_gain * EC_CHIP_DSP_GAIN * eq_power) + sf2_r * eq_power;
 
         /* 6. Ultra-light Schroeder room reverb (applied to combined chip + SF2 bus) */
+        const float dry_l = out_l;
+        const float dry_r = out_r;
         if (use_reverb) {
             if (rev_decim == 1) {
                 float wl = 0.0f, wr = 0.0f;
@@ -2298,6 +2524,13 @@ void ec_audio_mix_callback(int16_t *mix_stereo, size_t frames, double rate)
                 out_l += wl * rev_wet;
                 out_r += wr * rev_wet;
             }
+        }
+
+        /* Saida nao finita (NaN/Inf do SF2/reverb/EQ): limpa estado e usa o sinal seco */
+        if (!isfinite(out_l) || !isfinite(out_r)) {
+            ec_dsp_clear_buffers(dsp);
+            out_l = isfinite(dry_l) ? dry_l : 0.0f;
+            out_r = isfinite(dry_r) ? dry_r : 0.0f;
         }
 
         /* 7. Soft-limiter + S16 clamp */

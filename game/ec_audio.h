@@ -14,7 +14,8 @@ typedef enum {
 /* Ciclo de vida e reset (chamados a partir do runner/spec; nunca tocam em WRAM/Z80). */
 void ec_audio_init(void);
 void ec_audio_shutdown(void);
-void ec_audio_reset(void);
+void ec_audio_reset(void);            /* reset do console: descarta a musica com rampa */
+void ec_audio_on_state_loaded(void);  /* load de savestate: preserva bgm/perfil, shadow vira desconhecido */
 
 /* Selecao de modo ("off", "dsp", "hybrid", "ost", case-insensitive).
  * Retorna 1 se valido, 0 se invalido. */
@@ -32,7 +33,10 @@ int ec_audio_load_profiles_dir(const char *profiles_dir);
 /* Controles de mixagem e DSP. */
 void ec_audio_set_bgm_vol(float vol);        /* 0.0 .. 2.0, default 1.0 */
 void ec_audio_set_sfx_vol(float vol);        /* 0.0 .. 2.0, default 1.0 (ganho do chip) */
-void ec_audio_set_chip_blend(float blend);   /* 0.0 .. 1.0, default 0.65 em hybrid, 0.18 em ost */
+/* chip_blend 0.0 .. 1.0. Precedencia (hybrid/ost): override CLI > perfil da faixa >
+ * default do usuario > default do modo (0.65 hybrid, 0.18 ost). */
+void ec_audio_set_chip_blend(float blend);           /* default do usuario (settings.ini/env) */
+void ec_audio_set_chip_blend_override(float blend);  /* --audio-chip-blend (vence tudo) */
 void ec_audio_set_dsp_reverb(float amount);  /* 0.0 .. 1.0, default 0.18 */
 
 /* Eventos passivos de BGM (chamados pelos hooks de sound_cmd sem tocar no Z80). */

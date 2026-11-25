@@ -1,7 +1,13 @@
 # ROM e dados extraídos ficam fora do controle de versão (DESIGN §3).
 # A pasta inteira é ignorada, não a extensão: *.md é extensão de ROM de Mega Drive.
 roms/
-assets/
+assets/*
+!assets/shaders/
+# Remaster de áudio: versiona só os .toml (perfis, voices.toml); os MIDIs são
+# derivados da ROM e ficam de fora. O .sf2 (assets/soundfonts/) segue ignorado.
+!assets/audio_remaster/
+assets/audio_remaster/midi/
+assets/audio_remaster/midi_voices/
 
 # Gerados por tools/split.py (dados extraídos da ROM)
 disasm/data/

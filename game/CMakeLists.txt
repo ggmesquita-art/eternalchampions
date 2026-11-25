@@ -27,6 +27,7 @@ add_executable(EternalChampionsRecomp
     ec_audio.c
     ec_boss.c
     ec_hd.c
+    ec_shader_chain.c
     ec_video.c
     ../neural/infer/ec_bplus_gl.c
     ../neural/infer/ec_bplus_ort.c

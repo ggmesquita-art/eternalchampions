@@ -101,27 +101,29 @@ vidia\*in` no PATH (cudart/cublas/cudnn). Validado: `EC_ONNXRUNTIME_LIB=<venv>\
 > - **Orquestração prevista:** Fase 1 paralela (executor A: `game/ec_shader_chain.{h,c}` FBO ping-pong + parser `.glslp` integrado a `ec_video_present_gpu()`; executor B: baixar/adaptar shaders + presets em `assets/shaders/`); Fase 2: CLI/`settings.ini` + benchmark `GL_TIME_ELAPSED` 1080p/1440p/4K; Fase 3: `revisor` + build limpo + `17/17` `wram_diff=0/65536` + docs.
 
 ### Etapa S1 — Engine de Cadeia de Shaders Multi-Pass (OpenGL)
-- [ ] **S1.1** — Projetar e implementar `game/ec_shader_chain.{h,c}` com pipeline FBO ping-pong em OpenGL 3.3+ encaixado no fluxo `ec_video_present_gpu()` (`game/ec_video.c`), suportando estágios pré-upscale (nativo), upscale analítico e pós-upscale (saída 4× / viewport).
-- [ ] **S1.2** — Implementar parser leve de presets `.ecshader` (subset compatível com `.glslp` do RetroArch: `shaders`, `shaderN`, `filter_linearN`, `scale_typeN`, `scaleN`, `#pragma parameter`, uniformes `Source`, `Original`, `SourceSize`, `OriginalSize`, `OutputSize`, `FrameCount`).
-- [ ] **S1.3** — Garantir fallback silencioso em headless/software (`SDL_VIDEODRIVER=dummy`) e `wram_diff=0/65536`.
+> **Feito (2026-11-25):** `game/ec_shader_chain.{h,c}` — presets RetroArch `.glslp` + `.glsl` (GLSL legado libretro) no fim de `ec_video_present_gpu` (fonte = saída B+/Modo C ou frame nativo; `Original` = frame nativo). Suporta `scale_type(_x/_y)`/`scale`, `filter_linear`, `float/srgb_framebuffer`, `wrap_mode`, `mipmap_input`, `frame_count_mod`, `alias`, LUTs (`textures`), `#pragma parameter` + overrides, `#include`, uniforms `Texture/TextureSize/InputSize/OutputSize/FrameCount/MVPMatrix/Orig*/PassPrevN*/PassN*/<alias>*`; histórico `Prev*` aproximado pelo frame atual; `feedback_pass` e `#reference` ignorados com aviso. Extensões `ec_bplus/ec_bplus_dedither/ec_bplus_intensity` (CLI/env vencem). Config: `--shader-preset`, `--shader-param`, `EC_SHADER_PRESET/PARAMS`, `settings.ini [ec.video]` (CLI > env > ini). Força renderer `opengl` só com preset ativo; sem GL desliga em silêncio. Diagnóstico: `EC_SHADER_CAPTURE(_AT)`, `EC_SHADER_VIEWPORT=LxA`, métricas `GL_TIME_ELAPSED` por passe. Testado com presets reais da biblioteca libretro (crt-lottes, zfast, fsr, scalefx, xbrz-freescale, crt-royale 12 passes + 6 LUTs, guest-dr-venom-fast, potato-BVM, Cyclon) — orientação correta; harness `--quick` det=0/WS `wram_diff=0`. Revisão `revisor`: sem bugs graves; 6 correções menores aplicadas (modelo B+ do preset no caminho ONNX, `ec_bplus=none`, aspas no .ini, setjmp volatile, guard de plataforma, falha de timer não desativa a cadeia).
+- [x] **S1.1** — Projetar e implementar `game/ec_shader_chain.{h,c}` com pipeline FBO ping-pong em OpenGL 3.3+ encaixado no fluxo `ec_video_present_gpu()` (`game/ec_video.c`), suportando estágios pré-upscale (nativo), upscale analítico e pós-upscale (saída 4× / viewport).
+- [x] **S1.2** — Implementar parser leve de presets `.ecshader` (subset compatível com `.glslp` do RetroArch: `shaders`, `shaderN`, `filter_linearN`, `scale_typeN`, `scaleN`, `#pragma parameter`, uniformes `Source`, `Original`, `SourceSize`, `OriginalSize`, `OutputSize`, `FrameCount`).
+- [x] **S1.3** — Garantir fallback silencioso em headless/software (`SDL_VIDEODRIVER=dummy`) e `wram_diff=0/65536`.
 
 ### Etapa S2 — Biblioteca Curada de Shaders & Presets (`assets/shaders/`)
-- [ ] **S2.1** — Portar/implementar shaders base em GLSL:
+> **Feito (2026-11-25):** `assets/shaders/` versionado (`.gitignore`: `assets/*` + `!assets/shaders/`); cópias fiéis do libretro em `libretro/` (fsr, scalefx, super-xBR 3p smoother, jinc2, FXAA, xbrz-freescale; licenças nos cabeçalhos; origem: RetroArch snap no WSL, sem download) + `ec/ec-dedither.glsl` (port do de-dither CBOD/SGENPT do B+). **Decisão do usuário (2026-11-25): sem CRT — foco em suavização/otimização.** Presets: `remaster-crisp` (B+ v3 fast → RCAS), `remaster-hq` (B+ v3 HQ → FSR EASU+RCAS), `remaster-smooth` (B+ v3 fast → FXAA), `lite-scalefx` (dedither → ScaleFX → EASU → RCAS, sem neural), `lite-superxbr` (dedither → super-xBR → jinc2 → RCAS, sem neural); `lite-omniscale` testado e descartado (serrilhado). `tools/pipeline/check_shader_presets.py` valida as referências. Custo p50 da cadeia (sem B+), 4:3 960×672: crisp 0,012 · hq 0,042 · smooth 0,053 · scalefx 0,064–0,09 · superxbr 0,093 ms; benchmark 1080p/1440p/4K (`EC_SHADER_VIEWPORT`) da 1ª versão: ≤0,35 ms nos não-CRT; B+ v3 fast 1,87/2,92 ms (4:3/fit), HQ 4,03/6,31. Prancha: `assets/video_compare/shaders/board_presets_trident.png`. Obs.: em testes automatizados longos, 1 captura saiu com saída 320×224 vazia (janela provavelmente ocluída/minimizada) — não reproduziu.
+- [x] **S2.1** — Portar/implementar shaders base em GLSL:
   - Pré-passe de-dither (`cbod.glsl`, `sgenpt_mix.glsl`)
   - Upscale analítico leve para GPUs sem CUDA (`scalefx.glsl` ou `xbrz_4x.glsl` + `fsr_easu.glsl`)
   - Pós-passe de nitidez sem halo (`cas_rcas.glsl` — AMD FidelityFX CAS/RCAS para 1440p/4K)
   - Pós-passe CRT/Arcade (`crt_subtle.glsl` e `crt_lottes.glsl` com scanlines, máscara de fósforo e bloom/halation configuráveis)
-- [ ] **S2.2** — Criar 5 presets prontos em `assets/shaders/presets/`:
+- [x] **S2.2** — Criar 5 presets prontos em `assets/shaders/presets/`:
   - `remaster-crisp.ecshader` (Pre-Dither → B+ v3 → RCAS)
-  - `remaster-crt.ecshader` (Pre-Dither → B+ v3 → CRT sutil)
+  - ~~`remaster-crt.ecshader`~~ *(cancelado: sem CRT)*
   - `lite-scalefx.ecshader` (Pre-Dither → ScaleFX/xBRZ → CAS — sem neural/CUDA)
-  - `arcade-crt-trinitron.ecshader` (Pre-Dither → CRT-Lottes + ColorLUT Trinitron)
+  - ~~`arcade-crt-trinitron.ecshader`~~ *(cancelado: sem CRT)*
   - `off` (bypass)
 
 ### Etapa S3 — Integração CLI, `settings.ini`, Hotkey e Benchmark
-- [ ] **S3.1** — Adicionar `--shader-preset <nome|caminho>` e `--shader-param <chave=valor>` em `game/ec_spec.c` e suporte no `settings.ini`.
+- [x] **S3.1** — Adicionar `--shader-preset <nome|caminho>` e `--shader-param <chave=valor>` em `game/ec_spec.c` e suporte no `settings.ini`.
 - [ ] ~~**S3.2**~~ *(cancelado — sem hotkey, ver decisões acima)* — Adicionar hotkey em runtime (`F9` / `Shift+F9`) em `segagenesisrecomp/runner/main.c` para ciclar presets ao vivo com log/OSD, sem conflitar com `F7/F8` (save/load), `F10` (cold reset) e `F12` (screenshot).
-- [ ] **S3.3** — Medir latência por passe (`GL_TIME_ELAPSED`) e gerar prancha comparativa em `1080p`, `1440p` e `4K` em `assets/video_compare/shaders/`.
+- [x] **S3.3** — Medir latência por passe (`GL_TIME_ELAPSED`) e gerar prancha comparativa em `1080p`, `1440p` e `4K` em `assets/video_compare/shaders/`.
 
 ---
 
@@ -155,6 +157,19 @@ vidia\*in` no PATH (cudart/cublas/cudnn). Validado: `EC_ONNXRUNTIME_LIB=<venv>\
 - [x] **A4.2** — Criar e compilar biblioteca nativa leve `tools/audio/tsf_midi_synth.c` → `tools/audio/tsf_midi_synth.dll` (usando o mesmo `game/third_party/tsf.h` + `assets/soundfonts/TimGM6mb.sf2` do jogo) para sintetizar canais MIDI diretamente em memória RAM (suportando `auto`, `gm`, `percussion`, `transpose`, `bank`, `program`) sem depender de FluidSynth/WSL nem gravar WAVs em disco.
 - [x] **A4.3** — Migrar `tools/audio/mixer_studio.py` e `tools/audio/mixer_ui/{index.html,style.css,app.js}` para operar 100% sobre `assets/audio_remaster/midi/*.mid` + `assets/audio_remaster/profiles/*.toml` via `tsf_midi_synth.dll` em memória (com download do `.mid` e botão principal **Salvar Perfil `.toml`**), remover completamente a pasta obsoleta `assets/audio_remaster/stems/` (zero `.wav` em disco) e atualizar `docs/audio_remaster_architecture.md`.
 - [x] **A4.4** — Revisão independente (`revisor`) + validação fim-a-fim: conferir os 17 `.mid` válidos (notas, canais, zero notas agudas espúrias `>=96`), testar síntese em memória de todos os 17 BGMs via HTTP no `mixer_studio.py`, confirmar `0` WAVs em `assets/audio_remaster/` e manter `wram_diff=0/65536` no executável do jogo.
+
+### Etapa A5 — Revisão do Pilar 3 + Remaster por Instrumento (proposta 2026-11-25, **aguardando aprovação**)
+> **Diagnóstico (revisão 2026-11-25):**
+> - **Causa raiz das "aberrações":** o driver reusa cada canal FM com vários patches (instrumentos) ao longo da música — medido nos dumps `GENESIS_AUDIO_APPLIEDDUMP` dos 17 BGMs: **86 de 102 canais FM trocam de patch** (até 8 patches num canal); o motor e a extração MIDI mapeiam **1 instrumento GM por canal**, então baixo/lead/pad do mesmo canal viram o mesmo instrumento. Em contrapartida, a trilha inteira usa só **52 patches FM únicos** (16 compartilhados entre músicas) → uma biblioteca global de 52 instrumentos resolve o jogo todo.
+> - **Substituição real é viável:** `segagenesisrecomp/runner/audio/mixer.h` já expõe `audio_mixer_set_audition(enabled, mask)` (máscara de saída por canal FM1..6/DAC/PSG, só apresentação, stream canônico intacto) → dá para **silenciar no chip só o canal cujo instrumento está no SF2** e deixar os demais 100% originais, em vez do `chip_blend` global (a "mistura" atual).
+> - **Bugs confirmados:** (1) `chip_blend` do `settings.ini` (`0.75`) marca `chip_blend_custom` e **anula o blend por perfil e a diferença hybrid×ost** (os dois geram WAV bit-idêntico com o settings atual); (2) TL=127 (canal mudo) ainda toca no SF2 e fades/volume por TL após o key-on são ignorados; (3) notas sustentadas se perdem após pause/turbo/state load; (4) `ec_audio_reset` no state load zera o shadow (patch/fnum/perfil voltam ao default) e pode tratar bytes do DAC como eventos; (5) NaN do SF2 pode silenciar um lado do reverb para sempre; (6) `--audio-*` com valor inválido vira caminho da ROM; (7) `[ec.audio]` não tolera aspas/comentário; (8) perfil sem `bgm_id` sobrescreve o default; (9) SFX tocados em FM/PSG podem virar notas SF2 (verificar); (10) limiter/ganho do chip `1.75` (+4,9 dB vs off; medir distorção).
+> - **Higiene:** perfis `.toml` (trabalho manual) e o `.sf2` **fora do git** (`assets/*`); `tools/audio/remaster_track.py` e `export_stems.py` ainda usam `stems/` (removido na A4); `mixer_studio.py` lê WAVs de `assets/audio_prototypes/`; `--audio-manifest` não documentado; doc do `--wav` diz 48 kHz mas grava 223,7 kHz; `sfx_vol` escala todo o chip; licença do TimGM6mb não registrada.
+> - OK: hooks passivos, sem race (mix síncrono no `audio_flush`), modo `off` é bypass total, `wram_diff=0/65536` nos 4 modos, sem clipping/cliques medidos no filme 06.
+- [ ] **A5.1** — Corrigir os bugs 1–8 do motor + higiene/doc (versionar `assets/audio_remaster/profiles/`; aposentar scripts de `stems/`).
+- [ ] **A5.2** — Catálogo global de patches: estender a extração para gerar `assets/audio_remaster/voices.toml` (52 patches: hash do patch = ALG/FB + 4 operadores sem o TL dos carriers, parâmetros, músicas onde aparece, faixa de notas, duração média) e MIDI **por instrumento** (trilha por patch, não por canal); sugestão automática de programa GM por heurística (algoritmo/envelope/faixa de notas).
+- [ ] **A5.3** — Motor por instrumento: no key-on, identificar o patch pelo hash do shadow e aplicar o mapeamento `voices.toml` (global) + overrides por música; `mode = gm|percussion|chip|off` por instrumento; acompanhar TL como expressão (CC11); usar `audio_mixer_set_audition` para mutar no chip só os canais cujo instrumento atual está no SF2 (crossfade curto na troca) → substituição completa onde mapeado, original intacto onde `chip`; `chip_blend` vira opcional.
+- [ ] **A5.4** — `mixer_studio.py`: lista de **instrumentos** (52) em vez de canais, solo/A-B por instrumento ouvindo o patch original vs o GM, salvar em `voices.toml`. **[GATE USUÁRIO]** mapear os instrumentos.
+- [ ] **A5.5** — Validação: `wram_diff=0`, WAV por modo nos 17 BGMs + luta com SFX, sem notas presas em pause/turbo/state load.
 
 ---
 

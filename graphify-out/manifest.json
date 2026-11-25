@@ -18,15 +18,15 @@
     "semantic_hash": ""
   },
   "game/ec_audio.c": {
-    "mtime": 1795460014.3648684,
-    "seen": 1795464764.6282496,
-    "ast_hash": "977b1dcdfa0a06301bccc28a0644ebc4",
+    "mtime": 1795581056.0705993,
+    "seen": 1795581389.1590936,
+    "ast_hash": "14009414e52bc8ab57f8e941b89d88ae",
     "semantic_hash": ""
   },
   "game/ec_audio.h": {
-    "mtime": 1795458450.809436,
-    "seen": 1795464764.6282508,
-    "ast_hash": "385f9f0c667577d971a467d987ced13e",
+    "mtime": 1795581012.6988919,
+    "seen": 1795581389.159096,
+    "ast_hash": "5ba9a0da0a8f2e494213562561545f5b",
     "semantic_hash": ""
   },
   "game/ec_boss.c": {
@@ -54,15 +54,15 @@
     "semantic_hash": ""
   },
   "game/ec_spec.c": {
-    "mtime": 1795570055.580981,
-    "seen": 1795573469.5534112,
-    "ast_hash": "e4cdcfcfe542755e2372394c05e3d19a",
+    "mtime": 1795581073.4764042,
+    "seen": 1795581389.159111,
+    "ast_hash": "8e7827c6e774e64f69226452d4c526f1",
     "semantic_hash": ""
   },
   "game/ec_video.c": {
-    "mtime": 1795575661.5385225,
-    "seen": 1795575784.321846,
-    "ast_hash": "0979788d902cf2a3b53a6667b154ba6a",
+    "mtime": 1795578253.301291,
+    "seen": 1795578341.5465176,
+    "ast_hash": "08444a9ee155ed253741dedb598648a4",
     "semantic_hash": ""
   },
   "game/ec_video.h": {
@@ -186,21 +186,15 @@
     "semantic_hash": ""
   },
   "tools/audio/chip_ring_to_midi.py": {
-    "mtime": 1795463351.5345826,
-    "seen": 1795464764.6283045,
-    "ast_hash": "9490e863c72493fc8d01df483c1bf017",
+    "mtime": 1795581338.7030733,
+    "seen": 1795581389.1591587,
+    "ast_hash": "0f057cebde12cfb022cc625a7edd9197",
     "semantic_hash": ""
   },
   "tools/audio/chip_ring_to_vgm.py": {
     "mtime": 1795165227.8170326,
     "seen": 1795464764.628306,
     "ast_hash": "276da9beff9e28dda937ae8cc8bbf5ae",
-    "semantic_hash": ""
-  },
-  "tools/audio/export_stems.py": {
-    "mtime": 1795456139.4847739,
-    "seen": 1795464764.6283073,
-    "ast_hash": "537756edea7132c366c5e2a135958601",
     "semantic_hash": ""
   },
   "tools/audio/extract_all_midis.py": {
@@ -210,21 +204,15 @@
     "semantic_hash": ""
   },
   "tools/audio/mixer_studio.py": {
-    "mtime": 1795464634.50885,
-    "seen": 1795464764.6283104,
-    "ast_hash": "dc6588b29f5e1c8b80da7b68516dbee4",
+    "mtime": 1795581362.5616798,
+    "seen": 1795581389.1591685,
+    "ast_hash": "a78741d94be3d48df215cc050166390b",
     "semantic_hash": ""
   },
   "tools/audio/mixer_ui/app.js": {
-    "mtime": 1795464680.0338762,
-    "seen": 1795464764.628312,
-    "ast_hash": "c1e770ba0d8a9e4e38c034936df957c3",
-    "semantic_hash": ""
-  },
-  "tools/audio/remaster_track.py": {
-    "mtime": 1795456178.2453861,
-    "seen": 1795464764.6283135,
-    "ast_hash": "fceca79d70fe3764e8f81413362d90d6",
+    "mtime": 1795581362.5626862,
+    "seen": 1795581389.1591702,
+    "ast_hash": "5d79ed26435c48fe195e1d73d5ed5365",
     "semantic_hash": ""
   },
   "tools/audio/tsf_midi_synth.c": {
@@ -510,14 +498,14 @@
     "semantic_hash": ""
   },
   "docs/audio_remaster_architecture.md": {
-    "mtime": 1795463992.9297926,
-    "seen": 1795464764.628419,
-    "ast_hash": "55c3a448b76658e4c23ba6b08bdc497d",
+    "mtime": 1795581261.1656864,
+    "seen": 1795581389.1592798,
+    "ast_hash": "b6b5aac49135ff128ed5ea67e3806990",
     "semantic_hash": ""
   },
   "docs/frame_data/fight_probe_summary.md": {
-    "mtime": 1795575525.370468,
-    "seen": 1795575784.3220098,
+    "mtime": 1795578398.0573123,
+    "seen": 1795579230.636673,
     "ast_hash": "5091a62b1b0f21c0eff331fd1436756a",
     "semantic_hash": ""
   },
@@ -588,9 +576,9 @@
     "semantic_hash": ""
   },
   "game/CMakeLists.txt": {
-    "mtime": 1795452358.718375,
-    "seen": 1795464764.62844,
-    "ast_hash": "051d723828d0ed52336e16ea157c96d0",
+    "mtime": 1795576808.237561,
+    "seen": 1795577405.3775656,
+    "ast_hash": "caba59237a0933f88d97c57918e51560",
     "semantic_hash": ""
   },
   "game/ec_code_addrs.txt": {
@@ -600,15 +588,15 @@
     "semantic_hash": ""
   },
   "task.md": {
-    "mtime": 1795575778.9856515,
-    "seen": 1795575784.322039,
-    "ast_hash": "b2bdf0270d4e1603a8b681912e6e244f",
+    "mtime": 1795580074.1362202,
+    "seen": 1795581389.1593113,
+    "ast_hash": "f03c350aea4dae54440192cd7dfb346a",
     "semantic_hash": ""
   },
   "tools/audio/mixer_ui/index.html": {
-    "mtime": 1795463830.822606,
-    "seen": 1795464764.6284444,
-    "ast_hash": "c1bd42c6760e36b297387efd59d594c7",
+    "mtime": 1795581234.6621952,
+    "seen": 1795581389.1593146,
+    "ast_hash": "179e46910d80cca838a5c4348b63cae0",
     "semantic_hash": ""
   },
   "tools/vendor/README.md": {
@@ -624,9 +612,9 @@
     "semantic_hash": ""
   },
   "docs/CONFIGURATION_AND_CLI.md": {
-    "mtime": 1795574452.1551073,
-    "seen": 1795574515.4173865,
-    "ast_hash": "dfa5918a67504eb7af95726c556f4808",
+    "mtime": 1795581327.9017713,
+    "seen": 1795581389.1592743,
+    "ast_hash": "9596c9a15f4c34a39a8389bee6c7a3e9",
     "semantic_hash": ""
   },
   "tools/pipeline/upscaler_lab.py": {
@@ -693,6 +681,66 @@
     "mtime": 1795574414.618086,
     "seen": 1795574515.417433,
     "ast_hash": "0d46d15fde330a3df1b94948515471b5",
+    "semantic_hash": ""
+  },
+  "game/ec_shader_chain.c": {
+    "mtime": 1795578244.61124,
+    "seen": 1795578341.5465114,
+    "ast_hash": "5cbc4a8954a1df0d63f89bec606f8c1a",
+    "semantic_hash": ""
+  },
+  "game/ec_shader_chain.h": {
+    "mtime": 1795576808.2575707,
+    "seen": 1795577405.3773181,
+    "ast_hash": "2a44a6d2631d26981b13cf1c525244d9",
+    "semantic_hash": ""
+  },
+  "tools/pipeline/check_shader_presets.py": {
+    "mtime": 1795576264.089356,
+    "seen": 1795577405.3773894,
+    "ast_hash": "700fbe8a99a58e36194827637fd7b366",
+    "semantic_hash": ""
+  },
+  "assets/shaders/README.md": {
+    "mtime": 1795578713.2520075,
+    "seen": 1795579230.6366415,
+    "ast_hash": "5f369962b19c279ed604c222bbea6f71",
+    "semantic_hash": ""
+  },
+  "assets/shaders/libretro/README.md": {
+    "mtime": 1795578713.1090426,
+    "seen": 1795579230.6366458,
+    "ast_hash": "332dabc00a9c0a33de13ca5c70464d28",
+    "semantic_hash": ""
+  },
+  "tools/audio/legacy/export_stems.py": {
+    "mtime": 1795456139.4847739,
+    "seen": 1795581389.159165,
+    "ast_hash": "537756edea7132c366c5e2a135958601",
+    "semantic_hash": ""
+  },
+  "tools/audio/legacy/remaster_track.py": {
+    "mtime": 1795456178.2453861,
+    "seen": 1795581389.1591668,
+    "ast_hash": "fceca79d70fe3764e8f81413362d90d6",
+    "semantic_hash": ""
+  },
+  "tools/audio/voice_catalog.py": {
+    "mtime": 1795581338.7045772,
+    "seen": 1795581389.159174,
+    "ast_hash": "cc6999a5306cfb7bab944ff06362e8b9",
+    "semantic_hash": ""
+  },
+  "docs/audio_voice_hash.md": {
+    "mtime": 1795580575.5229104,
+    "seen": 1795581389.1592815,
+    "ast_hash": "443cbfb33da492579cebb4ebad953099",
+    "semantic_hash": ""
+  },
+  "tools/audio/legacy/README.md": {
+    "mtime": 1795581312.8318644,
+    "seen": 1795581389.159313,
+    "ast_hash": "7862844c026ce5458218749d47d42de3",
     "semantic_hash": ""
   },
   "package-lock.json": {

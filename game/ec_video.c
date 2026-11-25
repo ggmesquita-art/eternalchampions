@@ -14,6 +14,7 @@
 #include "ec_hd.h"
 #include "ec_bplus_gl.h"
 #include "ec_bplus_ort.h"
+#include "ec_shader_chain.h"
 #include "genesis_runtime.h"
 #include "genesis_dac.h"
 #include "genesis_vdp.h"
@@ -35,6 +36,9 @@ static int    s_hd_approved_entries = 0;
 
 static int        s_bplus_cli_set = 0;
 static int        s_bplus_enabled = 0;
+static int        s_bplus_preset_on = 0;   /* ec_bplus no preset de shader (CLI/env vencem) */
+static int        s_preset_bplus_applied = 0;
+static int        s_bplus_model_preset_set = 0; /* modelo veio do preset: conta como explicito */
 static int        s_bplus_model_cli_set = 0;
 static char       s_bplus_model_path[512] = "assets/models/ec_bplus_espcn4x_weights.bin";
 static int        s_bplus_onnx_cli_set = 0;
@@ -1093,12 +1097,47 @@ static int ec_bplus_is_enabled(void)
     if (s_bplus_cli_set)
         return s_bplus_enabled;
     const char *env = getenv("EC_NEURAL_BPLUS");
-    return (env && (strcmp(env, "1") == 0 || strcmp(env, "on") == 0));
+    if (env && *env)
+        return (strcmp(env, "1") == 0 || strcmp(env, "on") == 0);
+    return s_bplus_preset_on;
+}
+
+/* Extensoes ec_bplus* do preset de shader: so valem onde o usuario nao configurou
+ * (CLI > env > preset > default). Nunca marca *_cli_set. */
+static void ec_apply_preset_bplus_once(void)
+{
+    if (s_preset_bplus_applied)
+        return;
+    s_preset_bplus_applied = 1;
+    const char *model = NULL, *dither = NULL;
+    double intensity = -1.0;
+    int enable = -1;
+    if (!ec_shader_chain_get_bplus(&model, &dither, &intensity, &enable))
+        return;
+    const char *e;
+    if (enable == 1 && !s_bplus_cli_set && !((e = getenv("EC_NEURAL_BPLUS")) && *e))
+        s_bplus_preset_on = 1;
+    if (model && !s_bplus_model_cli_set && !((e = getenv("EC_BPLUS_MODEL")) && *e))
+    {
+        snprintf(s_bplus_model_path, sizeof(s_bplus_model_path), "%s", model);
+        s_bplus_model_preset_set = 1;
+    }
+    if (dither && !s_bplus_dedither_cli_set && !((e = getenv("EC_BPLUS_DEDITHER")) && *e)) {
+        EcBplusDeditherMode parsed = EC_BPLUS_DEDITHER_OFF;
+        if (ec_parse_dedither_mode(dither, &parsed))
+            s_bplus_dedither = parsed;
+        else
+            fprintf(stderr, "[EC_VIDEO] ec_bplus_dedither do preset desconhecido '%s'\n", dither);
+    }
+    if (intensity >= 0.0 && !s_bplus_intensity_cli_set && !((e = getenv("EC_BPLUS_INTENSITY")) && *e))
+        s_bplus_intensity = intensity;
 }
 
 static int ec_video_present_gpu_enabled(void)
 {
-    return ec_bplus_is_enabled() || ec_hd_is_active();
+    if (ec_shader_chain_active())
+        ec_apply_preset_bplus_once();
+    return ec_bplus_is_enabled() || ec_hd_is_active() || ec_shader_chain_active();
 }
 
 static const char *ec_resolve_bplus_model_path(void)
@@ -1108,6 +1147,8 @@ static const char *ec_resolve_bplus_model_path(void)
     const char *env = getenv("EC_BPLUS_MODEL");
     if (env && *env)
         return env;
+    if (s_bplus_model_preset_set)
+        return s_bplus_model_path;
     FILE *fp = fopen(s_bplus_model_path, "rb");
     if (fp) {
         fclose(fp);
@@ -1136,7 +1177,8 @@ static const char *ec_resolve_bplus_onnx_path(void)
      * pesos certos, em vez de rodar o v1 silenciosamente. */
     const char *model_env = getenv("EC_BPLUS_MODEL");
     const char *model = s_bplus_model_cli_set ? s_bplus_model_path
-                      : (model_env && *model_env ? model_env : NULL);
+                      : (model_env && *model_env ? model_env
+                      : (s_bplus_model_preset_set ? s_bplus_model_path : NULL));
     if (model) {
         static char derived[512];
         static char derived_fp16[512];
@@ -1280,15 +1322,22 @@ static struct SDL_Texture *ec_video_present_gpu(
     }
 
     if (ec_hd_is_active()) {
-        return ec_hd_composite_gpu(renderer, activation, base_tex,
-                                   argb, width, height, stride_px,
-                                   &g_machine.vdp, ec_ram16(0xFD64u));
+        base_tex = ec_hd_composite_gpu(renderer, activation, base_tex,
+                                       argb, width, height, stride_px,
+                                       &g_machine.vdp, ec_ram16(0xFD64u));
+    }
+    if (ec_shader_chain_active()) {
+        struct SDL_Texture *shaded =
+            ec_shader_chain_process(renderer, base_tex, argb, width, height, stride_px);
+        if (shaded)
+            return shaded;
     }
     return base_tex;
 }
 
 static void ec_video_present_gpu_destroy(void)
 {
+    ec_shader_chain_destroy();
     ec_hd_destroy_gpu();
     if (s_bplus_ort) {
         EcBplusOrtMetrics m;

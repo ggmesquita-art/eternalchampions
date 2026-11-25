@@ -216,3 +216,47 @@ O runner (`segagenesisrecomp/runner/audio.h`) fornece dois ganchos não invasivo
    - **Alargamento Estéreo Mid/Side (`1.12x`):** adiciona espacialidade controlada a SFX originalmente mono sem borrar transientes.
    - **Reverb Schroeder Compacto (4 combs + 2 allpass, decimado acima de `64 kHz`):** cola os efeitos sonoros e vozes PCM originais do Mega Drive no mesmo espaço acústico dos instrumentos SoundFont.
    - **Ducking / Blend Suave (`chip_blend`) + Soft-Limiter de Saída:** preserva 100% dos golpes, gritos e vozes do chip com teto livre de clipping.
+
+## A5 — remaster por instrumento (voices.toml)
+
+**Problema.** O perfil por `bgm_id` (seção 3.2) atribui 1 instrumento GM por *canal* FM, mas o driver do jogo reutiliza cada canal com vários patches ao longo da música (86 de 102 canais FM trocam de patch nos 17 BGMs). No jogo todo existem só **52 patches únicos** (16 compartilhados entre músicas). A identidade de instrumento é o patch, não o canal.
+
+**Hash do patch.** FNV-1a 32 bits sobre 31 bytes canônicos do shadow YM2612 lidos no key-on (ALG, FB, AMS/FMS, e por slot DT/MUL, TL, RS/AR, AM/D1R, D2R, SL/RR, SSG-EG; TL dos carriers vira `0xFF` porque é volume). Contrato exato, compartilhado com o motor C: [`docs/audio_voice_hash.md`](audio_voice_hash.md). Como o AMS/FMS entra no hash, patches idênticos que só diferem em AMS/FMS contam como vozes distintas.
+
+**Catálogo: `assets/audio_remaster/voices.toml`.** Gerado por `tools/audio/voice_catalog.py`. Uma tabela por voz, chave = hash:
+
+```toml
+[voices.5ec7df75]
+name = ""            # editável
+mode = "gm"          # gm | percussion | chip | off
+program = 38         # GM 0-127
+bank = 0
+transpose = 0
+volume_db = 0.0
+[voices.5ec7df75.meta]   # regerado a cada execução; o motor NÃO lê
+alg = 5  fb = 5 ...  patch (hex), ops (AR/D1R/D2R/SL/RR/MUL por slot), songs, channels,
+notes, note_min/max/median, avg_dur_ms, suggestion
+```
+
+- Editáveis (`name`, `mode`, `program`, `bank`, `transpose`, `volume_db`) são preservados nas reexecuções; só `meta` é atualizado. Vozes que sumirem dos dumps são mantidas. O `program` inicial é uma sugestão heurística (ver docstring de `voice_catalog.py`: faixa de notas, envelope dos carriers, ALG, FB, duração) e é só ponto de partida: depois da primeira geração o valor do arquivo manda; para re-sugerir apague a voz do toml.
+- O motor lê apenas as chaves editáveis; `meta` serve a humanos/ferramentas.
+
+**MIDI por instrumento.** `assets/audio_remaster/midi_voices/<slug>.mid` (Tipo 1): uma trilha por hash de patch, nomeada `v_<hash>` (+ nome, se houver), velocity derivada do TL dos carriers (mesma curva do `chip_ring_to_midi`), mais as trilhas `psg0..2`, `psg_noise` e `dac` como antes (percussão FM por ruído continua em `dac`). Os 17 MIDIs por canal em `midi/` não mudam.
+
+**Fluxo.**
+1. `python tools/audio/voice_catalog.py --extract --dumps-dir <dir>` (gera os dumps `bgm_NN.appdump.txt` via `extract_all_midis.py --keep-temp`) ou apenas `--dumps-dir <dir>` com dumps existentes.
+2. O script reproduz a transcrição FM do `chip_ring_to_midi` (mesmas notas), hasheia o patch no key-on, escreve `voices.toml` e os MIDIs por voz, e imprime o relatório (vozes únicas, por música, compartilhadas, top).
+3. Edite `voices.toml` (programa/nome/modo); reexecute sem perder as edições.
+4. `python tools/audio/voice_catalog.py --selftest` valida o hash contra o vetor do contrato.
+
+### A5.4 — Mixer Studio por instrumento
+
+Quando existem `assets/audio_remaster/voices.toml` e `assets/audio_remaster/midi_voices/<slug>.mid` da música, `tools/audio/mixer_studio.py` passa a trabalhar por **voz (patch FM)** em vez de por canal FM (o modo antigo por canal continua para `default` e músicas sem MIDI por voz).
+
+- **Lista de tiras:** vozes `v_<hash>` presentes na música (trilhas do MIDI por voz cruzadas com o catálogo), ordenadas por nº de notas na música, seguidas das trilhas não-FM (`dac`, `psg0..2`, `psg_noise`), que continuam vindo de `profiles/<slug>.toml` como antes. Voz só de percussão FM (sem trilha `v_*`, as notas vão para `dac`) não aparece.
+- **Campos por voz:** `name`, `mode` (`gm|percussion|chip|off`; sem `auto`), `program` (seletor GM categorizado), `bank` (128 em percussão), `transpose`, `volume_db`, mais mute/solo e aviso "usado em N músicas: ..." (a edição é **global**: vale para todas as músicas que usam o patch). `chip` e `off` ficam mudos no preview (`chip` só faz sentido dentro do jogo). Pan e EQ não existem para voz (o jogo não os lê do `voices.toml`) e ficam ocultos.
+- **Render:** `v_<hash>` usa as notas da trilha do MIDI por voz (leitor por nome de trilha, `read_midi_named_tracks`) com o mapeamento da voz; síntese em RAM via `tsf_midi_synth.dll` (a DLL não mudou, nada a recompilar). Volume/mute/solo seguem instantâneos na Web Audio.
+- **Salvar:** voz -> `voices.toml` pelo mesmo writer do `voice_catalog.py` (`meta` preservado; só os campos editáveis mudam); canais não-FM e faixa -> `profiles/<slug>.toml` como hoje.
+- **A/B com o original:** usa `assets/audio_prototypes/<slug>/A_original.wav` quando existe. Sem ele, o botão **Gerar original** (`POST /api/tracks/<slug>/generate-original`) roda o jogo headless no Music Test (script do `extract_all_midis.py`; `--audio-remaster off --wav <tmp> --max-frames N`, SDL dummy), recorta os ~40 s da música, reamostra para 48 kHz (numpy, se disponível), guarda **somente em RAM** e apaga o diretório temporário. Demora ~1 min por música; cache em memória até o servidor reiniciar. Requer `build/EternalChampionsRecomp.exe` e `roms/eternal_champions_us.gen`.
+
+Endpoints novos: `GET /api/voices` (catálogo global), `GET /api/tracks/<slug>/voices` (vozes da música com contagem de notas), `POST /api/tracks/<slug>/generate-original`. Os existentes (`GET /api/tracks/<slug>`, `render-channel`, `render-all`, `save`, `stems/<ch>.wav`) aceitam chaves `v_<hash>` em `channels`; `GET /api/tracks/<slug>` devolve `voice_mode` e `original.can_generate`.

@@ -1,0 +1,37 @@
+# lite-superxbr: NO neural stage. ec-dedither (native) -> super-xBR 3 passes (2x) -> jinc2 to viewport -> light RCAS.
+# Smooth pixel-art upscale for weak/medium GPUs. Use: --shader-preset lite-superxbr
+shaders = 6
+
+shader0 = ../ec/ec-dedither.glsl
+filter_linear0 = false
+scale_type0 = source
+scale0 = 1.0
+
+shader1 = ../libretro/xbr/shaders/super-xbr/super-xbr-pass0.glsl
+filter_linear1 = false
+scale_type1 = source
+scale1 = 1.0
+
+shader2 = ../libretro/xbr/shaders/super-xbr/super-xbr-pass1.glsl
+filter_linear2 = false
+scale_type2 = source
+scale2 = 2.0
+
+shader3 = ../libretro/xbr/shaders/super-xbr/super-xbr-pass2.glsl
+filter_linear3 = false
+scale_type3 = source
+scale3 = 1.0
+
+shader4 = ../libretro/xbr/shaders/super-xbr/custom-jinc2-sharper.glsl
+filter_linear4 = false
+scale_type4 = viewport
+scale4 = 1.0
+
+shader5 = ../libretro/fsr/shaders/fsr-pass1.glsl
+filter_linear5 = true
+scale_type5 = source
+scale5 = 1.0
+wrap_mode5 = "clamp_to_edge"
+
+EC_DEDITHER_MODE = 2.0
+FSR_SHARPENING = 0.6

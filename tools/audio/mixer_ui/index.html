@@ -25,7 +25,7 @@
     <div class="header-actions">
       <button id="btnSave" class="btn btn-primary btn-save-main" title="Salvar perfil TOML usado em tempo real pelo jogo (Ctrl+S)">
         <span id="unsavedDot" class="unsaved-dot hidden" aria-hidden="true"></span>
-        Salvar Perfil (.toml)
+        Salvar (voices.toml + perfil)
       </button>
       <button id="btnDownloadMidi" class="btn btn-secondary" title="Baixar arquivo MIDI Tipo 1 multi-canal (.mid)" disabled>
         Baixar MIDI (.mid)
@@ -94,6 +94,9 @@
       </button>
       <button id="btnModeB" class="ab-btn" title="Ouvir áudio original A_original.wav (Tecla B)">
         B · Original
+      </button>
+      <button id="btnGenOriginal" class="btn btn-ghost hidden" title="Roda o jogo headless (--audio-remaster off --wav temporário) no Music Test, carrega só em RAM e apaga o temporário (~1 min)">
+        Gerar original
       </button>
     </div>
 

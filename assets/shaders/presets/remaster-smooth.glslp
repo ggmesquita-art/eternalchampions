@@ -1,0 +1,13 @@
+# remaster-smooth: neural B+ v3 fast (engine, before the chain) + soft FXAA edge smoothing, linear filter to viewport.
+# Smoother than remaster-crisp, no sharpening halo. Use: --shader-preset remaster-smooth
+# Keys starting with ec_ are Eternal Champions extensions; RetroArch ignores them.
+ec_bplus = "../../models/ec_bplus_v3_fast_weights.bin"
+ec_bplus_dedither = both
+ec_bplus_intensity = 1.0
+
+shaders = 1
+
+shader0 = ../libretro/anti-aliasing/shaders/fxaa.glsl
+filter_linear0 = true
+scale_type0 = viewport
+scale0 = 1.0

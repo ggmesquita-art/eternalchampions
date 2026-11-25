@@ -309,6 +309,7 @@ def parse_chip_ring(
     legacy_fm_perc: bool = False,
     frame_start: int = 0,
     frame_end: int = 0,
+    fm_perc_to_dac: bool = True,
 ) -> tuple[dict[str, list[NoteEvent]], dict[str, int]]:
     """Decodifica chip_ring.txt ou GENESIS_AUDIO_APPLIEDDUMP para eventos de nota por canal físico.
 
@@ -426,6 +427,8 @@ def parse_chip_ring(
         dur_us = max(10_000.0, t_off - t_on)
         start_s = max(0.0, (t_on - t0_us) / 1_000_000.0)
         end_s = start_s + dur_us / 1_000_000.0
+        if is_perc and not fm_perc_to_dac:
+            return  # caminho por voz (voice_catalog): a nota FM fica na trilha da voz, nao em "dac"
         if is_perc:
             dur_ms = dur_us / 1000.0
             if dur_ms < 140.0:

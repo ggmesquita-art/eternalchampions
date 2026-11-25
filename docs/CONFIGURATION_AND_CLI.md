@@ -56,6 +56,10 @@ As variáveis de ambiente permitem configurar drivers de baixo nível da bibliot
 | `EC_BPLUS_BUDGET_MS` | `<float>` | Orçamento máximo de tempo em milissegundos por quadro alocado para inferência neural. |
 | `EC_BPLUS_INTENSITY` | `0.0` a `1.0` | Intensidade da interpolação entre o quadro original em baixa resolução e o quadro aprimorado pelo B+. |
 | `EC_BPLUS_DEDITHER` | `off`, `cbod`, `both` | Modo de filtro de desdither pré-inferência (Cross-Bilateral Optimization Dither). |
+| `EC_SHADER_PRESET` | `<nome \| caminho.glslp \| off>` | Preset de shader RetroArch (`.glslp`) aplicado no fim da apresentação GPU. Vence `settings.ini`; a flag `--shader-preset` vence o env. Ver seção 3.3.1. |
+| `EC_SHADER_PARAMS` | `A=1,B=2` | Sobrescreve `#pragma parameter` do preset (a CLI `--shader-param` vence). |
+| `EC_SHADER_CAPTURE` / `EC_SHADER_CAPTURE_AT` | `<arquivo.png>` / `<n>` | Grava a saída final da cadeia de shaders no frame `n` (padrão 1), para depuração. |
+| `EC_SHADER_VIEWPORT` | `<L>x<A>` (ex.: `3840x2160`) | Diagnóstico/benchmark: simula um monitor de `L`x`A` pixels para o cálculo do tamanho `viewport` da cadeia de shaders (o SDL redimensiona o resultado para a janela real). |
 
 ---
 
@@ -91,6 +95,29 @@ A precedência de configuração segue rigorosamente a regra: **Flags de Linha d
 | `--hd-manifest` | `<caminho.toml>` | Carrega o arquivo de manifesto de substituição de texturas/sprites vetoriais em alta definição (Modo C). |
 | `--hd-mode` | `<off \| planes \| all>` | Granularidade do Modo C: `planes` usa só planos/céus HD 4× (sprites ficam no B+/nativo, sem colcha de retalhos); `all` (padrão) planos + sprites HD; `off` desliga o Modo C. Env: `EC_HD_MODE`. O `pipeline/manifest.json` usa os planos pre-dither + AnimeSharp (`assets/hd/planes_v3/`); os planos Flux antigos ficam em `assets/hd/planes/` (campo `hd_file_flux`): use `--hd-manifest pipeline/manifest_flux.json` ou `tools/pipeline/regen_planes.py --restore-flux`. Ver `docs/modo_c_planos.md`. |
 
+### 3.3.1 Shaders (RetroArch `.glslp`)
+
+| Flag | Argumento | Descrição |
+|---|---|---|
+| `--shader-preset` | `<off \| nome \| caminho.glslp>` | Ativa uma cadeia multi-pass de shaders no formato **GLSL legado do libretro** (`.glslp` + `.glsl`; não é slang). `off` desliga. Caminho existente é usado direto; senão `nome` é procurado em `assets/shaders/presets/<nome>.glslp` (e `assets/shaders/libretro/`), também relativo ao exe e a `../../`. Env: `EC_SHADER_PRESET`; `settings.ini`: `[ec.video] shader_preset`. |
+| `--shader-param` | `<NOME=valor>` | Sobrescreve um `#pragma parameter` do preset (repetível; acumula). Env: `EC_SHADER_PARAMS` (`A=1,B=2`); `settings.ini`: `[ec.video] shader_params`. |
+
+**Precedência:** CLI > env > `settings.ini` > nenhum (vale para o preset e, por parâmetro, para os valores). Parâmetros: default do `#pragma` < linhas `NOME = valor` do preset < `settings.ini` < env < CLI.
+
+```powershell
+.\build\EternalChampionsRecomp.exe --no-launcher --shader-preset lite-superxbr
+.\build\EternalChampionsRecomp.exe --no-launcher --shader-preset C:/RetroArch/shaders/shaders_glsl/xbr/super-xbr-6p.glslp
+# Combinado com B+ (o shader enxerga a saída 4x do B+ como Source e o frame nativo como Original)
+.\build\EternalChampionsRecomp.exe --no-launcher --bplus-model assets/models/ec_bplus_v3_fast_weights.bin --bplus-dedither both --shader-preset fsr/fsr
+```
+
+- É um extra **host-only** (só lê o frame já renderizado; não altera o estado do jogo). Preset ativo força o renderer SDL `opengl`; sem GL (ex.: `SDL_RENDER_DRIVER=software`) a cadeia se desativa com uma linha de log e a imagem sai sem shader. Erro de compilação/link também desativa a cadeia inteira (log com o arquivo e o info log).
+- Suportado: `shaders`, `shaderN`, `filter_linearN`, `scale_typeN`/`_x`/`_y` (`source|viewport|absolute`), `scaleN`/`_x`/`_y`, `float_framebufferN`, `srgb_framebufferN`, `wrap_modeN`, `mipmap_inputN`, `frame_count_modN`, `aliasN`, `textures` + `NOME`, `NOME_linear`, `NOME_wrap_mode`, `NOME_mipmap` (LUT PNG), e `NOME = valor` como override de parâmetro. Uniforms: `Texture`, `TextureSize`, `InputSize`, `OutputSize`, `FrameCount`, `FrameDirection`, `MVPMatrix`, `Orig*`, `PassPrevK*`, `PassK*` (1-based: `Pass1` = saída do `shader0`), `<alias>*`, LUTs, parâmetros. `#include "x"` é expandido.
+- Não suportado: `#reference` (avisa e ignora), `feedback_pass` (ignorado), histórico real (`Prev*Texture` é aproximado pelo frame atual, com aviso), slang (`.slangp`), geração de mipmap por LUT além de `NOME_mipmap`.
+- O tamanho `viewport` é o retângulo real (pixels) onde o runner desenha o canvas lógico (respeita `integer_scale`). O último passe grava numa textura-alvo SDL desse tamanho (ou do `scale` do preset).
+- Extensões opcionais no `.glslp` (ignoradas pelo RetroArch): `ec_bplus = <weights.bin>` (relativo ao preset; ou `on`), `ec_bplus_dedither = off|cbod|both`, `ec_bplus_intensity = <float>`. Ativam o B+ somente se o usuário não o configurou por CLI/env (CLI/env vencem). `ec_bplus` aceita `on`/`1`/`true` (modelo padrão), `off`/`0`/`false`/`no`/`none`/`disabled`/vazio (desligado) ou um caminho (relativo ao `.glslp`, depois como dado); caminho inexistente gera aviso e deixa o B+ do preset desligado (não cai no modelo v1). O modelo vindo do preset conta como modelo explícito (o `.onnx` irmão do backend CUDA é derivado dele). O B+ ligado pelo preset continua ligado mesmo se a cadeia de shaders falhar em runtime (só os shaders são desativados).
+- Métricas ao sair: `[SHADER] preset=<nome> passes=N frames=… p50_ms=… p99_ms=…` (GL_TIME_ELAPSED) e uma linha por passe. `EC_SHADER_CAPTURE=<png>` + `EC_SHADER_CAPTURE_AT=<n>` gravam o frame `n`.
+
 ### 3.4 Áudio e Remasterização em Tempo Real
 
 | Flag | Argumentos | Descrição |
@@ -99,10 +126,11 @@ A precedência de configuração segue rigorosamente a regra: **Flags de Linha d
 | `--audio-sf2` | `<caminho.sf2>` | Aponta para o arquivo SoundFont (`.sf2`) usado no banco de amostras melódicas. |
 | `--audio-profiles-dir` | `<diretório>` | Diretório contendo os perfis de canais instrumentais em formato TOML. |
 | `--audio-bgm-vol` | `<float>` | Ajusta o volume relativo da música de fundo (BGM), ex.: `1.0` (padrão), `0.8`, `1.5`. |
-| `--audio-sfx-vol` | `<float>` | Ajusta o volume relativo dos efeitos sonoros (SFX) e vozes, ex.: `1.0`. |
-| `--audio-chip-blend` | `<float>` | Proporção de volume do áudio do chip original quando em modo híbrido (`0.0` a `1.0`). |
+| `--audio-sfx-vol` | `<float>` | Ganho (`0.0` a `2.0`, padrão `1.0`) aplicado a **todo o barramento do chip** (YM2612 + PSG + DAC, ou seja, BGM do chip, SFX e vozes) nos modos `dsp`/`hybrid`/`ost`; não atua só nos SFX nem na síntese SoundFont (essa usa `--audio-bgm-vol`). Valores fora da faixa são ajustados com aviso `[EC-AUDIO]`; valor não numérico é ignorado com aviso `valor invalido`. |
+| `--audio-chip-blend` | `<float>` | **Override explícito** (`0.0` a `1.0`) da presença do chip original em `hybrid`/`ost`; vence o `chip_blend` do perfil da faixa, o do `settings.ini` e os defaults do modo. Precedência completa: `--audio-chip-blend` > `chip_blend` do perfil `.toml` da faixa > `chip_blend` de `[ec.audio]` no `settings.ini` (default do usuário) > default do modo (`hybrid` 0.65, `ost` 0.18). Sem efeito em `off`/`dsp`. |
+| `--audio-manifest` | `<arquivo>` | **Obsoleto**: ignorado com aviso (o módulo usa síntese em tempo real: `--audio-sf2` + `--audio-profiles-dir`). |
 | `--audio-dsp-reverb` | `<float>` | Quantidade de reverberação de estúdio Schroeder injetada no barramento mestre (`0.0` a `1.0`). |
-| `--wav` | `<caminho.wav>` | Grava a reprodução contínua da sessão de jogo diretamente para um arquivo WAV estéreo de 16-bit / 48 kHz. |
+| `--wav` | `<caminho.wav>` | Grava a sessão em WAV estéreo 16-bit na **taxa interna do mixer (223 721 Hz)**, anterior à ponte DRC/reamostragem de saída; reamostre para 44,1/48 kHz antes de usar em players comuns. |
 | `--psg-vol-div` | `<inteiro>` | Divisor de ganho de atenuação do canal PSG (ajuste fino de balanço entre YM2612 e PSG). |
 | `--snd-dump-frame` | `<inteiro>` | Despeja o estado completo dos buffers de som no frame indicado (para diagnóstico determinístico). |
 | `--snd-dump-vint` | `<inteiro>` | Despeja o estado completo do som quando o contador lógico V-Int atingir o valor especificado. |
@@ -217,9 +245,20 @@ dsp_reverb = 0.35
 - **`sf2`**: Caminho relativo ou absoluto para o arquivo de banco SoundFont 2.
 - **`profiles_dir`**: Diretório com os mapeamentos TOML de instrumentos para cada uma das faixas do jogo.
 - **`bgm_vol`**: Ganho de volume para a trilha sonora (0.0 a 2.0).
-- **`sfx_vol`**: Ganho de volume para os efeitos sonoros de golpes e vozes (0.0 a 2.0).
-- **`chip_blend`**: Nível de presença do chip original nos canais sintetizados no modo híbrido (`0.0` a `1.0`).
+- **`sfx_vol`**: Ganho de todo o barramento do chip (BGM do chip + SFX + vozes DAC) nos modos `dsp`/`hybrid`/`ost` (0.0 a 2.0). Ver `--audio-sfx-vol`.
+- **`chip_blend`**: Default do usuário (`0.0` a `1.0`) para a presença do chip em `hybrid`/`ost`. Só é usado quando o perfil da faixa **não** define `chip_blend`; a CLI `--audio-chip-blend` vence ambos (ver precedência em `--audio-chip-blend`).
+- Valores de `[ec.audio]` aceitam aspas externas (`sf2 = "caminho com espaço.sf2"`) e comentário final (` ;` ou ` #`).
 - **`dsp_reverb`**: Intensidade do efeito de reverberação de sala aplicado à saída final (`0.0` a `1.0`).
+
+### 4.4.1 Seção `[ec.video]`
+
+```ini
+[ec.video]
+shader_preset = remaster-crisp
+shader_params = hardScan=-10,maskDark=0.4
+```
+
+Equivalem a `--shader-preset` / `--shader-param` (aspas externas e comentário final ` ;`/` #` são removidos); a CLI e as variáveis `EC_SHADER_PRESET` / `EC_SHADER_PARAMS` têm precedência.
 
 ### 4.5 Seção `[launcher]`
 

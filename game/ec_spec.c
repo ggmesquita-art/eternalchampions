@@ -18,6 +18,7 @@
 #include "ec_audio.h"
 #include "ec_boss.h"
 #include "ec_hd.h"
+#include "ec_shader_chain.h"
 #include "ec_video.h"
 #include "game_spec.h"
 #include "genesis_runtime.h"
@@ -88,7 +89,40 @@ static int ec_parse_double_strict(const char *val, double *out)
     return 1;
 }
 
-/* Optional [ec.audio] section in runner settings.ini (CLI flags take precedence). */
+/* Valor de settings.ini: remove aspas externas ou comentario final (" ;" / " #"). */
+static char *ec_ini_clean_value(char *v)
+{
+    if (*v == '"') {
+        ++v;
+        char *q = strchr(v, '"');
+        if (q)
+            *q = 0;
+        return v;
+    }
+    char *c = strstr(v, " ;");
+    if (c)
+        *c = 0;
+    c = strstr(v, " #");
+    if (c)
+        *c = 0;
+    return ec_ini_trim(v);
+}
+
+/* Valor numerico de flag --audio-*: sempre consome o valor; invalido -> aviso e ignora. */
+static int ec_audio_cli_number(const char *key, const char *val, void (*setter)(float), int *cli_flag)
+{
+    double v = 0.0;
+    if (!ec_parse_double_strict(val, &v)) {
+        fprintf(stderr, "[EC-AUDIO] valor invalido para %s: '%s' (ignorado)\n", key, val);
+        return 2;
+    }
+    setter((float)v);
+    if (cli_flag)
+        *cli_flag = 1;
+    return 2;
+}
+
+/* Optional [ec.audio] / [ec.video] sections in runner settings.ini (CLI flags take precedence). */
 static void ec_load_settings(const char *settings_path)
 {
     if (!settings_path || !*settings_path)
@@ -98,6 +132,7 @@ static void ec_load_settings(const char *settings_path)
         return;
 
     int in_audio_section = 0;
+    int in_video_section = 0;
     char line_buf[1280];
     while (fgets(line_buf, (int)sizeof(line_buf), fp) != NULL) {
         char *line = ec_ini_trim(line_buf);
@@ -105,9 +140,10 @@ static void ec_load_settings(const char *settings_path)
             continue;
         if (*line == '[') {
             in_audio_section = (strcmp(line, "[ec.audio]") == 0);
+            in_video_section = (strcmp(line, "[ec.video]") == 0);
             continue;
         }
-        if (!in_audio_section)
+        if (!in_audio_section && !in_video_section)
             continue;
         char *eq = strchr(line, '=');
         if (!eq)
@@ -118,7 +154,31 @@ static void ec_load_settings(const char *settings_path)
         if (!*key || !*val)
             continue;
 
+        if (in_video_section) {
+            /* [ec.video]: shader_preset / shader_params (CLI e env vencem; ver ec_shader_chain.c) */
+            char *cv = val;
+            if (*cv == '"') {
+                ++cv;
+                char *q = strchr(cv, '"');
+                if (q) *q = '\0';
+            } else {
+                char *c = strstr(cv, " ;");
+                if (c) *c = '\0';
+                c = strstr(cv, " #");
+                if (c) *c = '\0';
+                cv = ec_ini_trim(cv);
+            }
+            if (strcmp(key, "shader_preset") == 0)
+                ec_shader_chain_set_settings(cv, NULL);
+            else if (strcmp(key, "shader_params") == 0)
+                ec_shader_chain_set_settings(NULL, cv);
+            continue;
+        }
+
         double dv = 0.0;
+        val = ec_ini_clean_value(val);
+        if (!*val)
+            continue;
         if (strcmp(key, "remaster") == 0 && !s_audio_mode_cli) {
             (void)ec_audio_set_mode_str(val);
         } else if (strcmp(key, "sf2") == 0 && !s_audio_sf2_cli) {
@@ -141,7 +201,7 @@ static void ec_load_settings(const char *settings_path)
 static void ec_on_state_loaded(void)
 {
     /* Clear host-side BGM/DSP playback buffers after savestate/rewind load. */
-    ec_audio_reset();
+    ec_audio_on_state_loaded();
     ec_video_reset_ws_state();
     s_audio_last_pause_flag = 0;
 }
@@ -376,6 +436,14 @@ static int ec_handle_arg(const char *key, const char *val)
         ec_video_set_bplus_dedither(val);
         return 2;
     }
+    if (strcmp(key, "--shader-preset") == 0 && val && *val) {
+        ec_shader_chain_set_preset_cli(val);
+        return 2;
+    }
+    if (strcmp(key, "--shader-param") == 0 && val && *val) {
+        ec_shader_chain_add_param_cli(val);
+        return 2;
+    }
     if (strcmp(key, "--audio-remaster") == 0 && val && *val) {
         if (ec_audio_set_mode_str(val)) {
             s_audio_mode_cli = 1;
@@ -398,38 +466,14 @@ static int ec_handle_arg(const char *key, const char *val)
         fprintf(stderr, "[EC-AUDIO] aviso: --audio-manifest obsoleto; o modulo usa sintese em tempo real (--audio-sf2 + --audio-profiles-dir)\n");
         return 2;
     }
-    if (strcmp(key, "--audio-bgm-vol") == 0 && val && *val) {
-        double v = 0.0;
-        if (ec_parse_double_strict(val, &v)) {
-            ec_audio_set_bgm_vol((float)v);
-            s_audio_bgm_vol_cli = 1;
-            return 2;
-        }
-    }
-    if (strcmp(key, "--audio-sfx-vol") == 0 && val && *val) {
-        double v = 0.0;
-        if (ec_parse_double_strict(val, &v)) {
-            ec_audio_set_sfx_vol((float)v);
-            s_audio_sfx_vol_cli = 1;
-            return 2;
-        }
-    }
-    if (strcmp(key, "--audio-chip-blend") == 0 && val && *val) {
-        double v = 0.0;
-        if (ec_parse_double_strict(val, &v)) {
-            ec_audio_set_chip_blend((float)v);
-            s_audio_blend_cli = 1;
-            return 2;
-        }
-    }
-    if (strcmp(key, "--audio-dsp-reverb") == 0 && val && *val) {
-        double v = 0.0;
-        if (ec_parse_double_strict(val, &v)) {
-            ec_audio_set_dsp_reverb((float)v);
-            s_audio_reverb_cli = 1;
-            return 2;
-        }
-    }
+    if (strcmp(key, "--audio-bgm-vol") == 0 && val && *val)
+        return ec_audio_cli_number(key, val, ec_audio_set_bgm_vol, &s_audio_bgm_vol_cli);
+    if (strcmp(key, "--audio-sfx-vol") == 0 && val && *val)
+        return ec_audio_cli_number(key, val, ec_audio_set_sfx_vol, &s_audio_sfx_vol_cli);
+    if (strcmp(key, "--audio-chip-blend") == 0 && val && *val)
+        return ec_audio_cli_number(key, val, ec_audio_set_chip_blend_override, &s_audio_blend_cli);
+    if (strcmp(key, "--audio-dsp-reverb") == 0 && val && *val)
+        return ec_audio_cli_number(key, val, ec_audio_set_dsp_reverb, &s_audio_reverb_cli);
     return 0;
 }
 
@@ -618,7 +662,7 @@ const GameSpec g_game_spec = {
     .on_post_reset         = ec_on_post_reset,
     .on_state_loaded       = ec_on_state_loaded,
     .handle_arg            = ec_handle_arg,
-    .arg_usage             = "--hd-manifest <path> | --hd-mode <off|planes|all> | --neural-bplus | --bplus-model <bin> | --bplus-backend <auto|cuda|gl> | --bplus-budget-ms <ms> | --bplus-intensity <f> | --bplus-dedither <off|cbod|both> | --unlock-boss | --audio-remaster <off|dsp|hybrid|ost> | --audio-sf2 <path> | --audio-profiles-dir <dir> | --audio-bgm-vol <f> | --audio-sfx-vol <f> | --audio-chip-blend <f> | --audio-dsp-reverb <f>",
+    .arg_usage             = "--hd-manifest <path> | --hd-mode <off|planes|all> | --neural-bplus | --bplus-model <bin> | --bplus-backend <auto|cuda|gl> | --bplus-budget-ms <ms> | --bplus-intensity <f> | --bplus-dedither <off|cbod|both> | --shader-preset <off|nome|caminho.glslp> | --shader-param <NOME=valor> | --unlock-boss | --audio-remaster <off|dsp|hybrid|ost> | --audio-sf2 <path> | --audio-profiles-dir <dir> | --audio-bgm-vol <f> | --audio-sfx-vol <f> | --audio-chip-blend <f> | --audio-dsp-reverb <f>",
     .instruction_hook      = ec_instruction_hook,
     .rb_state_save         = ec_boss_rb_state_save,
     .rb_state_load         = ec_boss_rb_state_load,

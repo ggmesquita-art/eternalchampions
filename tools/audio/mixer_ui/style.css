@@ -823,3 +823,11 @@ kbd {
   font-size: 10px;
   color: var(--text);
 }
+
+
+/* A5.4 — strips por instrumento (voz FM) */
+.voice-strip .eq-box,
+.voice-strip .pan-row { display: none; }
+.voice-box { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.voice-note { font-size: 11px; opacity: 0.8; line-height: 1.3; }
+.voice-warn { color: #f0b429; margin-left: 6px; font-weight: 600; }

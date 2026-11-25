@@ -174,6 +174,7 @@
     btnResetEq: document.getElementById("btnResetEq"),
     mixerGrid: document.getElementById("mixerGrid"),
     exportMetaFooter: document.getElementById("exportMetaFooter"),
+    btnGenOriginal: document.getElementById("btnGenOriginal"),
   };
 
   // -------------------------------------------------------------------------
@@ -780,7 +781,13 @@
   // -------------------------------------------------------------------------
   // Renderização da UI do Mixer
   // -------------------------------------------------------------------------
+  function escHtml(v) {
+    return String(v === undefined || v === null ? "" : v)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
   function channelKindClass(ch) {
+    if (ch.startsWith("v_")) return "kind-fm";
     if (ch === "dac") return "kind-dac";
     if (ch === "psg_noise") return "kind-noise";
     if (ch.startsWith("psg")) return "kind-psg";
@@ -893,8 +900,25 @@
       const chHasMidi = Boolean(stem.has_midi);
 
       const strip = document.createElement("article");
-      strip.className = "channel-strip";
+      strip.className = "channel-strip" + (cfg.voice ? " voice-strip" : "");
       strip.dataset.channel = ch;
+      const globalWarn = Number(cfg.used_in || 0) > 1 ? `<span class="voice-warn">⚠ edição global</span>` : "";
+      const voiceBlock = cfg.voice
+        ? `
+        <div class="voice-box">
+          <input type="text" class="strip-input voice-name" maxlength="48" placeholder="nome do instrumento (opcional)" value="${escHtml(cfg.name)}" />
+          <div class="voice-note" title="A edição é GLOBAL: vale para todas as músicas que usam este patch (voices.toml).">
+            Usado em <strong>${Number(cfg.used_in || 0)}</strong> música(s): ${escHtml((cfg.songs || []).join(", "))}
+            ${globalWarn}
+          </div>
+          <div class="voice-note">Sugestão: <strong>${escHtml(cfg.suggestion || "—")}</strong> · ALG ${Number(cfg.alg || 0)} FB ${Number(cfg.fb || 0)} · nota mediana ${Number(cfg.note_median || 0)}</div>
+          <div class="voice-note voice-drum-row hidden">
+            Nota de bateria GM (0 = usar a nota da trilha; 42 = closed hi-hat, 38 = snare, 36 = kick):
+            <input type="number" class="strip-input voice-drum-note" min="0" max="127" step="1" value="${Number(cfg.drum_note || 0)}" />
+          </div>
+          <div class="voice-note voice-chip-note hidden">chip = som original do chip, só existe dentro do jogo; mudo neste preview.</div>
+        </div>`
+        : "";
 
       const dotClass = stem.has_wav ? "ready" : "";
 
@@ -924,6 +948,8 @@
           </div>
         </div>
 
+        ${voiceBlock}
+
         <div class="field-row">
           <label class="field-label"><span>Tipo / Modo</span></label>
           <select class="strip-select ch-mode"></select>
@@ -950,7 +976,7 @@
           <input type="range" class="slider-full ch-volume" min="-36" max="12" step="0.5" value="${Number(cfg.volume_db || 0)}" />
         </div>
 
-        <div class="field-row">
+        <div class="field-row pan-row">
           <div class="field-label">
             <span>Pan</span>
             <output class="out-pan">${fmtPan(cfg.pan)}</output>
@@ -1007,6 +1033,28 @@
         transInput.disabled = m === "off" || m === "percussion";
       };
       syncInstDisabling();
+      const chipNote = strip.querySelector(".voice-chip-note");
+      const syncChipNote = () => {
+        if (chipNote) chipNote.classList.toggle("hidden", cfg.mode !== "chip");
+        const drumRow = strip.querySelector(".voice-drum-row");
+        if (drumRow) drumRow.classList.toggle("hidden", cfg.mode !== "percussion");
+      };
+      syncChipNote();
+      const drumInput = strip.querySelector(".voice-drum-note");
+      if (drumInput) {
+        drumInput.addEventListener("change", () => {
+          cfg.drum_note = Math.max(0, Math.min(127, parseInt(drumInput.value, 10) || 0));
+          drumInput.value = String(cfg.drum_note);
+          onSynthParamChanged();
+        });
+      }
+      const nameInput = strip.querySelector(".voice-name");
+      if (nameInput) {
+        nameInput.addEventListener("change", () => {
+          cfg.name = nameInput.value.trim();
+          setUnsaved(true);
+        });
+      }
 
       // Eventos que exigem re-render do stem (quando há preview local)
       const onSynthParamChanged = () => {
@@ -1027,6 +1075,7 @@
         cfg.bank = newMode === "percussion" ? 128 : 0;
         populateProgramSelect(progSel, newMode, cfg.program);
         syncInstDisabling();
+        syncChipNote();
         onSynthParamChanged();
       });
 
@@ -1140,7 +1189,10 @@
           ? state.trackData.has_midi_stems
           : midiActiveCount > 0
     );
-    dom.metaStems.textContent = hasMidi ? `${wavReady}/${midiActiveCount} ativos` : "Perfil padrão";
+    const nVoices = Object.values(state.profile.channels || {}).filter((c) => c.voice).length;
+    dom.metaStems.textContent = hasMidi
+      ? `${wavReady}/${midiActiveCount} ativos${nVoices ? ` · ${nVoices} vozes FM` : ""}`
+      : "Perfil padrão";
     if (dom.metaEngine) {
       dom.metaEngine.textContent = state.trackData.synth_engine || "TinySoundFont (tsf.h)";
     }
@@ -1166,8 +1218,10 @@
     const origAvail = Boolean(state.trackData.original && state.trackData.original.available);
     dom.btnModeB.disabled = !origAvail;
     dom.btnModeB.title = origAvail
-      ? "Ouvir áudio original A_original.wav (Tecla B)"
-      : "A_original.wav não disponível para esta faixa em assets/audio_prototypes/";
+      ? "Ouvir áudio original (Tecla B)"
+      : "Original indisponível: sem A_original.wav — use Gerar original (roda o jogo headless, só em RAM)";
+    const canGen = !origAvail && Boolean(state.trackData.original && state.trackData.original.can_generate);
+    dom.btnGenOriginal.classList.toggle("hidden", !canGen);
     if (!origAvail && state.abMode === "original") {
       setABMode("remaster");
     }
@@ -1271,6 +1325,7 @@
             program: cfg.program,
             bank: cfg.bank,
             transpose: cfg.transpose,
+            drum_note: cfg.drum_note,
             save_profile: false,
           }),
         }
@@ -1420,11 +1475,45 @@
       );
       state.profile = res.profile;
       setUnsaved(false);
-      showStatus(`Perfil salvo em ${res.profile_path} — aplicado em tempo real pelo jogo.`, "success");
+      const nv = (res.voices_saved || []).length;
+      showStatus(
+        nv > 0
+          ? `Salvo: ${nv} voz(es) em ${res.voices_path} (GLOBAL) + canais não-FM em ${res.profile_path}.`
+          : `Perfil salvo em ${res.profile_path} — aplicado em tempo real pelo jogo.`,
+        "success"
+      );
     } catch (err) {
       showStatus(`Erro ao salvar perfil: ${err.message}`, "error");
     } finally {
       dom.btnSave.disabled = false;
+    }
+  }
+
+  async function generateOriginal() {
+    if (!state.currentTrack || state.isBusyGlobal) return;
+    const track = state.currentTrack;
+    state.isBusyGlobal = true;
+    dom.btnGenOriginal.disabled = true;
+    showStatus(`Gerando original de ${track} rodando o jogo headless (~1 min, só em RAM)...`, "info");
+    try {
+      const res = await apiJson(`/api/tracks/${encodeURIComponent(track)}/generate-original`, {
+        method: "POST",
+        body: "{}",
+      });
+      if (track !== state.currentTrack) return;
+      const data = await apiJson(`/api/tracks/${encodeURIComponent(track)}`);
+      state.trackData.original = data.original;
+      if (data.original && data.original.available && data.original.url) {
+        const obuf = await fetchAndDecodeWav(data.original.url);
+        state.originalBuffer = state.duration > obuf.duration ? padBufferWithSilence(obuf, state.duration) : obuf;
+      }
+      updateTrackMetadataUI();
+      showStatus(`Original gerado (${Number(res.duration_s || 0).toFixed(1)} s, ${res.cached ? "cache" : "novo"}). Tecla B alterna.`, "success");
+    } catch (err) {
+      showStatus(`Falha ao gerar original: ${err.message}`, "error");
+    } finally {
+      state.isBusyGlobal = false;
+      dom.btnGenOriginal.disabled = false;
     }
   }
 
@@ -1528,6 +1617,7 @@
     dom.btnDownloadMidi.addEventListener("click", downloadMidi);
   }
   dom.btnRenderAll.addEventListener("click", renderAllStems);
+  dom.btnGenOriginal.addEventListener("click", generateOriginal);
   dom.btnCloseStatus.addEventListener("click", hideStatus);
 
   dom.btnClearSolo.addEventListener("click", () => {

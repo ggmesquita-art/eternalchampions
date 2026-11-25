@@ -1,0 +1,165 @@
+# Perfil de remasterização por canal (editável manualmente ou via mixer_studio.py)
+[track]
+name = "03_syria_blade"
+bgm_id = 0
+soundfont = "assets/soundfonts/TimGM6mb.sf2"
+sample_rate = 48000
+loop_start = 0
+loop_end = 0
+master_gain_db = 0.0
+target_rms_dbfs = -16.5
+chip_blend = 0.65
+
+[channels.fm0]
+role = "auto"
+mode = "auto"
+program = 0
+bank = 0
+volume_db = 0.0
+pan = -0.25
+mute = false
+solo = false
+eq_low_db = 0.0
+eq_mid_db = 0.0
+eq_high_db = 0.0
+transpose = 0
+
+[channels.fm1]
+role = "lead"
+mode = "gm"
+program = 81
+bank = 0
+volume_db = -3.0
+pan = 0.2
+mute = false
+solo = false
+eq_low_db = 0.0
+eq_mid_db = 0.0
+eq_high_db = 0.5
+transpose = 0
+
+[channels.fm2]
+role = "auto"
+mode = "auto"
+program = 0
+bank = 0
+volume_db = 0.0
+pan = -0.35
+mute = false
+solo = false
+eq_low_db = 0.0
+eq_mid_db = 0.0
+eq_high_db = 0.0
+transpose = 0
+
+[channels.fm3]
+role = "auto"
+mode = "auto"
+program = 0
+bank = 0
+volume_db = 0.0
+pan = 0.35
+mute = false
+solo = false
+eq_low_db = 0.0
+eq_mid_db = 0.0
+eq_high_db = 0.0
+transpose = 0
+
+[channels.fm4]
+role = "auto"
+mode = "auto"
+program = 0
+bank = 0
+volume_db = 0.0
+pan = 0.0
+mute = false
+solo = false
+eq_low_db = 0.0
+eq_mid_db = 0.0
+eq_high_db = 0.0
+transpose = 0
+
+[channels.fm5]
+role = "auto"
+mode = "auto"
+program = 0
+bank = 0
+volume_db = 0.0
+pan = 0.0
+mute = false
+solo = false
+eq_low_db = 0.0
+eq_mid_db = 0.0
+eq_high_db = 0.0
+transpose = 0
+
+[channels.dac]
+role = "drums"
+mode = "percussion"
+program = 0
+bank = 128
+volume_db = -3.0
+pan = 0.0
+mute = false
+solo = false
+eq_low_db = 1.5
+eq_mid_db = 0.0
+eq_high_db = 0.5
+transpose = 0
+
+[channels.psg0]
+role = "psg_arp"
+mode = "gm"
+program = 80
+bank = 0
+volume_db = -10.0
+pan = -0.45
+mute = false
+solo = false
+eq_low_db = -2.0
+eq_mid_db = 0.0
+eq_high_db = 0.0
+transpose = 0
+
+[channels.psg1]
+role = "psg_arp"
+mode = "gm"
+program = 80
+bank = 0
+volume_db = -10.0
+pan = 0.0
+mute = false
+solo = false
+eq_low_db = -2.0
+eq_mid_db = 0.0
+eq_high_db = 0.0
+transpose = 0
+
+[channels.psg2]
+role = "psg_arp"
+mode = "gm"
+program = 80
+bank = 0
+volume_db = -10.0
+pan = 0.45
+mute = false
+solo = false
+eq_low_db = -2.0
+eq_mid_db = 0.0
+eq_high_db = 0.0
+transpose = 0
+
+[channels.psg_noise]
+role = "percussion"
+mode = "percussion"
+program = 0
+bank = 128
+volume_db = -3.0
+pan = 0.15
+mute = false
+solo = false
+eq_low_db = 0.0
+eq_mid_db = 0.0
+eq_high_db = 1.0
+transpose = 0

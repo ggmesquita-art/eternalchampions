@@ -1,0 +1,17 @@
+# remaster-crisp: neural B+ v3 upscale (4x, done by the engine BEFORE this chain) + RCAS sharpening.
+# Use: --shader-preset remaster-crisp   (or settings.ini [ec.video] shader_preset=remaster-crisp)
+# The chain receives the 4x B+ output; only the sharpening pass runs here (viewport scale).
+# Keys starting with ec_ are Eternal Champions extensions; RetroArch ignores them.
+ec_bplus = "../../models/ec_bplus_v3_fast_weights.bin"
+ec_bplus_dedither = both
+ec_bplus_intensity = 1.0
+
+shaders = 1
+
+shader0 = ../libretro/fsr/shaders/fsr-pass1.glsl
+filter_linear0 = true
+scale_type0 = viewport
+scale0 = 1.0
+wrap_mode0 = "clamp_to_edge"
+
+FSR_SHARPENING = 0.3
