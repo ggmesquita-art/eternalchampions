@@ -2,6 +2,7 @@
 #pragma once
 #include "input.h"
 #include "render.h"
+#include "schema.h"
 #include "theme.h"
 #include <filesystem>
 #include <memory>
@@ -29,6 +30,8 @@ public:
     Render render;
     Theme theme;
     Input input;
+    Config cfg;                          // settings.ini (preserva o que o launcher nao conhece)
+    bool dev_visible = false;            // area "Desenvolvedor" (AVANCADO) visivel
 
     // ---- caminhos (PLAN §2): exe em build/, settings.ini e rom-EC.cfg ao lado do exe
     std::filesystem::path exe_dir;       // diretorio do EternalChampions.exe (= build/)
@@ -52,11 +55,13 @@ public:
     float time = 0;                      // segundos desde o inicio (em shot: frame/60)
     bool quit = false;
     bool shot_mode = false;
+    int shot_page = 0, shot_focus = 0;   // --tab / --focus (so no modo de captura)
     bool game_running = false;
     // teste automatizado: --autoplay (JOGAR ao abrir; sai ao fim do jogo gravando launcher_autoplay.txt) e
     // --game-args "..." (argumentos extras repassados ao jogo, p.ex. --max-frames 120)
     bool autoplay = false;
     std::string extra_game_args;
+    std::string load_slot_arg;           // "N": proximo JOGAR passa --load-slot N (uso unico)
 
     bool init(bool hidden, int win_w, int win_h);
     void shutdown();
@@ -75,6 +80,9 @@ public:
     void load_rom_state();                                  // le rom-EC.cfg + recentes
     bool set_rom(const std::string& utf8_path, bool write_cfg);   // calcula SHA; grava cfg se pedido
     std::string rom_display_name() const;
+
+    // log do launcher (build/logs/launcher.log), com data/hora
+    void log(const std::string& line);
 
     // toast
     void toast(const std::string& msg, float secs = 3.f) { toast_msg_ = msg; toast_t_ = secs; }

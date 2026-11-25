@@ -58,7 +58,7 @@ public:
         draw_text(r, hf, x + 56, y, name, val);
         y += 30;
         draw_text(r, hf, x, y, "SHA-256:", lab);
-        float tx = x + 84;
+        float tx = x + 96;
         if (app.rom_path.empty() || !app.rom_exists) {
             TextStyle bad = TextStyle::solid(th.pal.bad, 1, th.pal.text_outline);
             draw_text(r, hf, tx, y, app.rom_path.empty() ? "\xE2\x80\x94" : "\xE2\x9C\x97  arquivo n\xC3\xA3o encontrado", bad);

@@ -3,9 +3,6 @@
 #include "app.h"
 #include <windows.h>
 
-// Edicao minima do settings.ini: garante `[launcher] skip_launcher = 1` preservando o resto.
-// (a L2 traz o leitor/escritor completo). Retorna false em erro de I/O.
-bool ensure_skip_launcher(const std::filesystem::path& settings_ini);
 
 struct GameProcess {
     HANDLE handle = nullptr;

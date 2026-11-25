@@ -23,6 +23,7 @@ public:
                 app.game_running = false;
                 SDL_RestoreWindow(app.render.window);
                 SDL_RaiseWindow(app.render.window);
+                app.cfg.load(app.settings_ini);   // o runner pode ter regravado o settings.ini
                 state_ = Done;
                 build_menu(app);
                 if (app.autoplay) {

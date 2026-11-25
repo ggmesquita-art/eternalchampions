@@ -354,46 +354,42 @@ def save_png(arr: np.ndarray, path: Path) -> list[int]:
 
 # --------------------------------------------------------------------------- stone tile
 def detect_stone_tile(scr: np.ndarray) -> dict:
-    """Acha periodo do padrao de pedra e o bloco (com o rejunte esquerdo/superior)."""
+    """Detecta o rejunte (linhas escuras) e o periodo do padrao de pedra.
+
+    Rejunte: colunas/linhas ~escuras e regulares -> bloco = intervalo entre rejuntes (80x72).
+    Textura: autocorrelacao horizontal na faixa limpa abaixo do texto (periodo real da
+    textura, pode ser multiplo do bloco). O bloco devolvido inclui o rejunte direito e o
+    superior, logo ladrilha sem emenda."""
     g = scr.astype(np.float32).mean(2)
     strip = g[192:212, :]
-    best = None
-    for p in range(32, 161):
-        d = np.abs(strip[:, :-p] - strip[:, p:]).mean()
-        if best is None or d < best[0] - 1e-6:
-            best = (d, p)
-    px = best[1]
-    # divisores curtos podem empatar: prefere o menor p com erro <= 1.15x do melhor
-    for p in range(32, px):
-        if px % p == 0 and np.abs(strip[:, :-p] - strip[:, p:]).mean() <= best[0] * 1.15 + 0.5:
-            px = p
-            break
-    # coluna de rejunte (linha escura vertical) na faixa limpa
+    errs = {p: float(np.abs(strip[:, :-p] - strip[:, p:]).mean()) for p in range(32, 161)}
+    tex_px = min(errs, key=errs.get)
     colprof = strip.mean(0)
-    gx = int(np.argmin(colprof[:px]))
-    # linhas de rejunte horizontais numa coluna limpa (x 2..30, evita texto)
-    rows = g[60:224, 2:30].mean(1)
-    cand = [i for i in range(1, len(rows) - 1) if rows[i] < rows[i - 1] - 6 and rows[i] <= rows[i + 1] - 0
-            and rows[i] < np.median(rows) - 8]
-    ys = [60 + i for i in cand]
-    qy = None
-    if len(ys) >= 2:
-        diffs = sorted(b - a for a, b in zip(ys, ys[1:]) if b - a > 20)
-        if diffs:
-            qy = diffs[len(diffs) // 2]
-    gy = ys[-1] if ys else 143
-    if qy is None:
-        qy = 72
-    # escolhe o bloco horizontal limpo (sem texto x 92..220 quando intersecta y 142..190)
-    best_x = gx
-    for k in range(0, SCREEN_W // px + 1):
-        x0 = gx + k * px
-        if x0 + px <= SCREEN_W and (x0 + px <= 92 or x0 >= 220):
-            best_x = x0
-    if gy + qy > SCREEN_H:
-        gy = max(0, SCREEN_H - qy)
-    return dict(period_x=px, period_y=qy, x=best_x, y=gy, grout_col=gx, fit_err=float(best[0]),
-                grout_rows=ys)
+    gcols = [i for i in range(SCREEN_W) if colprof[i] < np.median(colprof) - 25]
+    gaps = sorted(b - a for a, b in zip(gcols, gcols[1:]) if b - a > 20)
+    bw = gaps[len(gaps) // 2] if gaps else 80
+    rows = g[:, 2:30].mean(1)
+    grows = [i for i in range(SCREEN_H) if rows[i] < np.median(rows) - 40]
+    rgaps = sorted(b - a for a, b in zip(grows, grows[1:]) if b - a > 20)
+    bh = rgaps[len(rgaps) // 2] if rgaps else 72
+    gy = grows[-1] if grows and grows[-1] + bh <= SCREEN_H else (grows[-2] if len(grows) > 1 else 143)
+    gx = gcols[0] if gcols else bw - 1
+    # blocos horizontais limpos de texto (texto do menu ocupa x 92..220 em y 142..190)
+    cands = [x0 for x0 in range((gx + 1) % bw, SCREEN_W - bw + 1, bw) if x0 + bw <= 92 or x0 >= 220]
+    x0 = cands[-1] if cands else (gx + 1) % bw
+    # verificacao numerica: MAD do bloco vs vizinhos deslocados, em y limpo (>=195)
+    def mad(xa, xb):
+        return float(np.abs(g[195:212, xa:xa + bw] - g[195:212, xb:xb + bw]).mean())
+    v = {}
+    for k in (1, 2):
+        xb = x0 - k * bw
+        if xb >= 0:
+            v[f"shift_{k}_blocks"] = mad(x0, xb)
+        xb = x0 + k * bw
+        if xb + bw <= SCREEN_W:
+            v[f"shift_{k}_blocks_right"] = mad(x0, xb)
+    return dict(block_w=bw, block_h=bh, x=x0, y=gy, texture_period_x=tex_px,
+                grout_cols=gcols, grout_rows=grows, verify_mad=v)
 
 
 # --------------------------------------------------------------------------- fonts
@@ -669,16 +665,22 @@ def extract(a, out: Path, work: Path, rom: Path, exe: Path, rom_sha: str, t_star
 
     # stone tile
     st = detect_stone_tile(menu)
-    px, qy, sx, sy = st["period_x"], st["period_y"], st["x"], st["y"]
+    px, qy, sx, sy = st["block_w"], st["block_h"], st["x"], st["y"]
     stone = menu[sy:sy + qy, sx:sx + px]
     stone4 = menu4[sy * SCALE:(sy + qy) * SCALE, sx * SCALE:(sx + px) * SCALE]
     opaque = lambda im: np.dstack([im, np.full(im.shape[:2], 255, np.uint8)])  # noqa: E731
     put("stone_tile", opaque(stone), opaque(stone4), menu_src, period=[px, qy], origin=[sx, sy],
-        detect=st)
-    # verificacao: mesmo padrao deslocado de um periodo
-    if sx - px >= 0 and (sx - px + px <= 92):
-        other = menu[sy:sy + qy, sx - px:sx]
-        files["stone_tile"]["verify_mad_vs_neighbor"] = float(np.abs(other.astype(int) - stone.astype(int)).mean())
+        grout="1 px escuro na ultima coluna (direita) e na primeira linha (topo) do bloco",
+        texture_period_x=st["texture_period_x"], detect=st)
+
+    # variante alternativa do bloco (a textura alterna A/B a cada bloco; periodo real = 2 blocos)
+    ax = next((x for x in range((sx % px), SCREEN_W - px + 1, px)
+               if x != sx and (x + px <= 92 or x >= 220)), -1)
+    if ax >= 0:
+        alt = menu[sy:sy + qy, ax:ax + px]
+        alt4 = menu4[sy * SCALE:(sy + qy) * SCALE, ax * SCALE:(ax + px) * SCALE]
+        put("stone_tile_alt", opaque(alt), opaque(alt4), menu_src, period=[px, qy], origin=[ax, sy],
+            note="variante B da textura; alternar com stone_tile em colunas pares/impares")
 
     # yin-yang
     yy_files = []
@@ -733,13 +735,13 @@ def extract(a, out: Path, work: Path, rom: Path, exe: Path, rom_sha: str, t_star
         files["font_gold"] = {"file": "font_gold.png", "json": "font_gold.json", "size": gold, "source": "native"}
 
     # ---- previews --------------------------------------------------------------
-    t3 = np.tile(stone, (3, 3, 1))
-    save_png(np.repeat(np.repeat(t3, 2, 0), 2, 1), stage / "preview_tile_3x3.png")
+    t3 = np.tile(stone4, (3, 3, 1))
+    save_png(t3, stage / "preview_tile_3x3.png")
     pdoc = json.loads((stage / "font_menu.json").read_text(encoding="utf-8"))
     atlas = np.asarray(Image.open(stage / "font_menu.png").convert("RGBA"))
     prev, miss = render_text(pdoc, atlas, "ONE PLAYER  Two Players  JOGAR  ÁUDIO", 3)
     save_png(prev, stage / "preview_font.png")
-    log(f"  preview_font: glifos ausentes na frase de teste: {sorted(set(miss))}")
+    log(f"  preview_font: glifos ausentes na frase de teste: {ascii(sorted(set(miss)))}")
 
     # ---- manifest ---------------------------------------------------------------
     manifest = {
@@ -784,7 +786,7 @@ def detect_emblem(logo_rgba: np.ndarray, mask: np.ndarray):
     colh = mask[16:64].sum(0)
     # centro do logo = onde esta o anel; busca janela de largura ~52 px com mais pixels amarelos
     rgb = logo_rgba[..., :3].astype(int)
-    yellow = (rgb[..., 0] > 200) & (rgb[..., 1] > 170) & (rgb[..., 2] < 120) & mask
+    yellow = (rgb[..., 0] > 200) & (rgb[..., 1] > 240) & (rgb[..., 2] < 120) & mask
     cols = yellow.sum(0)
     xs = np.nonzero(cols > 0)[0]
     if len(xs) == 0:
@@ -798,7 +800,7 @@ def detect_emblem(logo_rgba: np.ndarray, mask: np.ndarray):
         prev = x
     groups.append((start, prev))
     g = max(groups, key=lambda t: cols[t[0]:t[1] + 1].sum())
-    x0, x1 = max(0, g[0] - 3), min(w, g[1] + 4)
+    x0, x1 = max(0, g[0] - 1), min(w, g[1] + 2)
     sub = mask[:, x0:x1]
     ys = np.nonzero(sub.any(1))[0]
     return (int(x0), int(ys.min()), int(x1), int(ys.max()) + 1)

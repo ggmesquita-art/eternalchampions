@@ -42,6 +42,7 @@ bool App::init(bool hidden, int win_w, int win_h) {
     if (!render.init(win_w, win_h, hidden, "Eternal Champions")) return false;
     if (!theme.init(render, path_to_utf8(assets_dir))) return false;
     input.init();
+    cfg.load(settings_ini);
     load_rom_state();
     return true;
 }
@@ -177,4 +178,15 @@ bool App::set_rom(const std::string& p, bool write_cfg) {
 std::string App::rom_display_name() const {
     if (rom_path.empty()) return "";
     return path_to_utf8(utf8_to_path(rom_path).filename());
+}
+
+void App::log(const std::string& line) {
+    std::error_code ec;
+    std::filesystem::create_directories(logs_dir, ec);
+    std::ofstream f(logs_dir / "launcher.log", std::ios::binary | std::ios::app);
+    SYSTEMTIME t; GetLocalTime(&t);
+    char ts[40];
+    snprintf(ts, sizeof ts, "%04d-%02d-%02d %02d:%02d:%02d ", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+    f << ts << line << "
+";
 }

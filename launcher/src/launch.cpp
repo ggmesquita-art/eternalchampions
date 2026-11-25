@@ -5,56 +5,22 @@
 
 namespace fs = std::filesystem;
 
-static std::string trim_ws(const std::string& s) {
-    size_t a = s.find_first_not_of(" \t\r\n"), b = s.find_last_not_of(" \t\r\n");
-    return a == std::string::npos ? "" : s.substr(a, b - a + 1);
-}
-
-bool ensure_skip_launcher(const fs::path& ini) {
-    std::vector<std::string> lines;
-    bool crlf = false;
-    {
-        std::ifstream f(ini, std::ios::binary);
-        std::string l;
-        while (std::getline(f, l)) {
-            if (!l.empty() && l.back() == '\r') { l.pop_back(); crlf = true; }
-            lines.push_back(l);
-        }
-    }
-    int sec_line = -1, key_line = -1;
-    bool in_launcher = false;
-    for (int i = 0; i < (int)lines.size(); ++i) {
-        std::string t = trim_ws(lines[i]);
-        if (!t.empty() && t[0] == '[') {
-            in_launcher = (t == "[launcher]");
-            if (in_launcher && sec_line < 0) sec_line = i;
-            continue;
-        }
-        if (in_launcher && key_line < 0) {
-            size_t eq = t.find('=');
-            if (eq != std::string::npos && t[0] != '#' && t[0] != ';' && trim_ws(t.substr(0, eq)) == "skip_launcher") {
-                if (trim_ws(t.substr(eq + 1)) == "1") return true;   // ja esta ok: nao reescreve
-                key_line = i;
-            }
-        }
-    }
-    if (key_line >= 0) lines[key_line] = "skip_launcher = 1";
-    else if (sec_line >= 0) lines.insert(lines.begin() + sec_line + 1, "skip_launcher = 1");
-    else { if (!lines.empty() && !trim_ws(lines.back()).empty()) lines.push_back(""); lines.push_back("[launcher]"); lines.push_back("skip_launcher = 1"); }
-    std::ofstream o(ini, std::ios::binary | std::ios::trunc);
-    if (!o) return false;
-    for (auto& l : lines) o << l << (crlf ? "\r\n" : "\n");
-    return (bool)o;
-}
-
 bool start_game(App& app, GameProcess& gp, std::string& err) {
     std::error_code ec;
     if (!fs::exists(app.game_exe, ec)) { err = "EternalChampionsRecomp.exe nao encontrado em " + path_to_utf8(app.exe_dir); return false; }
     if (app.rom_path.empty() || !fs::exists(utf8_to_path(app.rom_path), ec)) { err = "ROM nao configurada ou inexistente"; return false; }
-    if (!ensure_skip_launcher(app.settings_ini)) { err = "nao foi possivel gravar settings.ini"; return false; }
+    app.cfg.ensure_skip_launcher();   // o launcher generico do runner nunca deve aparecer
+    if (!app.cfg.save()) { err = "nao foi possivel gravar settings.ini"; return false; }
 
     std::wstring cmd = L"\"" + app.game_exe.wstring() + L"\" --no-launcher \"" + utf8_to_path(app.rom_path).wstring() + L"\"";
+    // argv = --no-launcher <rom> + flags de [launcher.args] (+ extras de teste); tudo o mais vai pelo ini
+    auto quote = [](const std::string& a) {
+        std::wstring w = utf8_to_path(a).wstring();
+        return w.find_first_of(L" 	\"") == std::wstring::npos ? w : L"\"" + w + L"\"";
+    };
+    for (const std::string& a : app.cfg.build_args()) cmd += L" " + quote(a);
     if (!app.extra_game_args.empty()) cmd += L" " + utf8_to_path(app.extra_game_args).wstring();
+    if (!app.load_slot_arg.empty()) cmd += L" --load-slot " + utf8_to_path(app.load_slot_arg).wstring();
     std::wstring cwd = app.root_dir.wstring();   // jogo resolve "assets/..." e "../assets/..." relativo ao cwd
     STARTUPINFOW si{}; si.cb = sizeof si;
     PROCESS_INFORMATION pi{};
@@ -63,6 +29,8 @@ bool start_game(App& app, GameProcess& gp, std::string& err) {
         err = "CreateProcess falhou (erro " + std::to_string(GetLastError()) + ")";
         return false;
     }
+    app.log("JOGAR cwd=" + path_to_utf8(app.root_dir) + " cmd=" + path_to_utf8(fs::path(cmd)) + " pid=" + std::to_string(pi.dwProcessId));
+    app.load_slot_arg.clear();
     CloseHandle(pi.hThread);
     gp.handle = pi.hProcess;
     gp.pid = pi.dwProcessId;

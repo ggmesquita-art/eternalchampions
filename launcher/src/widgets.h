@@ -43,3 +43,6 @@ std::string default_hints(App& app, const InputState& in, bool tabs = false);
 
 // Cabecalho dourado ("MAIN MENU", ...), com yin-yang opcional ao lado.
 void draw_header(App& app, const std::string& title, float cx, float y, float scale = 1.f);
+
+// Quebra de linha por palavras (largura em px do canvas, escala 1).
+std::vector<std::string> wrap_text(const Font& f, const std::string& text, float width);

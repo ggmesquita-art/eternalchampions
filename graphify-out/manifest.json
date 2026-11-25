@@ -504,8 +504,8 @@
     "semantic_hash": ""
   },
   "docs/frame_data/fight_probe_summary.md": {
-    "mtime": 1795586960.4815738,
-    "seen": 1795588016.0994134,
+    "mtime": 1795589052.6654444,
+    "seen": 1795589267.2385886,
     "ast_hash": "5091a62b1b0f21c0eff331fd1436756a",
     "semantic_hash": ""
   },
@@ -750,15 +750,15 @@
     "semantic_hash": ""
   },
   "launcher/src/app.cpp": {
-    "mtime": 1795588504.5925035,
-    "seen": 1795588782.7508264,
-    "ast_hash": "78effb8d71920f1d78b99852b5a21139",
+    "mtime": 1795589137.3397877,
+    "seen": 1795589267.23835,
+    "ast_hash": "4c195bd743d89eb611ad02c9569a966c",
     "semantic_hash": ""
   },
   "launcher/src/app.h": {
-    "mtime": 1795588753.607936,
-    "seen": 1795588782.7508311,
-    "ast_hash": "693b751d0e4b89ec121d5f408bc995db",
+    "mtime": 1795589230.2916875,
+    "seen": 1795589267.2383518,
+    "ast_hash": "a2b9ee029260d883a7501fb252ad557f",
     "semantic_hash": ""
   },
   "launcher/src/font.cpp": {
@@ -786,15 +786,15 @@
     "semantic_hash": ""
   },
   "launcher/src/launch.cpp": {
-    "mtime": 1795588753.607936,
-    "seen": 1795588782.7508452,
-    "ast_hash": "6f4b291d7a770e62f8a47111a231ac3e",
+    "mtime": 1795589148.8553178,
+    "seen": 1795589267.2383661,
+    "ast_hash": "78a733d547a0342ce25f802c22e33447",
     "semantic_hash": ""
   },
   "launcher/src/launch.h": {
-    "mtime": 1795588537.657781,
-    "seen": 1795588782.750848,
-    "ast_hash": "b19eafa1aea96f152cdca2428f10c764",
+    "mtime": 1795589145.2896497,
+    "seen": 1795589267.238368,
+    "ast_hash": "f1a631185bc750beb02f9b53de4dfc1e",
     "semantic_hash": ""
   },
   "launcher/src/main.cpp": {
@@ -834,15 +834,15 @@
     "semantic_hash": ""
   },
   "launcher/src/screens/game_run.cpp": {
-    "mtime": 1795588775.5060768,
-    "seen": 1795588782.750868,
-    "ast_hash": "cb4dcb2068ad63aec54aa839a222656c",
+    "mtime": 1795589230.2916875,
+    "seen": 1795589267.2383902,
+    "ast_hash": "ea50b3763576dd195e56af1eaa46dedf",
     "semantic_hash": ""
   },
   "launcher/src/screens/main_menu.cpp": {
-    "mtime": 1795588618.4061966,
-    "seen": 1795588782.7508705,
-    "ast_hash": "40a723718214d91c14835e3bff9de7bc",
+    "mtime": 1795588802.7671874,
+    "seen": 1795588822.6006365,
+    "ast_hash": "a25d048dbef8e0b71b95333d1ddf80c9",
     "semantic_hash": ""
   },
   "launcher/src/screens/placeholder.cpp": {
@@ -858,9 +858,9 @@
     "semantic_hash": ""
   },
   "launcher/src/screens/screens.h": {
-    "mtime": 1795588584.7218733,
-    "seen": 1795588782.7508795,
-    "ast_hash": "57094e12b2c584ec87a006fe9fd2e9b1",
+    "mtime": 1795589170.070318,
+    "seen": 1795589267.2384012,
+    "ast_hash": "858eaf3b0aaebb5141cc3b09b96f319f",
     "semantic_hash": ""
   },
   "launcher/src/screens/splash.cpp": {
@@ -894,27 +894,99 @@
     "semantic_hash": ""
   },
   "launcher/src/widgets.cpp": {
-    "mtime": 1795588525.051026,
-    "seen": 1795588782.7508962,
-    "ast_hash": "4394b01d4d6b509ed7ee6daa6d513403",
+    "mtime": 1795589170.02399,
+    "seen": 1795589267.2384176,
+    "ast_hash": "476fc109a7c4c3b0d63437a8f56794aa",
     "semantic_hash": ""
   },
   "launcher/src/widgets.h": {
-    "mtime": 1795588524.7257917,
-    "seen": 1795588782.7508986,
-    "ast_hash": "250eda717e8137ddd434e3ca020e7f7d",
+    "mtime": 1795589169.97835,
+    "seen": 1795589267.2384195,
+    "ast_hash": "f9c6012331c7931a6be5083d63956bcc",
     "semantic_hash": ""
   },
   "tools/launcher/extract_ui_assets.py": {
-    "mtime": 1795588758.7382474,
-    "seen": 1795588782.7510114,
-    "ast_hash": "31034cb7804e6786819d18b456606ebf",
+    "mtime": 1795588968.0904286,
+    "seen": 1795589267.2384837,
+    "ast_hash": "54241716db4538e8026132fd6052b1de",
     "semantic_hash": ""
   },
   "launcher/CMakeLists.txt": {
     "mtime": 1795588255.9467635,
     "seen": 1795588782.7512634,
     "ast_hash": "4b878b82bf975a192324407b2d90c7df",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/tests/ref_catalog.py": {
+    "mtime": 1795589191.1628516,
+    "seen": 1795589267.238347,
+    "ast_hash": "7e9e47ef7047281df5db00cee5b137b9",
+    "semantic_hash": ""
+  },
+  "launcher/src/ini.cpp": {
+    "mtime": 1795589017.884418,
+    "seen": 1795589267.2383578,
+    "ast_hash": "949b0a11cafc1acb4b7e3b2a60f782f8",
+    "semantic_hash": ""
+  },
+  "launcher/src/ini.h": {
+    "mtime": 1795589017.6309147,
+    "seen": 1795589267.2383597,
+    "ast_hash": "7fb8dc51c6efc450aa7a5c1a252a2820",
+    "semantic_hash": ""
+  },
+  "launcher/src/platform.cpp": {
+    "mtime": 1795589159.744748,
+    "seen": 1795589267.2383718,
+    "ast_hash": "8b15835f6313c8d0d408de34305534cb",
+    "semantic_hash": ""
+  },
+  "launcher/src/platform.h": {
+    "mtime": 1795589159.488583,
+    "seen": 1795589267.2383733,
+    "ast_hash": "2a8d1756cc5a01e2a43a3990b44bf8ed",
+    "semantic_hash": ""
+  },
+  "launcher/src/schema.cpp": {
+    "mtime": 1795589094.409328,
+    "seen": 1795589267.2383833,
+    "ast_hash": "23efd76f7646082397aab4ffe1d14762",
+    "semantic_hash": ""
+  },
+  "launcher/src/schema.h": {
+    "mtime": 1795589045.231458,
+    "seen": 1795589267.238385,
+    "ast_hash": "5b214b7ecd6d39bf3fa430af30861da3",
+    "semantic_hash": ""
+  },
+  "launcher/src/screens/confirm.cpp": {
+    "mtime": 1795589170.6218078,
+    "seen": 1795589267.2383888,
+    "ast_hash": "af08b1f67cbecda5bb8de88be466a9da",
+    "semantic_hash": ""
+  },
+  "launcher/src/screens/options_screen.cpp": {
+    "mtime": 1795589230.2916875,
+    "seen": 1795589267.2383938,
+    "ast_hash": "f8e33feecd9d6658dd0d641ac57d880a",
+    "semantic_hash": ""
+  },
+  "launcher/src/screens/options_screen.h": {
+    "mtime": 1795589210.409883,
+    "seen": 1795589267.2383955,
+    "ast_hash": "9889f8e8cbc26a66527924b711e7bdfa",
+    "semantic_hash": ""
+  },
+  "launcher/src/shader_params.cpp": {
+    "mtime": 1795589109.756759,
+    "seen": 1795589267.2384093,
+    "ast_hash": "c0524a29b3b69426c51c66fa7e225221",
+    "semantic_hash": ""
+  },
+  "launcher/src/shader_params.h": {
+    "mtime": 1795589109.5246644,
+    "seen": 1795589267.238411,
+    "ast_hash": "886afdea7de2a4824b410023e8b94120",
     "semantic_hash": ""
   },
   "package-lock.json": {

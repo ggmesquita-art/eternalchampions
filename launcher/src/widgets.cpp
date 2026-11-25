@@ -124,3 +124,22 @@ void draw_header(App& app, const std::string& title, float cx, float y, float sc
     st.align = Align::Center;
     draw_text(app.render, *th.fonts.title, cx, y, title, st);
 }
+
+std::vector<std::string> wrap_text(const Font& f, const std::string& text, float width) {
+    std::vector<std::string> lines;
+    std::string cur, word;
+    auto flush_word = [&]() {
+        if (word.empty()) return;
+        std::string t = cur.empty() ? word : cur + " " + word;
+        if (!cur.empty() && f.measure(t) > width) { lines.push_back(cur); cur = word; }
+        else cur = t;
+        word.clear();
+    };
+    for (char c : text) {
+        if (c == ' ') flush_word();
+        else word += c;
+    }
+    flush_word();
+    if (!cur.empty()) lines.push_back(cur);
+    return lines;
+}
