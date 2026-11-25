@@ -62,3 +62,6 @@ tools/.engram/cache/
 tools/vendor/gpgx_runner/[0-9]*
 
 neural/.pydeps/
+
+# Pacote OptiScaler/FidelityFX (DLLs de terceiros, ~282 MB): fica so no disco
+Optiscaler_*/
