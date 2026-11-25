@@ -12,6 +12,10 @@ set "NINJADIR=C:\Users\Administrator\AppData\Local\Microsoft\WinGet\Packages\Nin
 set "CMAKE=C:\Users\Administrator\AppData\Local\Microsoft\WinGet\Packages\Kitware.CMake_Microsoft.Winget.Source_8wekyb3d8bbwe\cmake-4.4.4-windows-x86_64\bin\cmake.exe"
 set "VCPKG_ROOT_DIR=C:\Users\Administrator\AppData\Local\Temp\opencode\vcpkg"
 set "PATH=%NINJADIR%;%PATH%"
+rem toolchain do vcpkg: o clone em %TEMP% pode ser podado pela limpeza do Windows; nesse caso usa o vcpkg do proprio VS,
+rem mantendo os pacotes ja instalados (libpng/zlib) via VCPKG_INSTALLED_DIR
+set "VCPKG_TOOLCHAIN=%VCPKG_ROOT_DIR%\scripts\buildsystems\vcpkg.cmake"
+if not exist "%VCPKG_TOOLCHAIN%" set "VCPKG_TOOLCHAIN=%VSINSTALLDIR%VC\vcpkg\scripts\buildsystems\vcpkg.cmake"
 cd /d "%ROOT%" || exit /b 1
 
 set "DO_CONFIGURE="
@@ -22,7 +26,8 @@ if defined DO_CONFIGURE (
   echo === CONFIGURE ===
   "%CMAKE%" -S game -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ^
     -DCMAKE_PREFIX_PATH="%ROOT%/segagenesisrecomp/runner/external/SDL2/SDL2-2.28.5" ^
-    -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT_DIR%/scripts/buildsystems/vcpkg.cmake" ^
+    -DCMAKE_TOOLCHAIN_FILE="%VCPKG_TOOLCHAIN%" ^
+    -DVCPKG_INSTALLED_DIR="%VCPKG_ROOT_DIR%/installed" -DVCPKG_MANIFEST_MODE=OFF ^
     -DVCPKG_TARGET_TRIPLET=x64-windows %1 %2 %3 %4 %5 %6 %7 %8 %9
   if errorlevel 1 exit /b 1
 )

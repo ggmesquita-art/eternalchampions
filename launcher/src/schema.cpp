@@ -1,7 +1,9 @@
 #include "schema.h"
 #include "app.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <map>
 #include <cstdio>
 
 namespace fs = std::filesystem;
@@ -206,7 +208,14 @@ bool Config::is_modified(const Opt& o) const { return !near_eq(get(o), o.def); }
 bool Config::set(const Opt& o, const std::string& v) {
     if (near_eq(v, o.def)) { ini_.remove(o.section, o.key); }
     else ini_.set(o.section, o.key, v);
-    return save();
+    pending_ = true;
+    last_change_ = std::chrono::steady_clock::now();
+    return true;   // falha de gravacao chega depois, por take_error() (toast)
+}
+void Config::flush_pending(bool force) {
+    if (!pending_) return;
+    if (!force && std::chrono::steady_clock::now() - last_change_ < std::chrono::milliseconds(350)) return;
+    save();
 }
 bool Config::set(const std::string& id, const std::string& v) {
     if (const Opt* o = schema_find(id)) return set(*o, v);
@@ -240,7 +249,19 @@ bool Config::ensure_skip_launcher() {
 }
 
 // ---------------------------------------------------------------------------
+static std::vector<Choice> dyn_choices_scan(const App& app, Dyn d);
+
+// a UI chama isto a cada quadro (valor das linhas Enum): varre o disco no maximo a cada 2 s por tipo
 std::vector<Choice> dyn_choices(const App& app, Dyn d) {
+    struct Entry { std::chrono::steady_clock::time_point t; std::vector<Choice> v; bool ok = false; };
+    static std::map<int, Entry> cache;
+    auto now = std::chrono::steady_clock::now();
+    Entry& e = cache[(int)d];
+    if (!e.ok || now - e.t > std::chrono::seconds(2)) { e.v = dyn_choices_scan(app, d); e.t = now; e.ok = true; }
+    return e.v;
+}
+
+static std::vector<Choice> dyn_choices_scan(const App& app, Dyn d) {
     std::vector<Choice> r;
     std::error_code ec;
     if (d == Dyn::Models) {

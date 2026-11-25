@@ -447,7 +447,7 @@ public:
                     if (in.mouse_click) { activate(app); return; }
                 }
             }
-        if (focus_ >= (int)rows_.size() || rows_.empty() || rows_[focus_].header || rows_[focus_].info) { focus_ = std::max(0, std::min(focus_, (int)rows_.size() - 1)); move(+1); }
+        if (focus_ < 0 || focus_ >= (int)rows_.size() || rows_.empty() || rows_[focus_].header || rows_[focus_].info) { focus_ = std::max(0, std::min(focus_, (int)rows_.size() - 1)); move(+1); }
         if (rows_.empty()) return;
         if (in.p(A_LEFT)) adjust(app, -1);
         else if (in.p(A_RIGHT)) adjust(app, +1);
@@ -483,15 +483,15 @@ public:
             unsigned m = test_mask(app);
             for (int b = 0; b < NB; ++b) lit.on[b] = (m & kBit[b]) != 0;
             live_marks(app, marks);
-        } else if (page_ == P_BINDS && focus_ < (int)rows_.size() && rows_[focus_].id >= 0 && rows_[focus_].id < NB) {
+        } else if (page_ == P_BINDS && focus_ >= 0 && focus_ < (int)rows_.size() && rows_[focus_].id >= 0 && rows_[focus_].id < NB) {
             focus_btn = rows_[focus_].id;
             const Bind& b = pc_.pad[focus_btn];
             if (b.kind) marks.push_back({b.kind, b.code, b.dir});
-        } else if (page_ == P_AUTOFIRE && focus_ < (int)rows_.size() && rows_[focus_].id >= 0 && rows_[focus_].id < NB) {
+        } else if (page_ == P_AUTOFIRE && focus_ >= 0 && focus_ < (int)rows_.size() && rows_[focus_].id >= 0 && rows_[focus_].id < NB) {
             focus_btn = rows_[focus_].id;
             const Bind& b = pc_.pad[focus_btn];
             if (b.kind) marks.push_back({b.kind, b.code, b.dir});
-        } else if (page_ == P_COMBOS && focus_ < (int)rows_.size() && rows_[focus_].id >= 0 && rows_[focus_].id < 8) {
+        } else if (page_ == P_COMBOS && focus_ >= 0 && focus_ < (int)rows_.size() && rows_[focus_].id >= 0 && rows_[focus_].id < 8) {
             const Combo& c = pc_.combo[rows_[focus_].id];
             for (int b = 0; b < NB; ++b) lit.on[b] = (c.dest & kBit[b]) != 0;
             if (c.kind == 1 || c.kind == 2) marks.push_back({c.kind, c.code, c.dir});
@@ -513,7 +513,7 @@ public:
         // ajuda
         {
             std::string help;
-            if (page_ != P_TEST && focus_ < (int)rows_.size()) help = rows_[focus_].help;
+            if (page_ != P_TEST && focus_ >= 0 && focus_ < (int)rows_.size()) help = rows_[focus_].help;
             if (page_ == P_TEST) help = "Aperte botões, teclas ou gatilhos: o resultado (binds + combos + deadzone + autofire) acende no Mega Drive.";
             TextStyle hs = th.help_style(); hs.align = Align::Center;
             auto lines = wrap_text(*th.fonts.help, help, CANVAS_W - 120);

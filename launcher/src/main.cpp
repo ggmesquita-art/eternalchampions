@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <sstream>
 #include <string>
 #include <windows.h>
 
@@ -24,7 +25,7 @@ struct Args {
     bool autoplay = false;
     std::string game_args, selftest_ini, apply_profile;
     int tab = 0, focus = 0, state = 0;
-    std::string ini, controls_preset, dumps, voices, root, out;
+    std::string ini, controls_preset, dumps, voices, root, out, keys;
     bool selftest_studio = false, run_preview = false, real_ini = false;
     bool dev = false;
 };
@@ -52,6 +53,7 @@ static Args parse_args(int argc, char** argv) {
         else if (!strcmp(argv[i], "--ini")) a.ini = next();
         else if (!strcmp(argv[i], "--apply-controls-preset")) a.controls_preset = next();
         else if (!strcmp(argv[i], "--game-args")) a.game_args = next();
+        else if (!strcmp(argv[i], "--keys")) a.keys = next();
         else if (!strcmp(argv[i], "--frames")) a.frames = std::max(1, atoi(next()));
         else if (!strcmp(argv[i], "--size")) {
             int w = 0, h = 0;
@@ -127,6 +129,25 @@ static int run_shot(App& app, const Args& a) {
     app.push(make_named(a.screen, app));
     app.apply_pending();
     InputState idle;
+    if (!a.keys.empty()) {   // --keys L,R,U,D,E,Q,A,X: entrada simulada (1 quadro por tecla) com o tempo de cada update
+        static const struct { const char* n; Action act; } km[] = {{"L", A_LEFT}, {"R", A_RIGHT}, {"U", A_UP}, {"D", A_DOWN},
+            {"E", A_TABNEXT}, {"Q", A_TABPREV}, {"A", A_ACCEPT}, {"X", A_RESET}};
+        std::string tok; std::istringstream ks(a.keys);
+        Uint64 freq = SDL_GetPerformanceFrequency();
+        double worst = 0;
+        while (std::getline(ks, tok, ',')) {
+            InputState in;
+            for (auto& k : km) if (tok == k.n) { in.pressed[k.act] = in.held[k.act] = true; }
+            Uint64 t0 = SDL_GetPerformanceCounter();
+            app.update(in, 1.f / 60.f);
+            app.render.begin(); app.draw(); app.render.end(false);
+            double ms = (double)(SDL_GetPerformanceCounter() - t0) * 1000.0 / freq;
+            worst = std::max(worst, ms);
+            fprintf(stdout, "key %-2s %8.2f ms\n", tok.c_str(), ms);
+        }
+        fprintf(stdout, "keys: pior %.2f ms\n", worst);
+        fflush(stdout);
+    }
     for (int f = 0; f < a.frames; ++f) {
         app.time = f / 60.f;
         app.update(idle, 1.f / 60.f);
@@ -151,10 +172,21 @@ static int run_interactive(App& app, const Args& a) {
     if (!a.controls_preset.empty()) { apply_controls_preset(app, 0, a.controls_preset); app.log("--apply-controls-preset " + a.controls_preset); }
     app.autoplay = a.autoplay;
     app.extra_game_args = a.game_args;
-    app.push(a.autoplay ? make_main_menu() : make_splash());
+    // --keys no modo interativo (diagnostico): abre --screen e injeta as teclas no laco real, medindo cada quadro
+    const bool scripted = !a.keys.empty() && !a.screen.empty();
+    std::vector<std::string> script;
+    if (scripted) {
+        std::string tok; std::istringstream ks(a.keys);
+        while (std::getline(ks, tok, ',')) script.push_back(tok);
+        app.push(make_main_menu());
+        app.push(make_named(a.screen, app));
+    } else {
+        app.push(a.autoplay ? make_main_menu() : make_splash());
+    }
     app.apply_pending();
     if (a.autoplay) request_play(app);
     Uint64 freq = SDL_GetPerformanceFrequency(), last = SDL_GetPerformanceCounter();
+    int frame = 0; size_t next_key = 0; double worst = 0;
     while (!app.quit) {
         Uint64 now = SDL_GetPerformanceCounter();
         float dt = (float)((double)(now - last) / freq);
@@ -162,9 +194,29 @@ static int run_interactive(App& app, const Args& a) {
         if (dt > 0.1f) dt = 0.1f;
         app.time += dt;
         app.input.poll(app.render, dt);
-        const InputState& in = app.input.state();
+        InputState in = app.input.state();
+        const char* injected = nullptr;
+        if (scripted) {
+            ++frame;
+            if (frame > 30 && (frame - 30) % 6 == 0 && next_key < script.size()) {
+                static const struct { const char* n; Action act; } km[] = {{"L", A_LEFT}, {"R", A_RIGHT}, {"U", A_UP}, {"D", A_DOWN},
+                    {"E", A_TABNEXT}, {"Q", A_TABPREV}, {"A", A_ACCEPT}, {"X", A_RESET}};
+                injected = script[next_key].c_str();
+                for (auto& k : km) if (script[next_key] == k.n) in.pressed[k.act] = in.held[k.act] = true;
+                ++next_key;
+            }
+            if (next_key >= script.size() && frame > 30 + 6 * (int)script.size() + 90) {
+                fprintf(stdout, "interativo: pior quadro com tecla %.2f ms\n", worst); fflush(stdout);
+                app.quit = true;
+            }
+        }
         if (in.quit) app.quit = true;
         app.update(in, dt);
+        if (injected) {
+            double ms = (double)(SDL_GetPerformanceCounter() - now) * 1000.0 / freq;
+            worst = std::max(worst, ms);
+            fprintf(stdout, "key %-2s %8.2f ms\n", injected, ms); fflush(stdout);
+        }
         if (!app.has_screens()) break;
 
         Uint32 wf = SDL_GetWindowFlags(app.render.window);

@@ -67,6 +67,7 @@ bool App::init(bool hidden, int win_w, int win_h) {
 }
 
 void App::shutdown() {
+    cfg.save();   // mudancas adiadas (Config::set)
     stack_.clear();
     pending_.clear();
     preview.cancel();
@@ -117,6 +118,7 @@ void App::update(const InputState& in, float dt) {
         std::string e;
         if (cfg.take_error(e)) toast("Falha ao gravar o settings.ini: " + e, 5.f);
     }
+    cfg.flush_pending();
     poll_art(dt);
     preview.poll(*this, dt);
     if (toast_t_ > 0) toast_t_ -= dt;

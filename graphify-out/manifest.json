@@ -5,18 +5,6 @@
     "ast_hash": "afd494876ad0b8d311efd1b89e9c3c4c",
     "semantic_hash": ""
   },
-  ".opencode/opencode.json": {
-    "mtime": 1795441504.809643,
-    "seen": 1795464764.6282465,
-    "ast_hash": "29a127b0fb325dd8c64bb4f77f0030fb",
-    "semantic_hash": ""
-  },
-  ".opencode/plugins/engram.js": {
-    "mtime": 1795441504.8031628,
-    "seen": 1795464764.628248,
-    "ast_hash": "ef61b92ec9aea41bc2429b026e1d04c5",
-    "semantic_hash": ""
-  },
   "game/ec_audio.c": {
     "mtime": 1795586643.5514348,
     "seen": 1795586895.253646,
@@ -504,8 +492,8 @@
     "semantic_hash": ""
   },
   "docs/frame_data/fight_probe_summary.md": {
-    "mtime": 1795589052.6654444,
-    "seen": 1795589267.2385886,
+    "mtime": 1795593235.4417877,
+    "seen": 1795614642.6170013,
     "ast_hash": "5091a62b1b0f21c0eff331fd1436756a",
     "semantic_hash": ""
   },
@@ -588,9 +576,9 @@
     "semantic_hash": ""
   },
   "task.md": {
-    "mtime": 1795591825.3548627,
-    "seen": 1795592922.1813412,
-    "ast_hash": "64465671782ed039264d6bfed5fe4b5e",
+    "mtime": 1795593250.119867,
+    "seen": 1795614642.6170356,
+    "ast_hash": "9db92649dcd5018f4f4d0cfdbb87ab1f",
     "semantic_hash": ""
   },
   "tools/audio/mixer_ui/index.html": {
@@ -744,15 +732,15 @@
     "semantic_hash": ""
   },
   "launcher/PLAN.md": {
-    "mtime": 1795591825.353541,
-    "seen": 1795592922.1813378,
-    "ast_hash": "a9a30403f012db701302307244de3379",
+    "mtime": 1795593250.4583938,
+    "seen": 1795614642.6170316,
+    "ast_hash": "078f578005c1be6fa50fddf006cb350f",
     "semantic_hash": ""
   },
   "launcher/src/app.cpp": {
-    "mtime": 1795592834.6697512,
-    "seen": 1795592922.18105,
-    "ast_hash": "a50cfd3c2f4b23816b7a3108a8a1efe5",
+    "mtime": 1795613956.5950046,
+    "seen": 1795614642.6167283,
+    "ast_hash": "84c181ba78bdf0107148812a1f5db92c",
     "semantic_hash": ""
   },
   "launcher/src/app.h": {
@@ -786,9 +774,9 @@
     "semantic_hash": ""
   },
   "launcher/src/launch.cpp": {
-    "mtime": 1795592337.9918518,
-    "seen": 1795592922.1810725,
-    "ast_hash": "22206c9dc4ffaf6197dfec5ae6af381e",
+    "mtime": 1795613955.87253,
+    "seen": 1795614642.6167521,
+    "ast_hash": "793b577d35f9ed4dc011c0c6f07a0a6b",
     "semantic_hash": ""
   },
   "launcher/src/launch.h": {
@@ -798,9 +786,9 @@
     "semantic_hash": ""
   },
   "launcher/src/main.cpp": {
-    "mtime": 1795592653.605218,
-    "seen": 1795592922.1810763,
-    "ast_hash": "07bf64cf5686b9d76a074d8dbb4865f6",
+    "mtime": 1795614271.770929,
+    "seen": 1795614642.616756,
+    "ast_hash": "edf84b9cc5a1cb1cc4493e86a56202a1",
     "semantic_hash": ""
   },
   "launcher/src/png_io.cpp": {
@@ -912,9 +900,9 @@
     "semantic_hash": ""
   },
   "launcher/CMakeLists.txt": {
-    "mtime": 1795592672.6371982,
-    "seen": 1795592922.1813362,
-    "ast_hash": "92de8c8a21857326e7c91a7b01e0b9b9",
+    "mtime": 1795614353.3308976,
+    "seen": 1795614642.61703,
+    "ast_hash": "82e7a714cef77b0408189e275fab3c0a",
     "semantic_hash": ""
   },
   "launcher/remaster/tests/ref_catalog.py": {
@@ -948,15 +936,15 @@
     "semantic_hash": ""
   },
   "launcher/src/schema.cpp": {
-    "mtime": 1795592746.1018176,
-    "seen": 1795592922.1810923,
-    "ast_hash": "b201d63324682b29616f58c794a1068e",
+    "mtime": 1795613966.2587032,
+    "seen": 1795614642.6167727,
+    "ast_hash": "6945e4514e5bdd53e81d44c991a51a57",
     "semantic_hash": ""
   },
   "launcher/src/schema.h": {
-    "mtime": 1795592653.5318067,
-    "seen": 1795592922.1810944,
-    "ast_hash": "4542c28c6e3af54621b6634234be0eba",
+    "mtime": 1795613945.654115,
+    "seen": 1795614642.6167746,
+    "ast_hash": "de3cb337c5bab892a9829ed70e49ba53",
     "semantic_hash": ""
   },
   "launcher/src/screens/confirm.cpp": {
@@ -966,9 +954,9 @@
     "semantic_hash": ""
   },
   "launcher/src/screens/options_screen.cpp": {
-    "mtime": 1795590961.3739023,
-    "seen": 1795591368.1003344,
-    "ast_hash": "522653ec71df83a648223356e646fc49",
+    "mtime": 1795614507.1399214,
+    "seen": 1795614642.6167905,
+    "ast_hash": "60fd5fa1d4d94d733234f40673f27a31",
     "semantic_hash": ""
   },
   "launcher/src/screens/options_screen.h": {
@@ -1122,9 +1110,9 @@
     "semantic_hash": ""
   },
   "launcher/src/screens/controls.cpp": {
-    "mtime": 1795592653.5312862,
-    "seen": 1795592922.1810994,
-    "ast_hash": "a2febf67ed363f0cbaa56ec428d53e93",
+    "mtime": 1795614599.5534508,
+    "seen": 1795614642.6167808,
+    "ast_hash": "d45bf3b0b18d9f7d9f8ffb42007bd288",
     "semantic_hash": ""
   },
   "launcher/remaster/CMakeLists.txt": {
@@ -1134,9 +1122,9 @@
     "semantic_hash": ""
   },
   "launcher/src/preview_job.cpp": {
-    "mtime": 1795592834.6697512,
-    "seen": 1795592922.181085,
-    "ast_hash": "bb9d2e6f6c47abfa7e2047d19840102a",
+    "mtime": 1795613956.99799,
+    "seen": 1795614642.6167655,
+    "ast_hash": "93452eacdb65530e3c44bf48ea7f4235",
     "semantic_hash": ""
   },
   "launcher/src/preview_job.h": {
@@ -1179,6 +1167,48 @@
     "mtime": 1795592728.1237133,
     "seen": 1795592922.1812987,
     "ast_hash": "1660859725bfab6287ba89259139d03c",
+    "semantic_hash": ""
+  },
+  "Optiscaler_0.9.5-final.20261116/setup_linux.sh": {
+    "mtime": 1773958173.8407311,
+    "seen": 1795614642.6166213,
+    "ast_hash": "f9a9bda46ccded2442727f6192bfe00b",
+    "semantic_hash": ""
+  },
+  "FRAMEGEN.md": {
+    "mtime": 1795602694.1002924,
+    "seen": 1795614642.6169667,
+    "ast_hash": "49c3b1a41013b5b13550ef53ae90ae8f",
+    "semantic_hash": ""
+  },
+  "Optiscaler_0.9.5-final.20261116/!! README_EXTRACT ALL FILES TO GAME FOLDER !!.txt": {
+    "mtime": 1772478832.836381,
+    "seen": 1795614642.6169722,
+    "ast_hash": "2cd21ce12c455cf38f3fa74a76ae0975",
+    "semantic_hash": ""
+  },
+  "Optiscaler_0.9.5-final.20261116/Licenses/DirectX_LICENSE.txt": {
+    "mtime": 1752159851.472142,
+    "seen": 1795614642.616974,
+    "ast_hash": "a53d591ef129ed2f94f2e79d7da2c9f2",
+    "semantic_hash": ""
+  },
+  "Optiscaler_0.9.5-final.20261116/Licenses/FidelityFX_v1_LICENSE.md": {
+    "mtime": 1752159884.7293866,
+    "seen": 1795614642.6169755,
+    "ast_hash": "85d773ed8bfa2cc900d388c8cc2cd955",
+    "semantic_hash": ""
+  },
+  "Optiscaler_0.9.5-final.20261116/Licenses/FidelityFX_v2_LICENSE.md": {
+    "mtime": 1782764247.0889444,
+    "seen": 1795614642.6169772,
+    "ast_hash": "5471847e945361a9fdc012e671b07d48",
+    "semantic_hash": ""
+  },
+  "Optiscaler_0.9.5-final.20261116/Licenses/XeSS_LICENSE.txt": {
+    "mtime": 1754320750.5604103,
+    "seen": 1795614642.6169786,
+    "ast_hash": "d2e72fdd699f54451849ce0e6b3ca765",
     "semantic_hash": ""
   },
   "package-lock.json": {

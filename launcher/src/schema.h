@@ -5,6 +5,7 @@
 // Valores sao guardados como texto; `Config::get` devolve o valor do ini ou o default do esquema.
 #pragma once
 #include "ini.h"
+#include <chrono>
 #include <string>
 #include <utility>
 #include <vector>
@@ -40,7 +41,11 @@ const Opt* schema_find(const std::string& id);
 class Config {
 public:
     bool load(const std::filesystem::path& settings_ini);
-    bool save() { bool ok = ini_.save(); if (!ok) error_ = ini_.error(); return ok; }
+    bool save() { pending_ = false; bool ok = ini_.save(); if (!ok) error_ = ini_.error(); return ok; }
+    // set() nao grava na hora: marca pendente e o App grava apos ~350 ms sem novas mudancas (segurar uma seta no
+    // controle gerava uma gravacao com flush por repeticao). save() explicito, JOGAR, previa e saida gravam na hora.
+    void flush_pending(bool force = false);
+    bool has_pending() const { return pending_; }
     // Falha de gravacao pendente (a UI mostra um toast). Devolve true uma vez por falha.
     void begin_batch() { ini_.begin_batch(); }
     bool end_batch() { bool ok = ini_.end_batch(); if (!ok) error_ = ini_.error(); return ok; }
@@ -64,6 +69,8 @@ public:
 private:
     Ini ini_;
     std::string error_;
+    bool pending_ = false;
+    std::chrono::steady_clock::time_point last_change_{};
 };
 
 // ---- Perfis de qualidade (§4.4)

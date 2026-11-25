@@ -120,6 +120,7 @@ void PreviewJob::start(App& app) {
     if (!app.ini_override.empty()) { state_ = State::Failed; msg_ = "Indisponível com --ini / cópia de teste: o jogo lê o settings.ini real (use --real-ini)."; return; }
     if (!app.rom_valid || !app.rom_exists) { state_ = State::Failed; msg_ = "Configure uma ROM válida primeiro."; return; }
     if (!fs::exists(app.game_exe, ec)) { state_ = State::Failed; msg_ = "EternalChampionsRecomp.exe não encontrado."; return; }
+    app.cfg.save();   // o jogo da previa le o settings.ini: grava mudancas adiadas antes
     fs::create_directories(d, ec);
     if (th_.joinable()) th_.join();
     state_ = State::Running; msg_ = "Rodando o jogo até a abertura (≈ 10–25 s)…"; elapsed_ = 0;

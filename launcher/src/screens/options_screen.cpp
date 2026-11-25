@@ -143,8 +143,8 @@ public:
                 }
             }
         }
-        if (focus_ >= (int)pg.rows.size() || !selectable(app, pg.rows[focus_])) move(+1);
-        if (pg.rows.empty()) return;
+        if (focus_ < 0 || focus_ >= (int)pg.rows.size() || !selectable(app, pg.rows[focus_])) move(+1);
+        if (pg.rows.empty() || focus_ < 0 || focus_ >= (int)pg.rows.size()) return;   // pagina sem linha selecionavel
         Row& r = pg.rows[focus_];
         if (in.p(A_LEFT) && r.adjust && enabled(app, r)) do_adjust(app, focus_, -1);
         else if (in.p(A_RIGHT) && r.adjust && enabled(app, r)) do_adjust(app, focus_, +1);
@@ -218,7 +218,7 @@ public:
         if (end < (int)pg.rows.size()) draw_text(rd, *th.fonts.help, panel_.x + panel_.w - 30, panel_.y + panel_.h - 28, "▼", th.help_style());
 
         // ajuda do item focado (2 linhas) + barra de atalhos
-        std::string help = (!pg.rows.empty() && focus_ < (int)pg.rows.size()) ? pg.rows[focus_].help : "";
+        std::string help = (focus_ >= 0 && focus_ < (int)pg.rows.size()) ? pg.rows[focus_].help : "";
         if (!help.empty()) {
             auto lines = wrap_text(*th.fonts.help, help, CANVAS_W - 120);
             TextStyle hs = th.help_style(); hs.align = Align::Center;
@@ -264,8 +264,8 @@ private:
         page_ = (page_ + d + (int)pages_.size()) % (int)pages_.size();
         focus_ = saved_focus_[page_]; scroll_ = 0;
         Page& pg = cur();
-        if (focus_ >= (int)pg.rows.size() || pg.rows[focus_].header || pg.rows[focus_].info) { focus_ = -1; move(+1); }
-        else move(0 == 0 ? 0 : 0);
+        // foco salvo -1 = aba nunca visitada: rows[-1] era lido aqui (e depois chamado em update), derrubando o launcher
+        if (focus_ < 0 || focus_ >= (int)pg.rows.size() || pg.rows[focus_].header || pg.rows[focus_].info) { focus_ = -1; move(+1); }
         (void)app;
         if (focus_ >= scroll_ + visible_) scroll_ = focus_ - visible_ + 1;
         app.fade = 0.08f;

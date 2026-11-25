@@ -10,6 +10,7 @@ bool start_game(App& app, GameProcess& gp, std::string& err) {
     std::error_code ec;
     if (!fs::exists(app.game_exe, ec)) { err = "EternalChampionsRecomp.exe nao encontrado em " + path_to_utf8(app.exe_dir); return false; }
     if (app.rom_path.empty() || !fs::exists(utf8_to_path(app.rom_path), ec)) { err = "ROM nao configurada ou inexistente"; return false; }
+    app.cfg.save();   // grava mudancas adiadas (Config::set) antes de o jogo ler o ini
     // o launcher generico do runner nunca deve aparecer; se o ini nao puder ser gravado, --no-launcher ja cobre: so registra
     if (!app.cfg.ensure_skip_launcher()) app.log("aviso: nao foi possivel gravar [launcher] skip_launcher no settings.ini (seguindo com --no-launcher)");
 
