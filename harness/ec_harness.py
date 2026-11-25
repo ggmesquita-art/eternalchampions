@@ -22,6 +22,7 @@ import re
 import struct
 import subprocess
 import sys
+import tempfile
 import tomllib
 import zlib
 from collections import Counter
@@ -31,7 +32,12 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_ROM = ROOT / "roms" / "eternal_champions_us.gen"
-DEFAULT_NATIVE = ROOT / "build" / "native" / "EternalChampionsRecomp"
+IS_WINDOWS = os.name == "nt"
+DEFAULT_NATIVE = (
+    ROOT / "build" / "EternalChampionsRecomp.exe"
+    if IS_WINDOWS
+    else ROOT / "build" / "native" / "EternalChampionsRecomp"
+)
 DEFAULT_GPGX_RUNNER = ROOT / "tools" / "vendor" / "gpgx_runner" / "gpgx_runner"
 DEFAULT_GPGX_CORE = ROOT / "tools" / "vendor" / "gpgx" / "genesis_plus_gx_libretro.so"
 DEFAULT_RAM_MAP = ROOT / "disasm" / "symbols" / "ram_map.toml"
@@ -710,6 +716,14 @@ def diff_wram(
     }
 
 
+def to_wsl_path(p: Path | str) -> str:
+    """C:\foo\bar -> /mnt/c/foo/bar (sem wslpath)."""
+    s = str(p).replace("\\", "/")
+    if len(s) >= 2 and s[1] == ":":
+        return f"/mnt/{s[0].lower()}{s[2:]}"
+    return s
+
+
 def run_native(
     native_bin: Path,
     rom_path: Path,
@@ -737,7 +751,9 @@ def run_native(
         cmd.extend(extra_args)
     cmd.append(str(rom_path))
 
-    res = subprocess.run(cmd, cwd=str(ROOT), env=env, capture_output=True, text=True)
+    res = subprocess.run(cmd, cwd=str(ROOT), env=env, capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
+    )
     floor_lines = [
         ln
         for ln in res.stderr.splitlines()
@@ -815,15 +831,27 @@ def run_gpgx(
             ckpt_paths[frame] = p
             dump_args.append(f"dump@{frame - 1},{p}")
 
+    if IS_WINDOWS:
+        dump_args = [
+            f"dump@{frame - 1},{to_wsl_path(p)}" for frame, p in ckpt_paths.items()
+        ]
+        conv = to_wsl_path
+        prefix = ["wsl.exe", "-d", "Ubuntu", "--"]
+    else:
+        conv = str
+        prefix = []
     cmd = [
-        str(gpgx_runner),
-        str(gpgx_core),
-        str(rom_path),
-        str(final_path),
-        str(movie["path"]),
+        *prefix,
+        conv(gpgx_runner),
+        conv(gpgx_core),
+        conv(rom_path),
+        conv(final_path),
+        conv(movie["path"]),
         *dump_args,
     ]
-    res = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
+    res = subprocess.run(
+        cmd, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace"
+    )
     if res.returncode != 0:
         raise RuntimeError(f"gpgx_runner falhou (exit={res.returncode}):\n{res.stderr}")
 
@@ -1083,7 +1111,9 @@ def main() -> int:
 
     selected_specs = MOVIE_SPECS[:2] if args.quick else MOVIE_SPECS
 
-    tmp_work = Path("/tmp/ec_harness_work")
+    tmp_work = (
+        Path(tempfile.gettempdir()) / "ec_harness_work" if IS_WINDOWS else Path("/tmp/ec_harness_work")
+    )
     tmp_work.mkdir(parents=True, exist_ok=True)
 
     report: dict[str, Any] = {

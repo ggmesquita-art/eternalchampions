@@ -14,6 +14,7 @@ import argparse
 import json
 import random
 import statistics
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -391,6 +392,308 @@ def benchmark_gpu_latency(
     return {"p50_ms": round(p50, 4), "p99_ms": round(p99, 4), "mean_ms": round(statistics.mean(times_sorted), 4)}
 
 
+# ---------------------------------------------------------------------------
+# G2.3: modo B+ v3 (full-frame distillation, perda perceptual)
+# ---------------------------------------------------------------------------
+def _load_rgb_u8(path: Path) -> np.ndarray:
+    """PNG -> uint8 CHW RGB."""
+    return np.ascontiguousarray(np.array(Image.open(path).convert("RGB"), dtype=np.uint8).transpose(2, 0, 1))
+
+
+def select_v3_frames(manifest: dict[str, Any], max_frames: int, max_val_frames: int) -> tuple[list[dict], list[dict]]:
+    """Subconjunto deterministico (espacado por id ordenado) respeitando o campo 'split'."""
+    frames = sorted(manifest.get("frames", []), key=lambda f: str(f["id"]))
+    train = [f for f in frames if f.get("split", "train") == "train"]
+    val = [f for f in frames if f.get("split") == "val"]
+
+    def spaced(items: list[dict], n: int) -> list[dict]:
+        if n <= 0 or len(items) <= n:
+            return items
+        return [items[int(i * len(items) / n)] for i in range(n)]
+
+    if max_frames > 0:
+        n_val = min(len(val), max_val_frames, max(1, int(round(max_frames * 0.1)))) if val else 0
+        train = spaced(train, max(1, max_frames - n_val))
+        val = spaced(val, n_val)
+    else:
+        val = spaced(val, max_val_frames)
+    return train, val
+
+
+def load_v3_pairs(
+    root: Path, teacher: str, frames: list[dict], device: torch.device
+) -> tuple[list[torch.Tensor], list[torch.Tensor], list[str]]:
+    lrs: list[torch.Tensor] = []
+    hrs: list[torch.Tensor] = []
+    ids: list[str] = []
+    for f in frames:
+        fid = str(f["id"])
+        lp = root / "predither" / f"{fid}.png"
+        hp = root / "targets" / teacher / f"{fid}.png"
+        if not lp.exists() or not hp.exists():
+            continue
+        lr = _load_rgb_u8(lp)
+        hr = _load_rgb_u8(hp)
+        if hr.shape[1] != lr.shape[1] * 4 or hr.shape[2] != lr.shape[2] * 4:
+            print(f"AVISO: dimensoes incompativeis em {fid}: {lr.shape} vs {hr.shape}; ignorado", file=sys.stderr)
+            continue
+        lrs.append(torch.from_numpy(lr).to(device))
+        hrs.append(torch.from_numpy(hr).to(device))
+        ids.append(fid)
+    return lrs, hrs, ids
+
+
+def sample_v3_batch(
+    lrs: list[torch.Tensor], hrs: list[torch.Tensor], batch: int, patch: int, gen: random.Random
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Patches aleatorios de frames inteiros + flip horizontal (sem rot90/flip vertical)."""
+    xs: list[torch.Tensor] = []
+    ys: list[torch.Tensor] = []
+    for _ in range(batch):
+        i = gen.randrange(len(lrs))
+        _, h, w = lrs[i].shape
+        p = min(patch, h, w)
+        y0 = gen.randint(0, h - p)
+        x0 = gen.randint(0, w - p)
+        lp = lrs[i][:, y0 : y0 + p, x0 : x0 + p]
+        hp = hrs[i][:, y0 * 4 : (y0 + p) * 4, x0 * 4 : (x0 + p) * 4]
+        if gen.random() < 0.5:
+            lp = lp.flip(-1)
+            hp = hp.flip(-1)
+        xs.append(lp)
+        ys.append(hp)
+    return torch.stack(xs).float().div_(255.0), torch.stack(ys).float().div_(255.0)
+
+
+def rgb_to_rgba(x: torch.Tensor) -> torch.Tensor:
+    return torch.cat([x, torch.ones_like(x[:, :1])], dim=1)
+
+
+def make_lpips(net: str, device: torch.device) -> nn.Module:
+    try:
+        import lpips  # type: ignore
+    except ImportError as exc:
+        raise SystemExit(
+            "lpips ausente: instale com `python -m pip install --target neural\\.pydeps lpips --no-deps` "
+            "e rode com PYTHONPATH=neural\\.pydeps"
+        ) from exc
+    m = lpips.LPIPS(net=net, verbose=False).to(device).eval()
+    for p in m.parameters():
+        p.requires_grad_(False)
+    return m
+
+
+class V3Loss(nn.Module):
+    def __init__(self, spec: str, weights: dict[str, float], lpips_net: str, device: torch.device) -> None:
+        super().__init__()
+        self.terms = set(spec.lower().split("+"))
+        unknown = self.terms - {"l1", "lpips", "grad", "ssim"}
+        if unknown:
+            raise SystemExit(f"--loss: termos desconhecidos {sorted(unknown)}")
+        self.w = weights
+        self.lpips = None
+        if "lpips" in self.terms and weights["lpips"] > 0:
+            self.lpips = make_lpips(lpips_net, device)
+
+    def forward(self, pred: torch.Tensor, tgt: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
+        """pred/tgt RGB fp32 em [0,1]."""
+        parts: dict[str, torch.Tensor] = {}
+        if "l1" in self.terms:
+            parts["l1"] = F.l1_loss(pred, tgt)
+        if "grad" in self.terms:
+            parts["grad"] = F.l1_loss(sobel_edges(pred), sobel_edges(tgt))
+        if "ssim" in self.terms:
+            parts["ssim"] = 1.0 - compute_ssim_tensor(pred, tgt)
+        if self.lpips is not None:
+            parts["lpips"] = self.lpips(pred * 2 - 1, tgt * 2 - 1).mean()
+        total = sum(self.w[k] * v for k, v in parts.items())
+        return total, {k: float(v.detach()) for k, v in parts.items()}
+
+
+def amp_ctx(device: torch.device, mode: str):
+    if device.type != "cuda" or mode == "off":
+        return torch.autocast(device_type="cpu", enabled=False)
+    return torch.autocast(device_type="cuda", dtype=torch.bfloat16 if mode == "bf16" else torch.float16)
+
+
+@torch.no_grad()
+def eval_v3(
+    model: nn.Module, lpips_model: nn.Module | None, vlr: list[torch.Tensor], vhr: list[torch.Tensor]
+) -> dict[str, float]:
+    model.eval()
+    psnrs: list[float] = []
+    ssims: list[float] = []
+    lp: list[float] = []
+    for lr, hr in zip(vlr, vhr):
+        x = rgb_to_rgba(lr[None].float() / 255.0)
+        t = hr[None].float() / 255.0
+        p = model(x)[:, :3].float()  # fp32 na validacao (paridade com ONNX/GL)
+        mse = float(F.mse_loss(p, t))
+        psnrs.append(10.0 * float(np.log10(1.0 / max(mse, 1e-10))))
+        ssims.append(compute_ssim(p, t))
+        if lpips_model is not None:
+            lp.append(float(lpips_model(p * 2 - 1, t * 2 - 1).mean()))
+    model.train()
+    out = {"psnr_db": float(np.mean(psnrs)), "ssim": float(np.mean(ssims))}
+    if lp:
+        out["lpips"] = float(np.mean(lp))
+    return out
+
+
+def train_v3(args: argparse.Namespace) -> int:
+    root: Path = args.dataset_v3
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    if args.teacher not in manifest.get("teachers", {}):
+        print(f"AVISO: teacher '{args.teacher}' nao listado em manifest.teachers", file=sys.stderr)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == "cuda":
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+    train_f, val_f = select_v3_frames(manifest, args.max_frames, args.max_val_frames)
+    # dados ficam na GPU como uint8; --data-device cpu para datasets muito grandes
+    ddev = device if args.data_device == "auto" else torch.device("cpu")
+    tlr, thr, tids = load_v3_pairs(root, args.teacher, train_f, ddev)
+    vlr, vhr, vids = load_v3_pairs(root, args.teacher, val_f, device)
+    if not tlr:
+        print("ERRO: nenhum par de treino encontrado (predither+targets).", file=sys.stderr)
+        return 1
+    if not vlr:  # sem split val: reserva alguns frames de treino
+        k = min(2, max(1, len(tlr) // 8))
+        vlr, vhr, vids = [t.to(device) for t in tlr[-k:]], [t.to(device) for t in thr[-k:]], tids[-k:]
+        if len(tlr) > k:
+            tlr, thr, tids = tlr[:-k], thr[:-k], tids[:-k]
+        print(f"AVISO: sem frames val; usando {k} frames de treino como val")
+
+    torch.manual_seed(args.seed)
+    gen = random.Random(args.seed)
+    model = ECStudentESPCN4x(channels=args.channels, num_blocks=args.num_blocks, scale=4).to(device)
+    if args.init_pt:
+        model.load_state_dict(torch.load(args.init_pt, map_location="cpu", weights_only=False)["state_dict"])
+    param_count = sum(p.numel() for p in model.parameters())
+    weights = {"l1": args.w_l1, "lpips": args.w_lpips, "grad": args.w_grad, "ssim": args.w_ssim}
+    crit = V3Loss(args.loss, weights, args.lpips_net, device)
+    eval_lpips = crit.lpips if crit.lpips is not None else make_lpips(args.lpips_net, device)
+
+    total_steps = args.epochs * args.steps_per_epoch
+    warm = min(args.warmup_steps, max(0, total_steps - 1))
+    opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
+
+    def lr_lambda(step: int) -> float:
+        if step < warm:
+            return (step + 1) / max(1, warm)
+        prog = (step - warm) / max(1, total_steps - warm)
+        return 0.01 + 0.99 * 0.5 * (1.0 + float(np.cos(np.pi * prog)))
+
+    sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda)
+    scaler = torch.amp.GradScaler("cuda", enabled=(device.type == "cuda" and args.amp == "fp16"))
+    print(
+        f"[v3] ch={args.channels} nb={args.num_blocks} ({param_count} params) teacher={args.teacher} dev={device} "
+        f"amp={args.amp} loss={args.loss} w={weights} patch={args.patch_size} batch={args.batch_size} | "
+        f"train={len(tlr)} val={len(vlr)} steps={total_steps}",
+        flush=True,
+    )
+
+    out_pt: Path = args.out_pt
+    out_pt.parent.mkdir(parents=True, exist_ok=True)
+    log_path = out_pt.with_suffix(out_pt.suffix + ".log.json")
+    curve: list[dict[str, Any]] = []
+    best_key = float("inf")
+    best_metrics: dict[str, float] = {}
+    t0 = time.time()
+
+    def save_ckpt(metrics: dict[str, float], epoch: int) -> None:
+        torch.save(
+            {
+                "arch": "ECStudentESPCN4x",
+                "channels": args.channels,
+                "num_blocks": args.num_blocks,
+                "scale": 4,
+                "param_count": param_count,
+                "dedither": "both",  # predither ja aplicado no dataset; o GL aplica antes da rede
+                "composite_scenes": False,
+                "teacher": args.teacher,
+                "dataset": "dataset_v3",
+                "loss": args.loss,
+                "loss_weights": weights,
+                "epoch": epoch,
+                "metrics": metrics,
+                "state_dict": {k: v.detach().cpu() for k, v in model.state_dict().items()},
+            },
+            out_pt,
+        )
+
+    model.train()
+    step = 0
+    for epoch in range(1, args.epochs + 1):
+        agg: dict[str, float] = {}
+        te = time.time()
+        for _ in range(args.steps_per_epoch):
+            bx, by = sample_v3_batch(tlr, thr, args.batch_size, args.patch_size, gen)
+            bx = rgb_to_rgba(bx.to(device, non_blocking=True))
+            by = by.to(device, non_blocking=True)
+            with amp_ctx(device, args.amp):
+                pred_full = model(bx)
+            pred = pred_full[:, :3].float()
+            loss, parts = crit(pred, by)
+            loss = loss + 0.1 * F.l1_loss(pred_full[:, 3:4].float(), torch.ones_like(pred[:, :1]))
+            opt.zero_grad(set_to_none=True)
+            scaler.scale(loss).backward()
+            scaler.step(opt)
+            scaler.update()
+            sched.step()
+            step += 1
+            parts["total"] = float(loss.detach())
+            for k, v in parts.items():
+                agg[k] = agg.get(k, 0.0) + v
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+        its = args.steps_per_epoch / max(1e-9, time.time() - te)
+        rec: dict[str, Any] = {"epoch": epoch, "step": step, "it_per_s": round(its, 2), "lr": round(opt.param_groups[0]["lr"], 7)}
+        rec.update({f"train_{k}": round(v / args.steps_per_epoch, 5) for k, v in agg.items()})
+        if epoch % args.eval_every == 0 or epoch == args.epochs:
+            m = eval_v3(model, eval_lpips, vlr, vhr)
+            rec.update({f"val_{k}": round(v, 5) for k, v in m.items()})
+            key = m.get("lpips", 0.0) if args.best_by == "lpips" else -m["psnr_db"]
+            if key < best_key:
+                best_key = key
+                best_metrics = {k: round(v, 5) for k, v in m.items()}
+                save_ckpt(best_metrics, epoch)
+                rec["best"] = True
+        curve.append(rec)
+        log_path.write_text(
+            json.dumps({"args": {k: str(v) for k, v in vars(args).items()}, "curve": curve, "best": best_metrics}, indent=1),
+            encoding="utf-8",
+        )
+        print("  " + " ".join(f"{k}={v}" for k, v in rec.items()), flush=True)
+
+    print(f"[v3] fim em {time.time() - t0:.1f}s | melhor val={best_metrics} | ckpt={out_pt} | log={log_path}")
+    return 0
+
+
+@torch.no_grad()
+def run_infer(args: argparse.Namespace) -> int:
+    src: Path = args.infer
+    files = sorted(src.glob(args.infer_glob)) if src.is_dir() else [src]
+    if not files:
+        print(f"ERRO: nenhuma imagem em {src}", file=sys.stderr)
+        return 1
+    ck = torch.load(args.ckpt or args.out_pt, map_location="cpu", weights_only=False)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = ECStudentESPCN4x(channels=int(ck["channels"]), num_blocks=int(ck["num_blocks"]), scale=int(ck["scale"]))
+    model.load_state_dict(ck["state_dict"])
+    model.to(device).eval()
+    out_dir: Path = args.out
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for f in files:
+        x = rgb_to_rgba(torch.from_numpy(_load_rgb_u8(f)).to(device)[None].float() / 255.0)
+        y = model(x)[0, :3].clamp(0, 1).mul(255.0).round().byte().cpu().numpy().transpose(1, 2, 0)
+        dst = out_dir / f"{f.stem}.png"
+        Image.fromarray(y, "RGB").save(dst)
+        print(f"{f.name} -> {dst} {y.shape[1]}x{y.shape[0]}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Treino do modelo aluno B+ ESPCN-4x na GPU via pares ComfyUI")
     ap.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
@@ -408,7 +711,36 @@ def main() -> int:
     ap.add_argument("--dedither-prob", type=float, default=1.0)
     ap.add_argument("--composite-scenes", action="store_true")
     ap.add_argument("--no-update-manifest", action="store_true")
+    # --- G2.3: modo v3 full-frame + perda perceptual (defaults antigos intactos) ---
+    g = ap.add_argument_group("v3 (full-frame distillation)")
+    g.add_argument("--dataset-v3", type=Path, default=None, help="dir com manifest.json/predither/targets")
+    g.add_argument("--teacher", default="animesharp", help="slug em targets/<teacher>/")
+    g.add_argument("--max-frames", type=int, default=0, help="subconjunto deterministico (0=todos)")
+    g.add_argument("--max-val-frames", type=int, default=16)
+    g.add_argument("--loss", default="l1+lpips+grad+ssim")
+    g.add_argument("--w-l1", type=float, default=1.0)
+    g.add_argument("--w-lpips", type=float, default=0.1)
+    g.add_argument("--w-grad", type=float, default=0.1)
+    g.add_argument("--w-ssim", type=float, default=0.1)
+    g.add_argument("--lpips-net", choices=("vgg", "alex"), default="vgg")
+    g.add_argument("--amp", choices=("bf16", "fp16", "off"), default="bf16")
+    g.add_argument("--warmup-steps", type=int, default=200)
+    g.add_argument("--eval-every", type=int, default=1, help="epocas entre validacoes")
+    g.add_argument("--best-by", choices=("lpips", "psnr"), default="lpips")
+    g.add_argument("--data-device", choices=("auto", "cpu"), default="auto")
+    g.add_argument("--init-pt", type=Path, default=None)
+    g.add_argument("--infer", type=Path, default=None, help="png ou dir (predither) para inferir com o .pt")
+    g.add_argument("--infer-glob", default="*.png")
+    g.add_argument("--ckpt", type=Path, default=None, help="checkpoint do --infer (default --out-pt)")
+    g.add_argument("--out", type=Path, default=None, help="dir de saida do --infer")
     args = ap.parse_args()
+
+    if args.infer is not None:
+        if args.out is None:
+            ap.error("--infer requer --out")
+        return run_infer(args)
+    if args.dataset_v3 is not None:
+        return train_v3(args)
 
     torch.manual_seed(args.seed)
     rng = random.Random(args.seed)

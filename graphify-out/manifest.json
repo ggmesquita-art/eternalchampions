@@ -5,528 +5,6 @@
     "ast_hash": "afd494876ad0b8d311efd1b89e9c3c4c",
     "semantic_hash": ""
   },
-  ".engram/.graphify_analysis.json": {
-    "mtime": 1795442664.3433723,
-    "seen": 1795464764.6281056,
-    "ast_hash": "fab45ee687e2f333e4501291102e9028",
-    "semantic_hash": ""
-  },
-  ".engram/.graphify_detect.json": {
-    "mtime": 1795442660.152079,
-    "seen": 1795464764.628109,
-    "ast_hash": "3fdb236efd8a7d8edd451a2f5a1910e0",
-    "semantic_hash": ""
-  },
-  ".engram/.graphify_labels.json": {
-    "mtime": 1795442648.0915987,
-    "seen": 1795464764.6281114,
-    "ast_hash": "37c3230dff5617999c72bf07eb9a7cc3",
-    "semantic_hash": ""
-  },
-  ".engram/2026-11-19/.graphify_labels.json": {
-    "mtime": 1795132483.1734753,
-    "seen": 1795464764.6281135,
-    "ast_hash": "1811c419d28173aa07f89fdf02685020",
-    "semantic_hash": ""
-  },
-  ".engram/2026-11-19/cost.json": {
-    "mtime": 1795132483.1734753,
-    "seen": 1795464764.628115,
-    "ast_hash": "2cef329b8ad7a225f56a43eb0ff25afb",
-    "semantic_hash": ""
-  },
-  ".engram/2026-11-19/graph.json": {
-    "mtime": 1795132483.1694741,
-    "seen": 1795464764.628117,
-    "ast_hash": "e1841da8dcb2a1d818f72b878a77c175",
-    "semantic_hash": ""
-  },
-  ".engram/2026-11-19/manifest.json": {
-    "mtime": 1795132483.1734753,
-    "seen": 1795464764.6281185,
-    "ast_hash": "2870e10f85a60a72120a86e7d4fe19b3",
-    "semantic_hash": ""
-  },
-  ".engram/2026-11-23/.graphify_labels.json": {
-    "mtime": 1795442598.3982098,
-    "seen": 1795464764.62812,
-    "ast_hash": "00f3984720bef4f45cdc66e97d3ca32a",
-    "semantic_hash": ""
-  },
-  ".engram/2026-11-23/cost.json": {
-    "mtime": 1795442598.3982098,
-    "seen": 1795464764.6281216,
-    "ast_hash": "2cef329b8ad7a225f56a43eb0ff25afb",
-    "semantic_hash": ""
-  },
-  ".engram/2026-11-23/graph.json": {
-    "mtime": 1795442598.3982098,
-    "seen": 1795464764.628123,
-    "ast_hash": "3612d1699ef3ae9326a572098f09c7ed",
-    "semantic_hash": ""
-  },
-  ".engram/2026-11-23/manifest.json": {
-    "mtime": 1795442598.3982098,
-    "seen": 1795464764.628125,
-    "ast_hash": "d2537802dbc159cdbed507e807ff24ee",
-    "semantic_hash": ""
-  },
-  ".engram/branch.json": {
-    "mtime": 1795442598.541526,
-    "seen": 1795464764.6281266,
-    "ast_hash": "6c738de05f93a8936c7a1b710fd64d71",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast-stat-index.json": {
-    "mtime": 1795061174.9441643,
-    "seen": 1795464764.628128,
-    "ast_hash": "d7f941590d854b7be0343d2ddf1b98a9",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/031694f984a910f005ae7256cb99fb1842b2cd0b54a7dc8a10471eda3c52a470.json": {
-    "mtime": 1795132482.4492764,
-    "seen": 1795464764.6281297,
-    "ast_hash": "4b9badd236c02b9ae4806b8e8d043cd6",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/0465c6ea0f7d97067b51a0d51722feb364b794b54216c495b138ce94d82ff059.json": {
-    "mtime": 1795442447.4989285,
-    "seen": 1795464764.6281314,
-    "ast_hash": "7a9035c52a2e56c92987719e7f271e2f",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/078e6b71ad22ce9ea3444bcdb0e3fd27db7d9d3a06e7f1fd4ef68bf1bc3facc3.json": {
-    "mtime": 1795132482.3732555,
-    "seen": 1795464764.6281328,
-    "ast_hash": "300c2742f93944935868a1d1b1053643",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/0c459b5e0904d36d0d0c3e14e8d7ece15410424f1ac9aa72d996d285465af290.json": {
-    "mtime": 1795132482.208686,
-    "seen": 1795464764.6281345,
-    "ast_hash": "0b90ed6a6ec76a84bfbad9c784847696",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/1cc2cea151e9d19f9270011598b4e0914700e75ddf91a33d4e03a377e5db3db0.json": {
-    "mtime": 1795061174.936612,
-    "seen": 1795464764.6281357,
-    "ast_hash": "5a932a34de11553f0ca39e647b884536",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/212b63474f5cf14eb682d060976e1aeaf27a5b054ebefa5c54c6ab3948e59aa4.json": {
-    "mtime": 1795442447.564174,
-    "seen": 1795464764.6281376,
-    "ast_hash": "41e644356ff06d072b26f98e5a6f3aab",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/2a98351effb03348b18aa49a9c38ba5b5f40b2b51e0b1d62a5b10c6a68bfb53d.json": {
-    "mtime": 1795442447.5591805,
-    "seen": 1795464764.628139,
-    "ast_hash": "c705d43cafbc6406790f5d647537babe",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/2abda8a02eff87a26de15bdc937e83cc3829e98e5b8544b3daabf609afeb137e.json": {
-    "mtime": 1795442447.4801,
-    "seen": 1795464764.6281404,
-    "ast_hash": "72f8e7d7494c473b2d3e8a6d4d66606f",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/2f2cc896b22fca9d3415ea110dec12f84fa4f2abda06ca3e60647eb3d54f46c8.json": {
-    "mtime": 1795132482.4612796,
-    "seen": 1795464764.6281426,
-    "ast_hash": "9a2e24768696f30fd03d6c39d55fa6bc",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/3006a814aabf3a9d4654d57e50d19638845f29ddf83532c685ad47688218c41f.json": {
-    "mtime": 1795132482.4572785,
-    "seen": 1795464764.628144,
-    "ast_hash": "3fc2e8b15d1e535abc3dec13e7ab465f",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/30639e566b1a340833773bf662c20fe2dd75b231d837d66f6bcfb86c54ee4515.json": {
-    "mtime": 1795442447.5265243,
-    "seen": 1795464764.6281455,
-    "ast_hash": "c9bae63d3f34d31cf5da0857418ff37f",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/30c5ad0ec24b777021a13dd156d33c1c2bcc03ed1a098708359cf909efbacbbf.json": {
-    "mtime": 1795132482.349249,
-    "seen": 1795464764.628147,
-    "ast_hash": "792a869fc017c51c2627c46da7f1e925",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/33943cda542b130103357641a477cb444c55937bd6ec0ba65140e2d4d344ccd1.json": {
-    "mtime": 1795132482.2212133,
-    "seen": 1795464764.6281486,
-    "ast_hash": "9fba09bdb16271790b12f07368bd90e2",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/3b8e15f1c576fbf546bba61e90bf36f87f7b3b419771807f0b9b14b2dbade132.json": {
-    "mtime": 1795061174.9177308,
-    "seen": 1795464764.62815,
-    "ast_hash": "4ce8aad37bb4e1e822dcdd0a4e274f69",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/3de12416837aabadb8d5b26e11b5c19421b66a035913d068957c206fd34a3e73.json": {
-    "mtime": 1795442447.5330567,
-    "seen": 1795464764.6281517,
-    "ast_hash": "22c3a4d6b024becc94c668a2a683e7fb",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/3fedde912bbbaa61ffe9e1bb50a4b457dfc56e9ae5b4b204b6936f3335bf4144.json": {
-    "mtime": 1795132482.4172676,
-    "seen": 1795464764.628153,
-    "ast_hash": "12a9284fbda262a26ff0e3770cebd75f",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/4085cb6c1eed75d88030b9da20d498da90d49f08f870d855d7bb7bc4e5ecf135.json": {
-    "mtime": 1795442447.367128,
-    "seen": 1795464764.6281545,
-    "ast_hash": "6798a90c8db241eadfd98cdff7cc7e15",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/44e5f0ee7660ac063927791974f665b8f699fb685a835a17ea85d3de246ef786.json": {
-    "mtime": 1795132482.2772288,
-    "seen": 1795464764.6281564,
-    "ast_hash": "9b7cc3803d9baa6e1613ed38197b6027",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/48954cc27dd7ee3720378e50cebd4fe17643442903a6bc4f925c69cce5b003c6.json": {
-    "mtime": 1795132482.361252,
-    "seen": 1795464764.6281579,
-    "ast_hash": "aef881110bbd65f2d0c13031ad0ca2d3",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/4cbed5f302326f0286cb8b540574faa165d4c8bbbce3d3df0e25613c61058dd2.json": {
-    "mtime": 1795442447.543731,
-    "seen": 1795464764.6281593,
-    "ast_hash": "7417441fb9130626c5cdc2114328e4e8",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/51bc9086b7a502ca7c4c8e7814c811030af948fbcb22ca6cd3b4f43cafc321f0.json": {
-    "mtime": 1795442447.510226,
-    "seen": 1795464764.6281607,
-    "ast_hash": "caac573f35e434848f21614c34826a06",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/5341d7f5d3e65adac477c40da21a4df0d631c8aebc5b23a60ac05e6b342a9e31.json": {
-    "mtime": 1795442447.371474,
-    "seen": 1795464764.6281624,
-    "ast_hash": "d502253eef12af91a54aabbb3f50f93d",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/5536615610143c9680de89b3e9a68675aedf60897981650fa429207364abf6bf.json": {
-    "mtime": 1795442447.4010196,
-    "seen": 1795464764.6281636,
-    "ast_hash": "34902a48958a65b79eb6cd7c1eb12804",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/5bdb720c198ba47513f9b55666d80c7095ebb31078bab3fb3e48e554d116e9cf.json": {
-    "mtime": 1795442447.4574766,
-    "seen": 1795464764.628165,
-    "ast_hash": "3c8b4218970f244035578c905505ce35",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/61c2b54c52e25a7f3d6105a38f6a6e106d03173573716962c01204bd7fc1a8da.json": {
-    "mtime": 1795442447.567695,
-    "seen": 1795464764.6281667,
-    "ast_hash": "fa909b7ec320feb05d8af8e972c1944f",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/631a4694d2583ec3eddb920c7896c9527824a24f34f0e70409d587ef47cfeda6.json": {
-    "mtime": 1795442447.5026944,
-    "seen": 1795464764.628168,
-    "ast_hash": "53688595ed9eb0710347247f8026fef9",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/692fc832addb48c465f9059c4d5e3d683ce9e12d4110a2a71a73e6eab1937ae3.json": {
-    "mtime": 1795132482.3180788,
-    "seen": 1795464764.6281698,
-    "ast_hash": "3c8b4218970f244035578c905505ce35",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/721670e88704ea8fef5c12ac125035e1920fda15e3c1f0b4350156b16c58bfed.json": {
-    "mtime": 1795132482.2932334,
-    "seen": 1795464764.6281712,
-    "ast_hash": "0419aaa95a684be0c89fe1bc6c96cc63",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/73142431aef32f5b79918c805197c7da6a75887922def4d5978a3463b2720e76.json": {
-    "mtime": 1795132482.205209,
-    "seen": 1795464764.6281729,
-    "ast_hash": "3eb6738835c093d2e0f66650ff182e67",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/7db56aac73900fa4e55682689f90b0410dbe5d45a2cc909432a1311d7a12d049.json": {
-    "mtime": 1795442447.5742433,
-    "seen": 1795464764.628175,
-    "ast_hash": "97a35d0d832641587c24351d925fde16",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/9368b34869a6b67a7b4adc3f0d41d483541d294ea0e1d622e3a36d04e49b01c4.json": {
-    "mtime": 1795442447.5516489,
-    "seen": 1795464764.6281767,
-    "ast_hash": "939cbcef299ec571cd4981a4dac3f6c0",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/979f4953484f8c37dfbad49910a0f6a0a62088d8722e3dc7e00ee3cd27e10e18.json": {
-    "mtime": 1795061174.940388,
-    "seen": 1795464764.628178,
-    "ast_hash": "092625842f2e134e658f70737d207d01",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/9b03f42e403786198b37e9eccca66f74d3d112d29344c3cfeabf106e057be0b0.json": {
-    "mtime": 1795442447.5064602,
-    "seen": 1795464764.6281796,
-    "ast_hash": "e8d11adef9d856d0c749421f68bf97b9",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/9ce75cc89dc3b20998268f4267fad3aa2b0ff42283892b28a886831e9e8c0553.json": {
-    "mtime": 1795442447.537013,
-    "seen": 1795464764.628181,
-    "ast_hash": "ccce7feda47e7b916569ab66c765f940",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/9f2ff4ebff5517ecd7f33ce9392e1965189af5044d576d47aec943335d589a86.json": {
-    "mtime": 1795442447.45374,
-    "seen": 1795464764.6281824,
-    "ast_hash": "3562214ab356927e43433a34c101aa0b",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/a03e70e6b72cd0e20b0fbfecd3793b276d12c6db62de088e89871b517cac767a.json": {
-    "mtime": 1795442447.3746593,
-    "seen": 1795464764.628184,
-    "ast_hash": "c5112349546f49f5541d832ad0673c3d",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/a30abbecedc799c17715e2d0ec9b026ea7f55aca0cbe6f0a5a4d5e1ddbf3e20a.json": {
-    "mtime": 1795132482.3892598,
-    "seen": 1795464764.6281857,
-    "ast_hash": "e9a2549367267bba9fdc94a8e7979eea",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/ab47839d1e560f4d2b5de848d4af6ac9b1636617d67ef8c3f1aab726758fdca1.json": {
-    "mtime": 1795132482.3380148,
-    "seen": 1795464764.6281874,
-    "ast_hash": "fe46c76a638148631af79c8e293027a5",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/aec2716cbd850ab92b5cd106fb223a13ab957fe89cb96ca1e0f1d042087d37a4.json": {
-    "mtime": 1795442447.4311454,
-    "seen": 1795464764.6281888,
-    "ast_hash": "d5ef9463b1d5772fb9cbb4136aeef47a",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/b196aed8ee106e3182434c952d71542e1292cafc93a00d5f41e9bb7ce5f747ea.json": {
-    "mtime": 1795061174.887521,
-    "seen": 1795464764.6281905,
-    "ast_hash": "4e49394e9e7ce6e3e6f0546afb2eae8b",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/b79c0647306a81bf9df0313a065519321e48b97c528cbcfacf14436d3a90ccca.json": {
-    "mtime": 1795132482.2246072,
-    "seen": 1795464764.628192,
-    "ast_hash": "34902a48958a65b79eb6cd7c1eb12804",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/b7d44250e1b253426dacd2b4c8ad31b07b2116c74b654a1faf1a130fb7d726d9.json": {
-    "mtime": 1795061174.8912973,
-    "seen": 1795464764.6281934,
-    "ast_hash": "4179332669914a52e57a536656269ea8",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/b8a5275eb139828698c3f8f4459980405a80920004c95a5a7f28b4ddc7986a8a.json": {
-    "mtime": 1795442447.5478833,
-    "seen": 1795464764.628195,
-    "ast_hash": "cc938310c6c6ece29630da25c6a28b6e",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/ba0f4fcaaa72813fb391b328b5dbc3af5a4861e5a5567c8787f5010a85f28c87.json": {
-    "mtime": 1795132482.2092102,
-    "seen": 1795464764.6281967,
-    "ast_hash": "c9c71c2dcd49e734da6a6e014ebf0945",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/bab6f52287c5ef9886a52741725497458f93597f0d20c60a0eebdbeed8c4aa9b.json": {
-    "mtime": 1795442447.5139916,
-    "seen": 1795464764.6281981,
-    "ast_hash": "63da49a4ae4201505dd0d488ab8b3d33",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/bb84f5037854cadbab13eccd63bbb1043ea4b250196a8fc6e10e065d21a48a6c.json": {
-    "mtime": 1795132482.4132664,
-    "seen": 1795464764.6281996,
-    "ast_hash": "691d7caa946d41099b9c2577399eb35b",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/c9fff356ac2ac658a0c152006ded95184ee647db01b08f3def80883f0a80e9d0.json": {
-    "mtime": 1795442447.3972538,
-    "seen": 1795464764.6282012,
-    "ast_hash": "dea2ae1b70abab4181bdfc9297b4a16a",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/da10ccf773a72586deedd7df0ef7e392ff562641d4ab867d409ceec0cc1f2211.json": {
-    "mtime": 1795132482.3351638,
-    "seen": 1795464764.6282027,
-    "ast_hash": "9e1c0cb4a7d3ce2b7a3b949d752a9c0b",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/e079bf97a6d0bbba5d9cbe9e4e569d59011e29b7e9ca1771ca56a4ea433ebd0e.json": {
-    "mtime": 1795061174.8950734,
-    "seen": 1795464764.6282043,
-    "ast_hash": "4e9c3ca5b674740886a774614ac3711f",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/e55431ade34aefadec41b245497ae07a34364624e5bcd39793133703b7e05239.json": {
-    "mtime": 1795442447.523607,
-    "seen": 1795464764.6282058,
-    "ast_hash": "25549221fa6a8195d73f8e0e0845e939",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/e8e31482b450ee811ea538496c47b613b3d3b5f617c122b2952c2e4aa57854d9.json": {
-    "mtime": 1795132482.3132389,
-    "seen": 1795464764.6282072,
-    "ast_hash": "155e232a7c38054b9b882793a2b424bf",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/f01e752a02bfa25a32c94d12dd01e8b05ab48b3679ba7f60bd0fcc3f48656458.json": {
-    "mtime": 1795442447.5177574,
-    "seen": 1795464764.6282089,
-    "ast_hash": "7b7a987766dc3d1bc71d5625f94462db",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/f1bb13ac28ac4c28cfd8e1c2656239f310ea285830d4eba1f3979f863fcce3ea.json": {
-    "mtime": 1795442447.5297697,
-    "seen": 1795464764.6282105,
-    "ast_hash": "04f6c43a8f46dabf764130fede04dee5",
-    "semantic_hash": ""
-  },
-  ".engram/cache/ast/f2f892eba84c6791337dc3b473881f04c35d85b6af04d899022aef29d9b83b7d.json": {
-    "mtime": 1795132482.3292432,
-    "seen": 1795464764.6282117,
-    "ast_hash": "c6e682fd058af37465b2772bba265944",
-    "semantic_hash": ""
-  },
-  ".engram/cache/semantic/247554f910565319243d31472fbef081030d175d7948f3fa62ef6471620d1857.json": {
-    "mtime": 1795061738.2182982,
-    "seen": 1795464764.6282132,
-    "ast_hash": "5a7e6400fb94faa3703a44ff96c7ed29",
-    "semantic_hash": ""
-  },
-  ".engram/cache/semantic/59e48ccc469af460a6cea860aabf36afc6ca3ecfbb1b548e86aaeaad30f0e152.json": {
-    "mtime": 1795061738.2102234,
-    "seen": 1795464764.6282148,
-    "ast_hash": "afe83264c1c67a76664b0a83bddb69b9",
-    "semantic_hash": ""
-  },
-  ".engram/cache/semantic/64630536eaff362f8b5196a9905a94cabcb97595c366802cea8e65b24a534c9f.json": {
-    "mtime": 1795061738.2143145,
-    "seen": 1795464764.6282163,
-    "ast_hash": "c5ae112af4ef63923401ff709462443a",
-    "semantic_hash": ""
-  },
-  ".engram/cache/semantic/6bd783e4f2baeda196316050a34e17774901414c33c6747e28524a6936528d1e.json": {
-    "mtime": 1795061738.2173798,
-    "seen": 1795464764.628218,
-    "ast_hash": "f6635e01c5a84b873b346cc289741fa0",
-    "semantic_hash": ""
-  },
-  ".engram/cache/semantic/78924574c4c5c5d8bc203390f7e56e1887aa54e8d1725d064449d4c6ebc874d2.json": {
-    "mtime": 1795061738.218055,
-    "seen": 1795464764.6282194,
-    "ast_hash": "1b03bba9c34d872ed1533a56befd9984",
-    "semantic_hash": ""
-  },
-  ".engram/cache/semantic/e5982943e70e601527e757d66e914d36f87cf68ec24f934fc982eb8dced6f66e.json": {
-    "mtime": 1795061738.2177794,
-    "seen": 1795464764.6282213,
-    "ast_hash": "6297839b3e10d698fff38846025fafab",
-    "semantic_hash": ""
-  },
-  ".engram/cache/stat-index.json": {
-    "mtime": 1795442448.9186108,
-    "seen": 1795464764.6282227,
-    "ast_hash": "8bf92b8bbca9811c26f0f9a4e7dd01be",
-    "semantic_hash": ""
-  },
-  ".engram/cost.json": {
-    "mtime": 1795442667.5103705,
-    "seen": 1795464764.6282244,
-    "ast_hash": "98c3151dd75af2cf188b99a154bf245c",
-    "semantic_hash": ""
-  },
-  ".engram/graph.json": {
-    "mtime": 1795442664.3433723,
-    "seen": 1795464764.6282258,
-    "ast_hash": "e295870d51bea3d29e78fef79f64c2b8",
-    "semantic_hash": ""
-  },
-  ".engram/manifest.json": {
-    "mtime": 1795442667.5103705,
-    "seen": 1795464764.6282272,
-    "ast_hash": "d2537802dbc159cdbed507e807ff24ee",
-    "semantic_hash": ""
-  },
-  ".engram/ontology/citations.json": {
-    "mtime": 1795442651.1479988,
-    "seen": 1795464764.6282291,
-    "ast_hash": "01ebf18ecb2608ffc774b74f1c1a73bf",
-    "semantic_hash": ""
-  },
-  ".engram/scope.json": {
-    "mtime": 1795442597.2177348,
-    "seen": 1795464764.6282308,
-    "ast_hash": "a99f2cb3b65e6bac3d27a7b8f1ca9482",
-    "semantic_hash": ""
-  },
-  ".engram/studio/entities.json": {
-    "mtime": 1795442656.2576745,
-    "seen": 1795464764.6282325,
-    "ast_hash": "a90fa6a8aff1a8ad3e680ce40a133911",
-    "semantic_hash": ""
-  },
-  ".engram/studio/graph.json": {
-    "mtime": 1795442656.0578647,
-    "seen": 1795464764.628234,
-    "ast_hash": "e295870d51bea3d29e78fef79f64c2b8",
-    "semantic_hash": ""
-  },
-  ".engram/studio/ontology/citations.json": {
-    "mtime": 1795442656.3217642,
-    "seen": 1795464764.6282358,
-    "ast_hash": "01ebf18ecb2608ffc774b74f1c1a73bf",
-    "semantic_hash": ""
-  },
-  ".engram/studio/reconciliation-candidates.json": {
-    "mtime": 1795442656.2576745,
-    "seen": 1795464764.6282372,
-    "ast_hash": "9a3f093e2dc5d929bb25879501d527c7",
-    "semantic_hash": ""
-  },
-  ".engram/studio/scene.json": {
-    "mtime": 1795442656.2576745,
-    "seen": 1795464764.6282392,
-    "ast_hash": "7d98f9390d3dd75c744f7b88fb5155b6",
-    "semantic_hash": ""
-  },
-  ".engram/studio/search-index.json": {
-    "mtime": 1795442656.3217642,
-    "seen": 1795464764.6282408,
-    "ast_hash": "edba56d4cd75fe7c28659bc83332da10",
-    "semantic_hash": ""
-  },
-  ".engram/studio/workspace-manifest.json": {
-    "mtime": 1795442656.3330743,
-    "seen": 1795464764.6282434,
-    "ast_hash": "0b3d567d3959a8fcc1113f3c91c7b0d8",
-    "semantic_hash": ""
-  },
-  ".engram/worktree.json": {
-    "mtime": 1795442598.541526,
-    "seen": 1795464764.6282449,
-    "ast_hash": "4294a652c816d77d8c33e98ee96be153",
-    "semantic_hash": ""
-  },
   ".opencode/opencode.json": {
     "mtime": 1795441504.809643,
     "seen": 1795464764.6282465,
@@ -564,33 +42,33 @@
     "semantic_hash": ""
   },
   "game/ec_hd.c": {
-    "mtime": 1795395103.1914983,
-    "seen": 1795464764.6282558,
-    "ast_hash": "834ee2abd8b1914f3ac8254328c74945",
+    "mtime": 1795572684.468975,
+    "seen": 1795573469.5534072,
+    "ast_hash": "8126fc37cc0df62649b87f9619bc6145",
     "semantic_hash": ""
   },
   "game/ec_hd.h": {
-    "mtime": 1795394104.2937543,
-    "seen": 1795464764.628257,
-    "ast_hash": "e77fd18dea7577c2a410bef8e3c65353",
+    "mtime": 1795570050.696232,
+    "seen": 1795573469.5534098,
+    "ast_hash": "396aff74de9833a952af7e58ab4aea92",
     "semantic_hash": ""
   },
   "game/ec_spec.c": {
-    "mtime": 1795458674.1393907,
-    "seen": 1795464764.6282585,
-    "ast_hash": "0cc304adc54e75b121c439619a260762",
+    "mtime": 1795570055.580981,
+    "seen": 1795573469.5534112,
+    "ast_hash": "e4cdcfcfe542755e2372394c05e3d19a",
     "semantic_hash": ""
   },
   "game/ec_video.c": {
-    "mtime": 1795397142.1281273,
-    "seen": 1795464764.6282601,
-    "ast_hash": "ddd35bbb252acf09cd69c0af74bcc08c",
+    "mtime": 1795565907.6145034,
+    "seen": 1795567045.7987108,
+    "ast_hash": "21dbf7310c5f9d7f92dcfd3ad191fbf6",
     "semantic_hash": ""
   },
   "game/ec_video.h": {
-    "mtime": 1795339226.0590482,
-    "seen": 1795464764.6282616,
-    "ast_hash": "a41e3897ad0d70fab02a4fb09bcba92d",
+    "mtime": 1795491518.1238089,
+    "seen": 1795492021.0241578,
+    "ast_hash": "7542f7c6ba704255aad547c24f1149d3",
     "semantic_hash": ""
   },
   "game/third_party/tsf.h": {
@@ -600,15 +78,15 @@
     "semantic_hash": ""
   },
   "harness/ec_harness.py": {
-    "mtime": 1795111988.687255,
-    "seen": 1795464764.6282647,
-    "ast_hash": "ef01b93137982433ac76916b13a5f25c",
+    "mtime": 1795488889.1857612,
+    "seen": 1795491252.5542166,
+    "ast_hash": "334f44be2e8c3288073395c0e978550c",
     "semantic_hash": ""
   },
   "neural/export_onnx.py": {
-    "mtime": 1795393537.0438478,
-    "seen": 1795464764.6282663,
-    "ast_hash": "bf96e08a22bc8e6e40bc94f5f1f925b2",
+    "mtime": 1795551270.1876335,
+    "seen": 1795551396.9484153,
+    "ast_hash": "12b82462cfb24522a4b6f4441b1fb489",
     "semantic_hash": ""
   },
   "neural/infer/ec_bplus_gl.c": {
@@ -654,9 +132,9 @@
     "semantic_hash": ""
   },
   "neural/train_espcn.py": {
-    "mtime": 1795393537.1374478,
-    "seen": 1795464764.6282783,
-    "ast_hash": "fe96e038ddce3b4d7afaf6b77dfbf17f",
+    "mtime": 1795522885.6824856,
+    "seen": 1795551396.9484332,
+    "ast_hash": "11c8333574d65f8bea0afb83f0d15c88",
     "semantic_hash": ""
   },
   "package.json": {
@@ -666,9 +144,9 @@
     "semantic_hash": ""
   },
   "pipeline/manifest.json": {
-    "mtime": 1795181052.9615338,
-    "seen": 1795464764.6282814,
-    "ast_hash": "0dc37362d05601b249debe94dc39225c",
+    "mtime": 1795574252.0040114,
+    "seen": 1795574515.4172635,
+    "ast_hash": "d08b65b12ca02f132388b7bfee53a971",
     "semantic_hash": ""
   },
   "pipeline/workflows/remaster_flux_usdu.json": {
@@ -699,54 +177,6 @@
     "mtime": 1795106321.7204437,
     "seen": 1795464764.628289,
     "ast_hash": "962c1bd7a950b943510ea076276c7cfb",
-    "semantic_hash": ""
-  },
-  "tools/.engram/cache/ast/1cc2cea151e9d19f9270011598b4e0914700e75ddf91a33d4e03a377e5db3db0.json": {
-    "mtime": 1795107935.6011097,
-    "seen": 1795464764.6282907,
-    "ast_hash": "5a932a34de11553f0ca39e647b884536",
-    "semantic_hash": ""
-  },
-  "tools/.engram/cache/ast/3b8e15f1c576fbf546bba61e90bf36f87f7b3b419771807f0b9b14b2dbade132.json": {
-    "mtime": 1795107935.5855234,
-    "seen": 1795464764.628292,
-    "ast_hash": "4ce8aad37bb4e1e822dcdd0a4e274f69",
-    "semantic_hash": ""
-  },
-  "tools/.engram/cache/ast/979f4953484f8c37dfbad49910a0f6a0a62088d8722e3dc7e00ee3cd27e10e18.json": {
-    "mtime": 1795107935.6050062,
-    "seen": 1795464764.6282935,
-    "ast_hash": "092625842f2e134e658f70737d207d01",
-    "semantic_hash": ""
-  },
-  "tools/.engram/cache/ast/b196aed8ee106e3182434c952d71542e1292cafc93a00d5f41e9bb7ce5f747ea.json": {
-    "mtime": 1795107935.5426607,
-    "seen": 1795464764.6282954,
-    "ast_hash": "4e49394e9e7ce6e3e6f0546afb2eae8b",
-    "semantic_hash": ""
-  },
-  "tools/.engram/cache/ast/b7d44250e1b253426dacd2b4c8ad31b07b2116c74b654a1faf1a130fb7d726d9.json": {
-    "mtime": 1795107935.550454,
-    "seen": 1795464764.6282966,
-    "ast_hash": "4179332669914a52e57a536656269ea8",
-    "semantic_hash": ""
-  },
-  "tools/.engram/cache/ast/e079bf97a6d0bbba5d9cbe9e4e569d59011e29b7e9ca1771ca56a4ea433ebd0e.json": {
-    "mtime": 1795107935.5543506,
-    "seen": 1795464764.6282983,
-    "ast_hash": "4e9c3ca5b674740886a774614ac3711f",
-    "semantic_hash": ""
-  },
-  "tools/.engram/cache/ast/f093d6d524e793193bdc3aae0f871140952aefa01c199b9c02bf49039d20daa6.json": {
-    "mtime": 1795109974.5058951,
-    "seen": 1795464764.6282997,
-    "ast_hash": "eba2787be9a38718f61bbbb0cebcadf0",
-    "semantic_hash": ""
-  },
-  "tools/.engram/cache/stat-index.json": {
-    "mtime": 1795109974.8684347,
-    "seen": 1795464764.6283014,
-    "ast_hash": "bbb31d9c9e05ef741529d6d799772677",
     "semantic_hash": ""
   },
   "tools/analyze_cluster.py": {
@@ -990,15 +420,15 @@
     "semantic_hash": ""
   },
   ".agents/skills/ec-build-and-harness/SKILL.md": {
-    "mtime": 1795327259.034495,
-    "seen": 1795464764.6283789,
-    "ast_hash": "69275566f8fcdce2000e8279b4cdc94f",
+    "mtime": 1795488712.573568,
+    "seen": 1795491252.5543265,
+    "ast_hash": "bf703f5de2566a672a2335c378a6e229",
     "semantic_hash": ""
   },
   ".agents/skills/ec-disasm-and-hooks/SKILL.md": {
-    "mtime": 1795327260.5804453,
-    "seen": 1795464764.6283803,
-    "ast_hash": "ad73e306ab7b05aa7d3f230cd934e389",
+    "mtime": 1795488713.1548338,
+    "seen": 1795491252.554328,
+    "ast_hash": "c832fa0926b3df597cf6e5b88c21deca",
     "semantic_hash": ""
   },
   ".claude/agents/executor.md": {
@@ -1019,42 +449,6 @@
     "ast_hash": "ee9d6eb7d5a93f894cc9fd5ce8458a12",
     "semantic_hash": ""
   },
-  ".engram/2026-11-19/GRAPH_REPORT.md": {
-    "mtime": 1795132483.1734753,
-    "seen": 1795464764.6283867,
-    "ast_hash": "90c5f90958a730e38804c6cb720b8e2e",
-    "semantic_hash": ""
-  },
-  ".engram/2026-11-23/GRAPH_REPORT.md": {
-    "mtime": 1795442598.3982098,
-    "seen": 1795464764.62839,
-    "ast_hash": "491536e3e259a860eec31d1d2936ebb4",
-    "semantic_hash": ""
-  },
-  ".engram/GRAPH_REPORT.md": {
-    "mtime": 1795442664.2980216,
-    "seen": 1795464764.6283917,
-    "ast_hash": "502781dce97cc9c7ab2f81da09806047",
-    "semantic_hash": ""
-  },
-  ".engram/studio/index.html": {
-    "mtime": 1795442656.0503247,
-    "seen": 1795464764.6283932,
-    "ast_hash": "1f5c8b4bc1b96518ce2451c0ac84a4eb",
-    "semantic_hash": ""
-  },
-  ".engram/studio/studio-template.html": {
-    "mtime": 1795442656.0578647,
-    "seen": 1795464764.6283948,
-    "ast_hash": "fde00f483eca4a34894ccf4dd700f54f",
-    "semantic_hash": ""
-  },
-  ".engram/studio/studio.html": {
-    "mtime": 1795442656.3594644,
-    "seen": 1795464764.6283963,
-    "ast_hash": "da9c92c442210cf65ccf25c003b8ec57",
-    "semantic_hash": ""
-  },
   "AGENTS.md": {
     "mtime": 1795462636.505719,
     "seen": 1795464764.628403,
@@ -1062,9 +456,9 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1795441491.828363,
-    "seen": 1795464764.6284044,
-    "ast_hash": "f51380e030185ee605a57c3819aabf8b",
+    "mtime": 1795486423.801157,
+    "seen": 1795491252.5543373,
+    "ast_hash": "7f930fda482884439f04e8b62a6c5862",
     "semantic_hash": ""
   },
   "DESIGN.md": {
@@ -1122,8 +516,8 @@
     "semantic_hash": ""
   },
   "docs/frame_data/fight_probe_summary.md": {
-    "mtime": 1795395162.734059,
-    "seen": 1795464764.6284204,
+    "mtime": 1795573253.2793996,
+    "seen": 1795573469.5535703,
     "ast_hash": "5091a62b1b0f21c0eff331fd1436756a",
     "semantic_hash": ""
   },
@@ -1188,9 +582,9 @@
     "semantic_hash": ""
   },
   "docs/widescreen.md": {
-    "mtime": 1795078162.0788045,
-    "seen": 1795464764.6284382,
-    "ast_hash": "509d59cb6abd2e79fdcf0e745ded6771",
+    "mtime": 1795490498.5953572,
+    "seen": 1795491252.5543795,
+    "ast_hash": "586385fba468d693c40dd6e935c38b5c",
     "semantic_hash": ""
   },
   "game/CMakeLists.txt": {
@@ -1206,9 +600,9 @@
     "semantic_hash": ""
   },
   "task.md": {
-    "mtime": 1795470991.3115647,
-    "seen": 1795471150.874898,
-    "ast_hash": "3f5127c4bcf90743246f842ab96f59e4",
+    "mtime": 1795574452.1541038,
+    "seen": 1795574515.417422,
+    "ast_hash": "9dca672072cf50724541441c8d294f1a",
     "semantic_hash": ""
   },
   "tools/audio/mixer_ui/index.html": {
@@ -1230,9 +624,75 @@
     "semantic_hash": ""
   },
   "docs/CONFIGURATION_AND_CLI.md": {
-    "mtime": 1795470985.6079535,
-    "seen": 1795471150.8748627,
-    "ast_hash": "565c3009f28deacdda6fa9542c355284",
+    "mtime": 1795574452.1551073,
+    "seen": 1795574515.4173865,
+    "ast_hash": "dfa5918a67504eb7af95726c556f4808",
+    "semantic_hash": ""
+  },
+  "tools/pipeline/upscaler_lab.py": {
+    "mtime": 1795489028.7783213,
+    "seen": 1795491252.554275,
+    "ast_hash": "63aa5799851000a8dae4873437301dd6",
+    "semantic_hash": ""
+  },
+  "neural/collect_dataset.py": {
+    "mtime": 1795522824.693351,
+    "seen": 1795551396.9484127,
+    "ast_hash": "542b1a6c098340ebbda8ec4099ff7a7b",
+    "semantic_hash": ""
+  },
+  "neural/gen_targets.py": {
+    "mtime": 1795522983.368663,
+    "seen": 1795551396.948417,
+    "ast_hash": "a878d4d1df1919bf836422b3106e3608",
+    "semantic_hash": ""
+  },
+  "tools/pipeline/student_board.py": {
+    "mtime": 1795558225.9949932,
+    "seen": 1795561155.4781358,
+    "ast_hash": "577a12ca422e57ea433057ced559aad3",
+    "semantic_hash": ""
+  },
+  "tools/pipeline/bplus_gl_parity.py": {
+    "mtime": 1795565886.5468874,
+    "seen": 1795567045.7987764,
+    "ast_hash": "21a37d6139742368b5ad9e80a28248ef",
+    "semantic_hash": ""
+  },
+  "tools/pipeline/regen_planes.py": {
+    "mtime": 1795574279.2735314,
+    "seen": 1795574515.4173052,
+    "ast_hash": "176e04946c15676d6548019ffa51d913",
+    "semantic_hash": ""
+  },
+  "pipeline/manifest_flux.json": {
+    "mtime": 1795574413.556676,
+    "seen": 1795574515.417266,
+    "ast_hash": "f5370848baad5bb0a22095ab8dbc87a3",
+    "semantic_hash": ""
+  },
+  "docs/modo_c_planos.md": {
+    "mtime": 1795574438.6608064,
+    "seen": 1795574515.417398,
+    "ast_hash": "82200280d463645c5915c2e654ebe78d",
+    "semantic_hash": ""
+  },
+  "docs/img/modo_c/planos_jetta.jpg": {
+    "mtime": 1795574414.775237,
+    "seen": 1795574515.4174297,
+    "ast_hash": "a42f985613d3b61af217edd6243316a1",
+    "semantic_hash": ""
+  },
+  "docs/img/modo_c/planos_larcen.jpg": {
+    "mtime": 1795574414.6984096,
+    "seen": 1795574515.4174314,
+    "ast_hash": "67a45e04fdb62d933c543347e4f06d91",
+    "semantic_hash": ""
+  },
+  "docs/img/modo_c/planos_trident.jpg": {
+    "mtime": 1795574414.618086,
+    "seen": 1795574515.417433,
+    "ast_hash": "0d46d15fde330a3df1b94948515471b5",
     "semantic_hash": ""
   },
   "package-lock.json": {

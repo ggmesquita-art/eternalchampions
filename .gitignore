@@ -54,3 +54,5 @@ graphify-out/cache/
 tools/.engram/cache/
 # Dumps de RAM/VRAM derivados da ROM gerados por engano pelo gpgx_runner
 tools/vendor/gpgx_runner/[0-9]*
+
+neural/.pydeps/

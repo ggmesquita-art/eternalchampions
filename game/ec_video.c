@@ -93,26 +93,83 @@ static int ec_plane_tiles(unsigned code2)
     }
 }
 
+/*
+ * Snapshot por quadro (tirado na linha 0) de tudo que o renderer widescreen le da WRAM.
+ * O 68K roda intercalado com o renderer por scanline e atualiza a WRAM por volta da
+ * linha ~35; ler ao vivo causava rasgo de x0 e corrida do c0 (ver docs/widescreen.md GW.3).
+ */
+#define EC_SNAP_LAYERS   32
+#define EC_SNAP_LAYER_SZ 0x3Au
+
+typedef struct {
+    uint8_t  raw[EC_SNAP_LAYER_SZ]; /* bytes $00..$39 da camada ($D84E) */
+    uint32_t a1;                    /* ($CD1E + slot*8) */
+    uint16_t a0;                    /* ($CD1E + slot*8 + 4) */
+    uint16_t d5;                    /* ($2,a0) >> 5 */
+    uint8_t  slot_ok;               /* slot < 128 */
+} EcLayerSnap;
+
+static EcLayerSnap s_snap_layers[EC_SNAP_LAYERS];
+static int         s_snap_nlayers = 0;
+static int         s_snap_valid = 0;
+static int         s_snap_arena = 0;
+static int         s_snap_x0 = 0;
+static int         s_snap_force_ok = 0; /* ($9B32) != 0 */
+static int         s_snap_native_w = 320; /* largura nativa do quadro (H40=320, H32=256) */
+static uint16_t    s_snap_fd64 = 0xFFFFu; /* estado ($FD64) do snapshot anterior */
+
+static uint16_t ec_snap_w(const EcLayerSnap *L, unsigned off)
+{
+    return (uint16_t)(((uint16_t)L->raw[off] << 8) | L->raw[off + 1u]);
+}
+
+static uint32_t ec_snap_l(const EcLayerSnap *L, unsigned off)
+{
+    return ((uint32_t)ec_snap_w(L, off) << 16) | (uint32_t)ec_snap_w(L, off + 2u);
+}
+
+static void ec_take_layer_snapshot(void)
+{
+    s_snap_nlayers = 0;
+    uint16_t a4 = ec_ram16(0xD84Eu);
+    for (int step = 0; step < EC_SNAP_LAYERS && a4 != 0u; ++step, a4 = ec_ram16(a4)) {
+        EcLayerSnap *L = &s_snap_layers[s_snap_nlayers++];
+        for (unsigned i = 0; i < EC_SNAP_LAYER_SZ; ++i)
+            L->raw[i] = g_ram[((unsigned)a4 + i) & 0xFFFFu];
+        uint16_t slot = ec_snap_w(L, 0x2Cu);
+        L->slot_ok = (slot < 128u);
+        L->a1 = 0u;
+        L->a0 = 0u;
+        L->d5 = 0u;
+        if (L->slot_ok) {
+            L->a1 = ec_ram32(0xCD1Eu + (unsigned)slot * 8u);
+            L->a0 = ec_ram16(0xCD1Eu + (unsigned)slot * 8u + 4u);
+            if (L->a0 != 0u)
+                L->d5 = (uint16_t)(ec_ram16((unsigned)L->a0 + 2u) >> 5);
+        }
+    }
+}
+
 static uint16_t ec_lookup_layer_tile(uint16_t pl, int line, int sx, int hs, uint16_t cur_e)
 {
-    uint16_t a4 = ec_ram16(0xD84Eu);
-    for (int step = 0; step < 32 && a4 != 0u; ++step, a4 = ec_ram16(a4)) {
-        if (ec_ram16((unsigned)a4 + 0x2Eu) != pl)
+    for (int li = 0; li < s_snap_nlayers; ++li) {
+        const EcLayerSnap *L = &s_snap_layers[li];
+        if (ec_snap_w(L, 0x2Eu) != pl)
             continue;
-        uint8_t fl = g_ram[((unsigned)a4 + 0x30u) & 0xFFFFu];
+        uint8_t fl = L->raw[0x30u];
         if ((fl & 0x06u) == 0u)
             continue;
 
-        int s1C = (int)(int16_t)ec_ram16((unsigned)a4 + 0x1Cu);
-        int hA  = (int)(int16_t)ec_ram16((unsigned)a4 + 0x0Au);
+        int s1C = (int)(int16_t)ec_snap_w(L, 0x1Cu);
+        int hA  = (int)(int16_t)ec_snap_w(L, 0x0Au);
         if (line < s1C || line >= s1C + hA)
             continue;
 
-        int x4  = (int)(int16_t)ec_ram16((unsigned)a4 + 0x04u);
-        int eE  = (int)(int16_t)ec_ram16((unsigned)a4 + 0x0Eu);
-        int e12 = (int)(int16_t)ec_ram16((unsigned)a4 + 0x12u);
-        int s1A = (int)(int16_t)ec_ram16((unsigned)a4 + 0x1Au);
-        int c0  = (int)(int16_t)ec_ram16((unsigned)a4 + 0x1Eu);
+        int x4  = (int)(int16_t)ec_snap_w(L, 0x04u);
+        int eE  = (int)(int16_t)ec_snap_w(L, 0x0Eu);
+        int e12 = (int)(int16_t)ec_snap_w(L, 0x12u);
+        int s1A = (int)(int16_t)ec_snap_w(L, 0x1Au);
+        int c0  = (int)(int16_t)ec_snap_w(L, 0x1Eu);
 
         int base_x0 = eE - s1A;
         int hs_x0   = ((-hs) - x4) & 0x3FF;
@@ -127,23 +184,27 @@ static uint16_t ec_lookup_layer_tile(uint16_t pl, int line, int sx, int hs, uint
         int mt_col = l_tc >> 2;
         int mt_row = l_tr >> 2;
 
+        /*
+         * hstream: so o centro de 320px confia na janela c0 / nametable da VRAM. Nas margens
+         * a coluna pode ainda nao ter sido gravada pelo vblank (corrida do c0), entao o
+         * fallback de metatiles da ROM e sempre usado.
+         */
         int is_hstream = ((fl & 0x22u) == 0x02u);
+        int margin_px  = (sx < 0 || sx >= s_snap_native_w);
         int out_of_win = (c0 != 0x4FFF && (mt_col < c0 || mt_col > c0 + 10));
-        if (cur_e != 0x809Cu && !(is_hstream && out_of_win))
+        if (cur_e != 0x809Cu && !(is_hstream && (out_of_win || margin_px)))
             return cur_e;
 
-        uint16_t slot = ec_ram16((unsigned)a4 + 0x2Cu);
-        if (slot >= 128u)
+        if (!L->slot_ok)
             return cur_e;
 
-        uint32_t a1 = ec_ram32(0xCD1Eu + (unsigned)slot * 8u);
-        uint16_t a0 = ec_ram16(0xCD1Eu + (unsigned)slot * 8u + 4u);
-        if (a1 == 0u || a0 == 0u)
+        uint32_t a1 = L->a1;
+        if (a1 == 0u || L->a0 == 0u)
             return cur_e;
 
-        uint16_t d5     = (uint16_t)(ec_ram16((unsigned)a0 + 2u) >> 5);
-        uint16_t mask32 = ec_ram16((unsigned)a4 + 0x32u);
-        uint16_t mask34 = ec_ram16((unsigned)a4 + 0x34u);
+        uint16_t d5     = L->d5;
+        uint16_t mask32 = ec_snap_w(L, 0x32u);
+        uint16_t mask34 = ec_snap_w(L, 0x34u);
         uint16_t mc     = ec_mem16(a1);
         uint16_t mr     = ec_mem16(a1 + 2u);
         uint16_t fb     = ec_mem16(a1 + 4u);
@@ -321,25 +382,25 @@ static int ec_plane_edge_comp(uint16_t pl, int line, int dx)
         return 0;
 
     int comp = 0;
-    uint16_t a4 = ec_ram16(0xD84Eu);
-    for (int step = 0; step < 32 && a4 != 0u; ++step, a4 = ec_ram16(a4)) {
-        if (ec_ram16((unsigned)a4 + 0x2Eu) != pl)
+    for (int li = 0; li < s_snap_nlayers; ++li) {
+        const EcLayerSnap *L = &s_snap_layers[li];
+        if (ec_snap_w(L, 0x2Eu) != pl)
             continue;
-        if ((g_ram[((unsigned)a4 + 0x30u) & 0xFFFFu] & 0x08u) == 0u)
+        if ((L->raw[0x30u] & 0x08u) == 0u)
             continue;
 
-        int s1C = (int)(int16_t)ec_ram16((unsigned)a4 + 0x1Cu);
-        int hA  = (int)(int16_t)ec_ram16((unsigned)a4 + 0x0Au);
+        int s1C = (int)(int16_t)ec_snap_w(L, 0x1Cu);
+        int hA  = (int)(int16_t)ec_snap_w(L, 0x0Au);
         if (line < s1C || line >= s1C + hA)
             continue;
 
         /* Preserva tabelas raster por scanline ($36,a4). */
-        if (ec_ram32((unsigned)a4 + 0x36u) != 0u) {
+        if (ec_snap_l(L, 0x36u) != 0u) {
             comp = 0;
             continue;
         }
 
-        uint8_t hmode = g_ram[((unsigned)a4 + 0x26u) & 0xFFFFu];
+        uint8_t hmode = L->raw[0x26u];
         switch (hmode) {
         case 0x00:
         case 0x08:
@@ -353,7 +414,7 @@ static int ec_plane_edge_comp(uint16_t pl, int line, int dx)
             comp = dx;
             break;
         case 0x0C: {
-            int fac = (int)(int16_t)ec_ram16((unsigned)a4 + 0x28u);
+            int fac = (int)(int16_t)ec_snap_w(L, 0x28u);
             int num = -fac * dx;
             comp = (num >= 0) ? ((num + 2048) / 4096) : ((num - 2048) / 4096);
             break;
@@ -366,7 +427,130 @@ static int ec_plane_edge_comp(uint16_t pl, int line, int dx)
     return comp;
 }
 
-static void ec_eval_full_sprites_line(const GVDP *v, int line, int left, int x0,
+/*
+ * Sub-sprites descartados por Sub_E684 ($E772..$E7B0: x de tela fora de [-32,320]) em
+ * objetos fl20&$4000 (pilares, decoracoes). A SAT nunca os contem, entao nas margens
+ * widescreen eles sumiam. Hooks passivos em $E684 (zera) e $E7B0 (registra) coletam-nos
+ * em s_extra_pend durante a logica do quadro f; na linha 0 do quadro seguinte (quando a
+ * SAT correspondente passa a ser exibida) a lista vira s_extra_act. Nao escreve no jogo.
+ */
+#define EC_EXTRA_MAX 48
+typedef struct {
+    int16_t  x;     /* x + 128 (como gravado na SAT) */
+    int16_t  y;     /* y + 128 */
+    uint16_t szw;   /* palavra size/link de origem (byte alto = size) */
+    uint16_t attr;
+    uint16_t ord;   /* d4: indice da SAT onde entraria (ordem de prioridade) */
+} EcExtraSpr;
+
+static EcExtraSpr s_extra_pend[EC_EXTRA_MAX];
+static int        s_extra_pend_n = 0;
+static EcExtraSpr s_extra_act[EC_EXTRA_MAX];
+static int        s_extra_act_n = 0;
+
+void ec_video_reset_ws_state(void)
+{
+    s_extra_pend_n = 0;
+    s_extra_act_n  = 0;
+    s_snap_valid   = 0;
+    s_snap_fd64    = 0xFFFFu;
+}
+
+void ec_video_on_sprite_hook(uint32_t pc)
+{
+    if (s_mode == EC_VIDEO_OFF)
+        return;
+    if (pc == 0x00E684u) {
+        s_extra_pend_n = 0;
+        return;
+    }
+    if (pc != 0x00E7B0u || s_extra_pend_n >= EC_EXTRA_MAX)
+        return;
+    uint16_t a0 = (uint16_t)g_cpu.A[0];
+    uint16_t a1 = (uint16_t)g_cpu.A[1];
+    if (a0 == 0u || ec_ram16((unsigned)a0 + 0x18u) == 6u)
+        return;                                   /* HUD screen-space nunca */
+    if ((ec_ram16((unsigned)a0 + 0x20u) & 0x4000u) == 0u)
+        return;
+    uint16_t d0 = (uint16_t)g_cpu.D[0];
+    uint16_t d1 = (uint16_t)g_cpu.D[1];
+    if ((uint16_t)(d1 - 0x60u) > 0x100u)
+        return;                                   /* descartado por Y, nao por X */
+    if ((uint16_t)(d0 - 0x60u) <= 0x160u)
+        return;
+    EcExtraSpr *e = &s_extra_pend[s_extra_pend_n++];
+    e->x    = (int16_t)d0;
+    e->y    = (int16_t)d1;
+    e->szw  = ec_ram16((unsigned)a1 + 0u);
+    e->attr = ec_ram16((unsigned)a1 + 2u);
+    e->ord  = (uint16_t)g_cpu.D[4];
+}
+
+/* Desenha um sprite na linha. margin_only: so pixels fora de [x0, x0+native_w). */
+static void ec_draw_sprite_span(const GVDP *v, int line, int y, int sx0, int base_x,
+                                uint8_t sz, uint16_t attr, int link, int width,
+                                int im2, int sh_mode, int margin_only, int x0, int native_w,
+                                uint8_t *drawn, EcMarginSprites *ms)
+{
+    int cell_h_shift = im2 ? 4 : 3;
+    int tile_bytes   = im2 ? 64 : 32;
+    int hsz    = ((sz >> 2) & 3) + 1;
+    int vsz    = (sz & 3) + 1;
+    int height = vsz << cell_h_shift;
+    if (!(line >= y && line < y + height))
+        return;
+
+    int spr_w = hsz * 8;
+    int ox0   = base_x + sx0;
+    int ox1   = ox0 + spr_w;
+    if (!(ox1 > 0 && ox0 < width))
+        return;
+
+    int tile  = (int)(attr & 0x07FFu);
+    int pal   = (int)((attr >> 13) & 0x3u);
+    int pri   = (attr & 0x8000u) != 0;
+    int hf    = (attr & 0x0800u) != 0;
+    int vf    = (attr & 0x1000u) != 0;
+    int iy    = vf ? (height - 1 - (line - y)) : (line - y);
+    int celly = iy >> cell_h_shift;
+    int fy    = iy & ((1 << cell_h_shift) - 1);
+
+    for (int lx = 0; lx < spr_w; ++lx) {
+        int ox = ox0 + lx;
+        if (ox < 0 || ox >= width)
+            continue;
+        if (margin_only && ox >= x0 && ox < x0 + native_w)
+            continue;
+        if (drawn[ox])
+            continue;
+
+        int ix     = hf ? (spr_w - 1 - lx) : lx;
+        int cellx  = ix >> 3;
+        int fx     = ix & 7;
+        int tileno = (tile + cellx * vsz + celly) & 0x07FF;
+        uint16_t pa  = (uint16_t)(tileno * tile_bytes + fy * 4 + (fx >> 1));
+        uint8_t byte = v->vram[pa];
+        int nib      = (fx & 1) ? (byte & 0x0F) : (byte >> 4);
+        if (nib == 0)
+            continue;
+
+        drawn[ox] = 1;
+        if (sh_mode && pal == 3 && nib == 14) {
+            ms->hl[ox] = 1;
+            ms->hi[ox] = (uint8_t)pri;
+        } else if (sh_mode && pal == 3 && nib == 15) {
+            ms->sh[ox] = 1;
+            ms->hi[ox] = (uint8_t)pri;
+        } else {
+            ms->idx[ox]  = (uint8_t)(pal * 16 + nib);
+            ms->op[ox]   = 1;
+            ms->hi[ox]   = (uint8_t)pri;
+            ms->link[ox] = (uint8_t)link;
+        }
+    }
+}
+
+static void ec_eval_full_sprites_line(const GVDP *v, int line, int left, int x0, int native_w,
                                       int width, int force_display, EcMarginSprites *ms)
 {
     memset(ms, 0, sizeof(*ms));
@@ -378,12 +562,12 @@ static void ec_eval_full_sprites_line(const GVDP *v, int line, int left, int x0,
     int sh_mode      = (v->reg[12] & 0x08u) != 0;
     int max_sprites  = h40 ? 80 : 64;
     int cell_h_shift = im2 ? 4 : 3;
-    int tile_bytes   = im2 ? 64 : 32;
     uint16_t sat     = (uint16_t)((v->reg[5] & 0x7Fu) << 9);
 
     uint8_t drawn[GVDP_MAX_WIDTH];
     memset(drawn, 0, (size_t)width);
 
+    int ex = 0;                       /* proximo extra a intercalar (ordenados por ord) */
     int link = 0;
     int any_nonzero_x = 0;
     for (int n = 0; n < max_sprites; ++n) {
@@ -395,9 +579,16 @@ static void ec_eval_full_sprites_line(const GVDP *v, int line, int left, int x0,
         if (w0 == 0 && w1 == 0 && attr == 0 && w3 == 0)
             break;
 
+        /* Extras descartados que Sub_E684 teria colocado antes deste indice da SAT. */
+        for (; ex < s_extra_act_n && s_extra_act[ex].ord <= (uint16_t)link; ++ex) {
+            const EcExtraSpr *x = &s_extra_act[ex];
+            ec_draw_sprite_span(v, line, (int)(x->y & 0x3FF) - (im2 ? 256 : 128),
+                                (int)x->x - 128, x0, (uint8_t)(x->szw >> 8), x->attr, 0xFF,
+                                width, im2, sh_mode, 1, x0, native_w, drawn, ms);
+        }
+
         int y      = (int)(w0 & 0x3FFu) - (im2 ? 256 : 128);
         uint8_t sz = (uint8_t)(w1 >> 8);
-        int hsz    = ((sz >> 2) & 3) + 1;
         int vsz    = (sz & 3) + 1;
         int height = vsz << cell_h_shift;
         int next   = (int)(w1 & 0x7Fu);
@@ -412,58 +603,21 @@ static void ec_eval_full_sprites_line(const GVDP *v, int line, int left, int x0,
 
             /* Sub_E684 grava (screen_x + 128) com sinal 16-bit na SAT; HUD usa âncora fixa `left`. */
             int sx0    = (int)(int16_t)w3 - 128;
-            int spr_w  = hsz * 8;
             int base_x = s_sat_is_hud[link] ? left : x0;
-            int ox0    = base_x + sx0;
-            int ox1    = ox0 + spr_w;
-
-            if (ox1 > 0 && ox0 < width) {
-                int tile  = (int)(attr & 0x07FFu);
-                int pal   = (int)((attr >> 13) & 0x3u);
-                int pri   = (attr & 0x8000u) != 0;
-                int hf    = (attr & 0x0800u) != 0;
-                int vf    = (attr & 0x1000u) != 0;
-                int iy    = vf ? (height - 1 - (line - y)) : (line - y);
-                int celly = iy >> cell_h_shift;
-                int fy    = iy & ((1 << cell_h_shift) - 1);
-
-                for (int lx = 0; lx < spr_w; ++lx) {
-                    int ox = ox0 + lx;
-                    if (ox < 0 || ox >= width)
-                        continue;
-                    if (drawn[ox])
-                        continue;
-
-                    int ix     = hf ? (spr_w - 1 - lx) : lx;
-                    int cellx  = ix >> 3;
-                    int fx     = ix & 7;
-                    int tileno = (tile + cellx * vsz + celly) & 0x07FF;
-                    uint16_t pa  = (uint16_t)(tileno * tile_bytes + fy * 4 + (fx >> 1));
-                    uint8_t byte = v->vram[pa];
-                    int nib      = (fx & 1) ? (byte & 0x0F) : (byte >> 4);
-                    if (nib == 0)
-                        continue;
-
-                    drawn[ox] = 1;
-                    if (sh_mode && pal == 3 && nib == 14) {
-                        ms->hl[ox] = 1;
-                        ms->hi[ox] = (uint8_t)pri;
-                    } else if (sh_mode && pal == 3 && nib == 15) {
-                        ms->sh[ox] = 1;
-                        ms->hi[ox] = (uint8_t)pri;
-                    } else {
-                        ms->idx[ox]  = (uint8_t)(pal * 16 + nib);
-                        ms->op[ox]   = 1;
-                        ms->hi[ox]   = (uint8_t)pri;
-                        ms->link[ox] = (uint8_t)link;
-                    }
-                }
-            }
+            ec_draw_sprite_span(v, line, y, sx0, base_x, sz, attr, link, width, im2, sh_mode,
+                                0, x0, native_w, drawn, ms);
         }
 
         if (next == 0 || next >= max_sprites)
             break;
         link = next;
+    }
+
+    for (; ex < s_extra_act_n; ++ex) {
+        const EcExtraSpr *x = &s_extra_act[ex];
+        ec_draw_sprite_span(v, line, (int)(x->y & 0x3FF) - (im2 ? 256 : 128),
+                            (int)x->x - 128, x0, (uint8_t)(x->szw >> 8), x->attr, 0xFF,
+                            width, im2, sh_mode, 1, x0, native_w, drawn, ms);
     }
 }
 
@@ -761,15 +915,42 @@ static void ec_video_scanline_lazy(const GVDP *vdp, int line, int native_w,
     int left = (width - native_w) / 2;
     if (left < 0) left = 0;
 
-    if (vdp && ec_is_arena_state() && width > native_w && width <= GVDP_MAX_WIDTH) {
+    if (line == 0) {
+        /* Snapshot por quadro: tudo que o renderer le da WRAM (ver docs/widescreen.md GW.3). */
+        s_snap_arena = ec_is_arena_state();
+        s_snap_valid = 0;
+        if (vdp && s_snap_arena && width > native_w && width <= GVDP_MAX_WIDTH) {
+            uint16_t fd64 = ec_ram16(0xFD64u);
+            ec_take_layer_snapshot();
+            s_snap_native_w = native_w;
+            s_snap_x0       = ec_compute_viewport_x0(0, native_w, width);
+            s_snap_force_ok = (ec_ram16(0x9B32u) != 0u);
+            if (fd64 == s_snap_fd64) {
+                memcpy(s_extra_act, s_extra_pend, (size_t)s_extra_pend_n * sizeof(EcExtraSpr));
+                s_extra_act_n = s_extra_pend_n;
+            } else {
+                /* Entrada/troca de arena: a lista pendente pode ser de outro estado. */
+                s_extra_act_n = 0;
+            }
+            s_snap_fd64  = fd64;
+            s_snap_valid = 1;
+        } else {
+            /* Fora de arena widescreen: nada de extras residuais no proximo quadro valido. */
+            s_extra_pend_n = 0;
+            s_extra_act_n  = 0;
+            s_snap_fd64    = 0xFFFFu;
+        }
+    }
+
+    if (vdp && s_snap_valid && s_snap_arena && width > native_w && width <= GVDP_MAX_WIDTH) {
         if (line == 0)
             ec_refresh_frame_hud_sat(vdp);
-        int x0 = ec_compute_viewport_x0(line, native_w, width);
+        int x0 = s_snap_x0;
         if (line == 0 && ec_hd_is_active())
             ec_hd_begin_frame(vdp, ec_ram16(0xFD64u), width, 224, left, x0, s_sat_is_hud);
-        int force_display = (line >= 216 && s_frame_had_display && ec_ram16(0x9B32u) != 0u) ? 1 : 0;
+        int force_display = (line >= 216 && s_frame_had_display && s_snap_force_ok) ? 1 : 0;
         EcMarginSprites ms;
-        ec_eval_full_sprites_line(vdp, line, left, x0, width, force_display, &ms);
+        ec_eval_full_sprites_line(vdp, line, left, x0, native_w, width, force_display, &ms);
         ec_render_ws_scanline(vdp, line, native_w, left, x0, width, force_display, &ms, out);
         return;
     }
@@ -948,6 +1129,35 @@ static const char *ec_resolve_bplus_onnx_path(void)
     const char *env = getenv("EC_BPLUS_ONNX");
     if (env && *env)
         return env;
+    /* Modelo escolhido explicitamente (--bplus-model / EC_BPLUS_MODEL): o ONNX
+     * do backend CUDA tem que ser o irmão do mesmo modelo
+     * (<base>_weights.bin -> <base>_fp16.onnx | <base>.onnx). Sem irmão, retorna
+     * o caminho derivado inexistente: o ORT falha e `auto` cai no GL com os
+     * pesos certos, em vez de rodar o v1 silenciosamente. */
+    const char *model_env = getenv("EC_BPLUS_MODEL");
+    const char *model = s_bplus_model_cli_set ? s_bplus_model_path
+                      : (model_env && *model_env ? model_env : NULL);
+    if (model) {
+        static char derived[512];
+        static char derived_fp16[512];
+        size_t n = strlen(model);
+        static const char k_suffix[] = "_weights.bin";
+        size_t ks = sizeof(k_suffix) - 1u;
+        if (n >= ks && strcmp(model + n - ks, k_suffix) == 0)
+            n -= ks;
+        else if (n >= 4u && strcmp(model + n - 4u, ".bin") == 0)
+            n -= 4u;
+        if (n > sizeof(derived) - 16u)
+            n = sizeof(derived) - 16u;
+        snprintf(derived_fp16, sizeof(derived_fp16), "%.*s_fp16.onnx", (int)n, model);
+        snprintf(derived, sizeof(derived), "%.*s.onnx", (int)n, model);
+        FILE *fp = fopen(derived_fp16, "rb");
+        if (fp) {
+            fclose(fp);
+            return derived_fp16;
+        }
+        return derived;
+    }
     /* Prefere o modelo fp16 quando disponível (paridade < 1/255, ~2x mais
      * rápido no CUDA); cai pro fp32 senão. */
     static const char *fp16_candidates[] = {

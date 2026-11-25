@@ -17,6 +17,7 @@
 #include "audio/mixer.h"
 #include "ec_audio.h"
 #include "ec_boss.h"
+#include "ec_hd.h"
 #include "ec_video.h"
 #include "game_spec.h"
 #include "genesis_runtime.h"
@@ -141,6 +142,7 @@ static void ec_on_state_loaded(void)
 {
     /* Clear host-side BGM/DSP playback buffers after savestate/rewind load. */
     ec_audio_reset();
+    ec_video_reset_ws_state();
     s_audio_last_pause_flag = 0;
 }
 
@@ -148,6 +150,7 @@ static void ec_on_post_reset(void)
 {
     ec_boss_reset();
     ec_audio_reset();
+    ec_video_reset_ws_state();
     s_audio_last_pause_flag = 0;
     if (s_boot_init_done)
         return;
@@ -316,6 +319,10 @@ static int ec_instruction_hook(uint32_t pc)
     case 0x00093Cu:
         ec_audio_on_bgm_stop(1);
         return 0;
+    case 0x00E684u:
+    case 0x00E7B0u:
+        ec_video_on_sprite_hook(pc); /* passivo: so coleta sub-sprites descartados */
+        return 0;
     default:
         break;
     }
@@ -329,6 +336,10 @@ static int ec_handle_arg(const char *key, const char *val)
     if (strcmp(key, "--hd-manifest") == 0 && val && *val) {
         (void)ec_video_load_hd_manifest(val);
         return 2;
+    }
+    if (strcmp(key, "--hd-mode") == 0 && val && *val) {
+        if (ec_hd_set_mode_str(val))
+            return 2;
     }
     if (strcmp(key, "--neural-bplus") == 0) {
         ec_video_enable_bplus(1);
@@ -607,7 +618,7 @@ const GameSpec g_game_spec = {
     .on_post_reset         = ec_on_post_reset,
     .on_state_loaded       = ec_on_state_loaded,
     .handle_arg            = ec_handle_arg,
-    .arg_usage             = "--hd-manifest <path> | --neural-bplus | --bplus-model <bin> | --bplus-backend <auto|cuda|gl> | --bplus-budget-ms <ms> | --bplus-intensity <f> | --bplus-dedither <off|cbod|both> | --unlock-boss | --audio-remaster <off|dsp|hybrid|ost> | --audio-sf2 <path> | --audio-profiles-dir <dir> | --audio-bgm-vol <f> | --audio-sfx-vol <f> | --audio-chip-blend <f> | --audio-dsp-reverb <f>",
+    .arg_usage             = "--hd-manifest <path> | --hd-mode <off|planes|all> | --neural-bplus | --bplus-model <bin> | --bplus-backend <auto|cuda|gl> | --bplus-budget-ms <ms> | --bplus-intensity <f> | --bplus-dedither <off|cbod|both> | --unlock-boss | --audio-remaster <off|dsp|hybrid|ost> | --audio-sf2 <path> | --audio-profiles-dir <dir> | --audio-bgm-vol <f> | --audio-sfx-vol <f> | --audio-chip-blend <f> | --audio-dsp-reverb <f>",
     .instruction_hook      = ec_instruction_hook,
     .rb_state_save         = ec_boss_rb_state_save,
     .rb_state_load         = ec_boss_rb_state_load,

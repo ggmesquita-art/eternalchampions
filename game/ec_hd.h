@@ -19,7 +19,16 @@ enum {
  * Returns total entry count on success, or -1 on error. */
 int ec_hd_load_manifest(const char *path);
 
-/* True when a manifest is loaded and has at least one approved HD asset. */
+/* Granularidade do Modo C (--hd-mode / EC_HD_MODE):
+ *   off    = desliga o Modo C mesmo com manifest carregado;
+ *   planes = só planos/céus HD 4x (sprites ficam na base B+/nativa, sem colcha de retalhos);
+ *   all    = planos + sprites HD (padrão, comportamento histórico). */
+enum { EC_HD_MODE_OFF = 0, EC_HD_MODE_PLANES = 1, EC_HD_MODE_ALL = 2 };
+/* Aceita "off" | "planes" | "all"; retorna 1 se válido. CLI tem precedência sobre EC_HD_MODE. */
+int ec_hd_set_mode_str(const char *mode);
+int ec_hd_get_mode(void);
+/* True when a manifest is loaded and has at least one approved HD asset
+ * and --hd-mode != off. */
 int ec_hd_is_active(void);
 
 /* True when ec_hd_begin_frame() armed the current frame for per-pixel recording. */

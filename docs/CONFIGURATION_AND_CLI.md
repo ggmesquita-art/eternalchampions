@@ -83,12 +83,13 @@ A precedência de configuração segue rigorosamente a regra: **Flags de Linha d
 | Flag | Argumentos | Descrição |
 |---|---|---|
 | `--neural-bplus` | Nenhum | Ativa o processamento de upscale neural B+ nos planos de fundo e sprites. |
-| `--bplus-model` | `<caminho.bin>` | Especifica o arquivo de modelo neural binário compilado. |
+| `--bplus-model` | `<caminho.bin>` | Especifica o arquivo de modelo neural binário compilado (ex.: `assets/models/ec_bplus_v3_fast_weights.bin`, `ec_bplus_v3_hq_weights.bin`, `ec_bplus_v3_hq_janai_weights.bin`). O backend CUDA usa o ONNX irmão do mesmo modelo (`<base>_fp16.onnx` ou `<base>.onnx`); sem irmão, `auto` cai no GL. Os modelos v2/v3 foram treinados com entrada pré-dither: use `--bplus-dedither both`. |
 | `--bplus-backend` | `<auto \| cuda \| gl>` | Força o backend de execução do modelo: `gl` (OpenGL Compute Shaders portável) ou `cuda` (NVIDIA CUDA via DirectML/ORT). |
 | `--bplus-budget-ms` | `<float>` | Define o limite máximo de tempo por frame em milissegundos para a inferência antes de degradar suavemente para filtragem bilinear. |
 | `--bplus-intensity` | `<float>` | Fator de mistura entre a imagem pura de baixa resolução e a inferência neural (`0.0` = sem efeito, `1.0` = 100% neural). |
 | `--bplus-dedither` | `<off \| cbod \| both>` | Ativa o algoritmo de redução de pontilhismo dither do Mega Drive antes da passagem pelo modelo neural. |
 | `--hd-manifest` | `<caminho.toml>` | Carrega o arquivo de manifesto de substituição de texturas/sprites vetoriais em alta definição (Modo C). |
+| `--hd-mode` | `<off \| planes \| all>` | Granularidade do Modo C: `planes` usa só planos/céus HD 4× (sprites ficam no B+/nativo, sem colcha de retalhos); `all` (padrão) planos + sprites HD; `off` desliga o Modo C. Env: `EC_HD_MODE`. O `pipeline/manifest.json` usa os planos pre-dither + AnimeSharp (`assets/hd/planes_v3/`); os planos Flux antigos ficam em `assets/hd/planes/` (campo `hd_file_flux`): use `--hd-manifest pipeline/manifest_flux.json` ou `tools/pipeline/regen_planes.py --restore-flux`. Ver `docs/modo_c_planos.md`. |
 
 ### 3.4 Áudio e Remasterização em Tempo Real
 

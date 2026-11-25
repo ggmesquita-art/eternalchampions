@@ -2,45 +2,81 @@
 
 > **Roadmap estratégico:** [`ROADMAP.md`](ROADMAP.md) · **Último log de sessão:** [`LAST_STATUS_AGY1.md`](LAST_STATUS_AGY1.md) · **Progresso histórico:** [`docs/PROGRESS.md`](docs/PROGRESS.md).
 > **Foco ativo:** Renderização Gráfica (`G`), Suporte a Shaders (`S`) e Remasterização da Trilha Sonora (`A`).
-> **Regra de validação:** Toda alteração em C/runtime exige build limpo (`cmake --build build/native -j`) + `python3 harness/ec_harness.py --quick` (e suíte `17/17` no fechamento de cada etapa) com `wram_diff=0/65536`.
+> **Regra de validação (Windows nativo):** Toda alteração em C/runtime exige build limpo (`.\build.cmd` → `build\EternalChampionsRecomp.exe`) + `python harness\ec_harness.py --quick --native build\EternalChampionsRecomp.exe` (e suíte `17/17` no fechamento de cada etapa) com `wram_diff=0/65536`. Procedimentos detalhados nas skills [`.agents/skills/ec-build-and-harness`](.agents/skills/ec-build-and-harness/SKILL.md) e [`.agents/skills/ec-disasm-and-hooks`](.agents/skills/ec-disasm-and-hooks/SKILL.md) — **toda delegação a subagente deve citá-las**.
 
 ---
 
 ## 0. Pré-requisito / Checkpoint Imediato (Higiene de Git)
 
-- [ ] **G0.1 — Revisar e commitar o pacote validado do working tree atual** *(aguarda autorização do usuário)*:
-  - Submódulo `segagenesisrecomp/`: `runner/main.c` (Hotkey `F12` screenshot em `screenshots/` + `Shift/Ctrl+F12` preservando dump dev) e `runner/glue.c`.
-  - Repo principal: Pré-dither GPU (`neural/infer/ec_bplus_gl.{h,c}`), treino/export B+ v2 (`neural/train_espcn.py`, `neural/export_onnx.py`), Modo C (`game/ec_hd.{h,c}`, `game/ec_video.{h,c}`, `game/ec_spec.c`, `game/CMakeLists.txt`), backend CUDA ORT (`neural/infer/ec_bplus_ort.{h,c}` + `ort/`), `ROADMAP.md` e `task.md`.
-  - Decidir sobre `docs/ROADMAP.md` (cópia legada v0.1 não rastreada).
+- [x] **G0.1 — Checkpoint do working tree** — repo principal `a883a39` (tudo, inclusive `docs/ROADMAP.md` legado) + `segagenesisrecomp` `0b62ec8` (branch `eternalchampions`; repo separado, ignorado pelo principal — não é submódulo). Fora do commit: dumps de RAM `tools/vendor/gpgx_runner/{900,2000}` (derivados da ROM) e caches `graphify-out/cache/`, `tools/.engram/cache/` (agora no `.gitignore`); mode-change `755→644` de `segagenesisrecomp/tools/rb_*.sh` não commitado.
+- [ ] **G0.2 — Ambiente de validação 100% na pasta Windows** *(decisão do usuário: desenvolver e buildar só em `C:\Users\Administrator\Projects\eternalchampions`; o clone WSL `~/eternalchampions` é **somente leitura**, apenas fonte de arquivos de referência — nunca modificar)*:
+  - Copiar do WSL (somente leitura) para pastas ignoradas daqui: `gpgx_runner` + `genesis_plus_gx_libretro.so` → `tools/vendor/`, savestates `native_save_{2,5,6,7}.bin` → `build/ref_saves/` (sem sobrescrever os `native_save_1..3.bin` locais).
+  - [x] Copiados (somente leitura) do WSL: `tools/vendor/gpgx_runner/gpgx_runner` e savestates `build/ref_saves/native_save_{1..9}.bin` (+ `.thumb`); core `.so` já existia.
+  - [x] `harness/ec_harness.py` portado para Windows (`IS_WINDOWS`, `DEFAULT_NATIVE` = `build/EternalChampionsRecomp.exe`, `to_wsl_path()`, GPGX via `wsl.exe -d Ubuntu --`, workdir em `%TEMP%\ec_harness_work`, subprocess UTF-8). **Linha de base `--quick` no Windows idêntica ao Linux:** `det=0/65536`, `interp_diff=0/65536`, misses `(0,0,0,0)`, GPGX diff `729` / `2194` (mesmos valores históricos), margens 16:9 `8593/8461`, `wram_diff=0/65536`.
+  - [x] Build oficial: `build.cmd` reescrito para buildar **neste repo** em `build/` (MSVC x64 + Ninja; `reconfigure` opcional) — verificado `BUILD_OK`. Risco: vcpkg ainda em `%TEMP%\opencode\vcpkg`.
+  - [x] Skills `.agents/skills/ec-build-and-harness` e `ec-disasm-and-hooks` adaptadas de WSL para Windows (clone WSL somente leitura).
+  - Python/GPU: venv do ComfyUI (`F:\ComfyUI\ComfyUI\.venv`, torch `2.13+cu130`, `spandrel 0.4.2`, RTX 5060 Ti) usado sem alterar seus pacotes; dependências extras (`lpips`, aprovado) instaladas com `pip --target neural/.pydeps` + `PYTHONPATH`; pesos VGG16 no cache do torch.
+- **Alvo de desempenho B+ v3 fast:** Windows nativo (GL/CUDA direto na RTX 5060 Ti); WSL D3D12 apenas referência secundária.
+
+> **Ordem de execução (decisão do usuário, 2026-11-23):** Pilar 1 (`G`) + revisão de bugs do widescreen (`GW`) **primeiro**; Pilar 2 (`S`) na fase seguinte, reaproveitando funções do render revisado.
 
 ---
 
 ## 1. Pilar 1 — Aperfeiçoamento da Renderização Gráfica (`Trilha G`)
 
+### Etapa GW — Revisão de Bugs do Widescreen (Modo A `--widescreen`, roda em paralelo a G1)
+- [x] **GW.1** — Reproduzir e diagnosticar o **pilar esquerdo do portal da arena da Jetta (Estado `22`) que some ao rolar a câmera para a esquerda** (capturas quadro a quadro 4:3 × 16:9 nas margens; identificar se a coluna vem do Plano A/B — streaming de colunas da nametable só cobre a janela de 320 px — ou de sprite culled pelo jogo fora da tela).
+- [x] **GW.2** — Reproduzir e diagnosticar o **flickering/artefato nas laterais** (margens `[0..left)` / `[left+320..width)`) em todas as arenas `14, 17..27` — relato do usuário: ocorre em várias arenas, **mais no início da luta, antes de os sprites terminarem de carregar** (DMA de tiles), diminuindo depois, salvo com muito movimento de câmera — cruzando `ec_compute_viewport_x0()`, `ec_plane_edge_comp()`, `ec_eval_full_sprites_line()` e `ec_refresh_frame_hud_sat()` em `game/ec_video.c`.
+- [x] **GW.3** — Corrigir em `game/ec_video.c` (somente leitura passiva de VRAM/VSRAM/SAT/WRAM; zero escrita no estado do jogo) e documentar causa-raiz em `docs/widescreen.md`.
+  - *Resultado GW.1–GW.3 (2026-11-24):* **Bug 1** — o pilar é sprite (obj `id40=$009F`, `fl20&$4000`) descartado da SAT por `Sub_E684` (`$E772–$E7B0`, x fora de [-32,320]); correção: hooks passivos `$00E684`/`$00E7B0` (`game.toml` + `ec_spec.c`) registram sub-sprites descartados por X e `ec_eval_full_sprites_line` os desenha só nas margens, na ordem `d4`. **Bug A (flicker lateral)** — leituras de WRAM ao vivo por scanline (68K atualiza ~linha 35, VRAM só no vblank) → rasgo de x0 + corrida do `c0`; correção: snapshot na linha 0 (x0, camadas `$D84E`, `$CD1E`, `$9B32`) + margens hstream sempre via fallback ROM. Objetos de quadro alternado (S23, bit 13/12 de `fl20`) são comportamento original do jogo. Revisor: sem achados graves; aplicados reset de extras/snapshot em troca de arena, reset e load de savestate (`ec_video_reset_ws_state`), `margin_px` por `native_w`. Rasgo de x0: 5→0 quadros; linhas sem match com 4:3 em movie 04: 2835→2395. Pendências: 81 quadros com ~8 linhas diferentes do 4:3 (pré-existente, hipótese parallax), detalhe ~100 px no canto sup. esq. do centro (f3376), sprites descartados que não são `fl20&$4000`, quadros de lag não testados, lista parcial se `Sub_E684` cruzar a linha 0 (teórico).
+- [x] **GW.4** — Validar: capturas antes/depois em `assets/video_compare/widescreen/`, `--quick` + suíte `17/17` com `wram_diff=0/65536`, e `inspect_widescreen_margins()` sem regressão.
+  - *Validado (2026-11-24, build final pós-revisão):* `.uild.cmd` BUILD_OK; suíte completa **17/17** `det=0/65536`, misses `(0,0,0,0)`, `gp_ok` em todos (13 = EC opt-in, GPGX N/A; 15 = arena sorteada por RNG HV, já documentado); **16/16** capturas `[WS 16:9]` com `wram_diff=0/65536`; capturas `after_*` em `assets/video_compare/widescreen/` reproduzidas pixel a pixel com o build final; 21:9 em S22 sem lixo nas margens.
+
 ### Etapa G1 — Laboratório Visual de Upscalers Teachers *(Próximo passo imediato — sem alterar código do jogo)*
-- [ ] **G1.1** — Capturar 4 frames nativos reais completos já com Pre-Dither `both` aplicado (`Vietnam S6`, `Salem S7`, `Sanctuary S2`, `Trident S5`) cobrindo personagens, sombras translúcidas, céu, fogo e HUD.
-- [ ] **G1.2** — Processar os 4 frames na RTX 5060 Ti com os upscalers já instalados em `F:\ComfyUI\ComfyUI\models\upscale_models\`:
+- [x] **G1.1** — Capturar 4 frames nativos reais completos já com Pre-Dither `both` aplicado (`Vietnam S6`, `Salem S7`, `Sanctuary S2`, `Trident S5`) cobrindo personagens, sombras translúcidas, céu, fogo e HUD.
+- [x] **G1.2** — Processar os 4 frames na RTX 5060 Ti com os upscalers já instalados em `F:\ComfyUI\ComfyUI\models\upscale_models\`:
   - `4x-AnimeSharp.pth`
   - `4x_IllustrationJaNai_V1_DAT2_190k.pth`
   - `4x_foolhardy_Remacri.pth`
   - `4x_NMKD-Siax_200k.pth`
   - `4x-UltraSharpV2.safetensors`
   - `4xNomos8kSCHAT-L.pth`
-- [ ] **G1.3** — Montar pranchas comparativas lado a lado com zoom 1:1 (lutadores, rosto/roupas, céu, chão e HUD) em `assets/video_compare/upscalers_teacher/` e comparar contra B+ v1 e B+ v2.
-- [ ] **G1.4 [GATE USUÁRIO]** — Escolher visualmente o upscaler teacher vencedor (para tela inteira / sprites e, se diferente, para planos/céus).
+- [x] **G1.3** — Montar pranchas comparativas lado a lado com zoom 1:1 (lutadores, rosto/roupas, céu, chão e HUD) em `assets/video_compare/upscalers_teacher/` e comparar contra B+ v1 e B+ v2.
+  - *Resultado (2026-11-23):* `tools/pipeline/upscaler_lab.py` (venv ComfyUI); 4 cenas (`s2_sanctuary`, `s5_trident` via movie 06 f2700, `s6_vietnam`, `s7_salem`); pre-dither `both` via `pre_dedither_torch` validado vs GL (máx 1/255); 9 upscalers (+3 bônus) + nearest/bicúbico/B+ v1/v2; pranchas `board_<cena>_{full,crops}.png` + `report.json`. Tempos 398x224→1592x896: ESRGAN-likes ~0,21 s (fp16), DAT2/UltraSharpV2 ~2,1 s, SCHAT-L ~2,8 s. Top 3 do agente: UltraSharpV2, Nomos8kSCHAT-L, AnimeSharp.
+- [x] **G1.4 [GATE USUÁRIO]** — Escolher visualmente o upscaler teacher vencedor (para tela inteira / sprites e, se diferente, para planos/céus).
+  - *Decisão do usuário (2026-11-24):* shortlist de 4 teachers — `4x-AnimeSharp` (velocidade), `4x_IllustrationJaNai_V1_ESRGAN_135k`, `4x_IllustrationJaNai_V1_DAT2_190k`, `4xNomos8kSCHAT-L`. B+ v2 fica só como referência (é student, não teacher). Vencedor definido pelo **student treinado**, não pela saída do teacher: G2.2 gera alvos com os 4; **G2.3b (novo)** treina um piloto v3-fast por teacher em subconjunto e monta prancha de students para o usuário escolher; G2.4 treina fast/HQ só com o vencedor. Alvos gerados offline via spandrel no venv do ComfyUI (sem servidor/workflow ComfyUI).
 
 ### Etapa G2 — Modo B+ v3 Full-Frame Distilled (100% da tela uniforme + 60 fps)
-- [ ] **G2.1** — Criar script de coleta de dataset full-frame (`neural/collect_dataset.py`) capturando centenas de frames reais variados (todas as 11 arenas, todos os 10 lutadores incluindo EC, poses em pé/aéreas/golpes/especiais/overkills, menus e HUD) com Pre-Dither `both`.
-- [ ] **G2.2** — Gerar targets 4× sobre todo o dataset usando o upscaler teacher aprovado em **G1.4** (sem recortes 32×32 e sem borda `NEAREST`).
-- [ ] **G2.3** — Aprimorar `neural/train_espcn.py` com perda perceptual (VGG/LPIPS ou perceptual + L1 + gradiente/SSIM) voltada para suavização real de contornos e redução da pixelação interna.
-- [ ] **G2.4** — Treinar e exportar duas variantes lado a lado (sem sobrescrever v1/v2):
-  - `assets/models/ec_bplus_v3_fast_weights.bin` (`ch=36..40`, `nb=2..3`, alvo `p50 ≤ 8–10 ms` no WSL D3D12 = 60 fps travados).
+- [x] **G2.1** — Criar script de coleta de dataset full-frame (`neural/collect_dataset.py`) capturando centenas de frames reais variados (todas as 11 arenas, todos os 10 lutadores incluindo EC, poses em pé/aéreas/golpes/especiais/overkills, menus e HUD) com Pre-Dither `both`.
+  - *Feito (2026-11-24):* `neural/collect_dataset.py` → `assets/dataset_v3/` com **1397 frames** 398x224 (17 movies, passo 7, dedup MAD<1.5, 70 val), estados 1/7/9/14/16/17–27 cobertos (EC=60 frames), `predither/` via `pre_dedither_torch(both)`.
+- [x] **G2.2** — Gerar targets 4× sobre todo o dataset usando o upscaler teacher aprovado em **G1.4** (sem recortes 32×32 e sem borda `NEAREST`).
+  - *Parcial (2026-11-24):* `neural/gen_targets.py` (spandrel, retomável, `--check`): `animesharp` 1397 (567 s) e `janai_esrgan` 1397 (485 s) **CHECK OK**; `janai_dat2` e `nomos_schatl` 1397 cada (~2,3 s/frame) — **CHECK OK nos 4** (2026-11-24 11:42). ~2 GB por teacher.
+- [x] **G2.3** — Aprimorar `neural/train_espcn.py` com perda perceptual (VGG/LPIPS ou perceptual + L1 + gradiente/SSIM) voltada para suavização real de contornos e redução da pixelação interna.
+  - *Feito (2026-11-24):* modo `--dataset-v3/--teacher` em `neural/train_espcn.py` (patches de frames inteiros, flip H, perda L1+LPIPS+Sobel+SSIM, AMP bf16, warmup+cosine, best por LPIPS val, `--infer`); `lpips 0.1.4` em `neural/.pydeps` (ignorado). Smoke ok (val LPIPS 0,279→0,219), fluxo v1/v2 intacto. Throughput: LPIPS-VGG ~1,1 it/s (gargalo), LPIPS-Alex ~8 it/s. Pendente p/ G2.5: parity gate do `export_onnx.py` falhou por pouco no smoke (`max_abs_err 1,145e-4` > 1e-4, PSNR 93 dB).
+- [x] **G2.3b [GATE USUÁRIO]** — Piloto: treinar `v3-fast` (ch=40, nb=2) por teacher em subconjunto do dataset com a perda nova, inferir nas 4 cenas do laboratório e montar pranchas `assets/video_compare/students_v3_pilot/` (students × teachers × B+ v2) com latência estimada; usuário escolhe o teacher final.
+  - *Pilotos feitos (2026-11-24):* 400 frames, 30×100 steps, LPIPS-Alex, ~4–7,5 min cada; ckpts `assets/models/pilot/v3_fast_<teacher>.pt`. Val vs. o próprio teacher: animesharp 31,01 dB / SSIM 0,935 / LPIPS 0,048; nomos_schatl 29,84 / 0,881 / 0,071; janai_dat2 26,35 / 0,856 / 0,086; janai_esrgan 25,65 / 0,844 / 0,105. Visualmente os 4 students convergem para saídas muito parecidas (rede pequena não absorve contornos grossos/texturas do JaNai); AnimeSharp é o mais nítido e o que melhor imita o teacher. Pranchas `board_<cena>_crops.png` (4 cenas). **Decisão do usuário (2026-11-24): teacher final = AnimeSharp.**
+- [x] **G2.4** — Treinar e exportar duas variantes lado a lado (sem sobrescrever v1/v2):
+  - `assets/models/ec_bplus_v3_fast_weights.bin` (`ch=36..40`, `nb=2..3`, alvo `p50 ≤ 8–10 ms` no **Windows nativo** = 60 fps travados; WSL D3D12 só referência).
   - `assets/models/ec_bplus_v3_hq_weights.bin` (`ch=48..56`, `nb=4..6`, foco qualidade máxima em GPU nativa).
-- [ ] **G2.5** — Validar paridade PyTorch ↔ ONNX ↔ GL Compute (`PSNR ≥ 60 dB`), `wram_diff=0/65536`, benchmark 120 frames e prancha comparativa v1 × v2 × v3.
+  - *Ablação de capacidade (2026-11-24, AnimeSharp, 400 frames, 3000 steps, LPIPS-Alex; latência GL p50 no jogo, RTX 5060 Ti, `--widescreen fit` 2048×896; v2 48/4 = 6,5 ms em 4:3):* 40/2 31,01 dB/LPIPS 0,048/4,5 ms · **40/3 31,44/0,044/6,0 ms** · 48/4 31,91/0,038/10,3 ms · 48/6 32,38/0,034/14,8 ms · **56/4 32,40/0,034/13,8 ms** · 56/6 32,77/0,031/19,8 ms (estoura 16,6 ms). Escolha: **fast = ch40/nb3**, **HQ = ch56/nb4**.
+  - *Treino completo:* 1327 frames treino / 32 val; fase A LPIPS-Alex 60×200 steps (lr 1e-3) → fase B fine-tune LPIPS-VGG 15×200 steps (lr 2e-4); intermediários em `assets/models/v3_stage/`, finais `assets/models/ec_bplus_v3_{fast,hq}.pt`.
+  - *Feito (2026-11-24):* val (32 frames, vs AnimeSharp): **fast** fase A 32,75 dB/SSIM 0,950/LPIPS-Alex 0,031 → fase B 32,71 dB/LPIPS-VGG 0,0696→0,0652; **HQ** fase A 34,00 dB/0,960/0,022 → fase B 33,99 dB/LPIPS-VGG 0,0551→0,0506. Exportados `ec_bplus_v3_{fast,hq}.onnx` + `_weights.bin` (ECBP roundtrip 0,0). Latência GL no jogo (p50, fallback 0): fast 3,75 ms (4:3) / 5,97 ms (fit 2048×896); HQ 8,58 / 13,79 ms. ORT CUDA: fast 8,4 ms, HQ 10,2 ms. Prancha v1×v2×v3: `assets/video_compare/v3_final/board_<cena>_crops.png` (`tools/pipeline/student_board.py --final`).
+  - *Variante opcional HQ JaNai DAT2 (2026-11-24, pedido do usuário):* mesmo esquema do HQ (56/4, Alex→VGG). Val vs. o próprio teacher: 28,27 dB / SSIM 0,902 / LPIPS-VGG 0,090 (imita pior que o AnimeSharp, mas a 56/4 já mostra estilo próprio: mais nítido, preserva mais detalhe/contorno do pixel art, menos "pintado"). `assets/models/ec_bplus_v3_hq_janai{.pt,.onnx,_weights.bin}`; GL fit 13,84 ms, fallback 0. Prancha `assets/video_compare/v3_final/hq_style/` (`student_board.py --hq-style`). Export com `--parity-max-abs 2e-3` (fight_320 1,2e-3, PSNR 84,7 dB vs ORT CUDA).
+  - *Paridade do export:* PyTorch CPU × ORT **CUDA** = max_abs 4–5e-4, PSNR 85–90 dB (≈1/10 LSB 8-bit; diferença vem de TF32/cuDNN no ORT). O gate padrão (1e-4/90 dB) foi mantido; `export_onnx.py` ganhou `--parity-max-abs/--parity-min-psnr` e o v3 foi exportado com `1e-3/80`. Validar GL↔PyTorch (≥60 dB) em G2.5.
+- [x] **G2.5** — Validar paridade PyTorch ↔ ONNX ↔ GL Compute (`PSNR ≥ 60 dB`), `wram_diff=0/65536`, benchmark 120 frames e prancha comparativa v1 × v2 × v3.
+  - *Feito (2026-11-24):* `tools/pipeline/bplus_gl_parity.py` joga o filme `06` (luta real) no exe com janela/GL, captura entrada nativa + saída 4× (`EC_BPLUS_CAPTURE*`) e compara com o `.pt` em PyTorch (pre-dither espelho). **15/15 OK** (3 modelos × dedither both/off × frames 3000/3390 + widescreen fit): **erro máx. 1 LSB, 0% > 1 LSB**; PSNR 59,5–62,3 dB — o teto vem só de flips de arredondamento fp16→8 bits (10–20% dos pixels ±1), por isso o gate virou `max ≤ 1 LSB` (PSNR reportado). Resultados em `assets/captures/bplus_gl_parity{,_ws}.json`. Armadilha corrigida no script: frames 900–2400 do filme são pretos (rejeitados agora). PyTorch↔ONNX: ver G2.4 (85–90 dB vs ORT CUDA).
+  - `wram_diff` com B+ GL **ativo em janela real** (filme `06`, `--widescreen fit`, dedither both): v3 fast e v3 HQ JaNai **0/65536** vs. baseline headless sem B+. Harness `--quick`: `det=0`, misses 0, WS `wram_diff=0`.
+  - Benchmark GL (p50/p99 em 3399 frames de jogo, RTX 5060 Ti, fallback 0): fast 3,78/3,81 ms (4:3) · 5,99/6,02 ms (fit 2048×896); HQ 8,62/8,69 · 13,87/13,95; HQ JaNai 8,63/8,69 · 13,86/13,95. Referência: v1 2,81 ms, v2 6,45 ms (4:3) / 10,33 ms (fit). Prancha v1×v2×v3 em G2.4.
+  - *Correção (`game/ec_video.c`):* o backend CUDA ignorava `--bplus-model` e carregava sempre o ONNX do v1 (`ec_bplus_espcn4x_fp16.onnx`); agora deriva o ONNX irmão do modelo escolhido (`<base>_fp16.onnx` | `<base>.onnx`) e, sem irmão, `auto` cai no GL com os pesos certos. Documentado em `docs/CONFIGURATION_AND_CLI.md`.
+  - *Pendência → G4.2:* CUDA/ORT indisponível no Windows: o loader acha um `onnxruntime.dll` 1.17.1 do sistema (API ≤ 17) e o build pede API 32 → `[BPLUS_ORT] ORT API version mismatch`; empacotar o `onnxruntime.dll` certo ao lado do exe. Só GL validado.
 
 ### Etapa G3 — Modo C Híbrido (Planos HD limpos + Fallback B+ v3)
-- [ ] **G3.1** — Adicionar controle granular `--hd-mode <off|planes|all>` em `game/ec_hd.{h,c}`, `game/ec_video.{h,c}` e `game/ec_spec.c` (permitindo usar apenas os planos/céus 4× sem o efeito colcha de retalhos de sprites parciais).
-- [ ] **G3.2** — Regerar os 27 planos de arena (`assets/hd/planes/`) passando Pre-Dither `both` **antes** do upscaler/Flux (corrigindo especificamente o grão residual do céu do Trident `86cb2ec7b0cbbdd2`).
+- [x] **G3.1** — Adicionar controle granular `--hd-mode <off|planes|all>` em `game/ec_hd.{h,c}`, `game/ec_video.{h,c}` e `game/ec_spec.c` (permitindo usar apenas os planos/céus 4× sem o efeito colcha de retalhos de sprites parciais).
+  - *Feito (2026-11-24):* `--hd-mode <off|planes|all>` + env `EC_HD_MODE` (`game/ec_hd.{h,c}`, `game/ec_spec.c`; padrão `all`). Bug corrigido no caminho: em `planes`, `s_sat_match_slot[]` ficava zerado → todo sprite parecia "casado" e o plano HD apagava os lutadores/HUD; agora zera para -1.
+  - **De-dither de pseudo-transparência no shader de planos** (causa real do "grão" do Modo C): o compositor escolhe o vencedor VDP por pixel nativo; plano A em xadrez opaco/transparente sobre o B (ou B sobre o backdrop) fazia a saída HD alternar A/B/A/B. Agora, se ≥3 dos 4 vizinhos são de outra camada, mistura 50/50 com o HD do outro plano amostrado no texel real do vizinho; contra backdrop/tile sem HD mantém a base B+ (já de-ditherizada). Vale também para os planos Flux. Diagnóstico: `EC_HD_CAPTURE_MAP=<png>` grava o mapa de camadas por pixel.
+  - Validação: harness `--quick` det=0/misses 0/WS `wram_diff=0`; `wram_diff=0/65536` com Modo C ativo em janela real (`planes` + v3 planes e `all` + Flux, filme `06`, fit).
+- [x] **G3.2** — Regerar os 27 planos de arena (`assets/hd/planes/`) passando Pre-Dither `both` **antes** do upscaler/Flux (corrigindo especificamente o grão residual do céu do Trident `86cb2ec7b0cbbdd2`).
+  - *Feito (2026-11-24) via teacher, não Flux:* `tools/pipeline/regen_planes.py` (pre-dither `both` + AnimeSharp 4×, alpha NEAREST, ~43 s p/ 27 planos) → `assets/hd/planes_v3/` (inicialmente num manifest paralelo para A/B). Pranchas A/B em jogo (`--hd-mode planes`): `assets/video_compare/hd_mode/board_planes_*.png`. Achados: Flux inventa conteúdo (ex.: pôster de Larcen vira texto "MEAGH TING BUICERTS", cidade do Trident redesenhada); os planos AnimeSharp são fiéis e ficam muito próximos do B+ v3 (ganho só de nitidez). **Decisão do usuário (2026-11-24): AnimeSharp (fiel) é o padrão** → `pipeline/manifest.json` aponta os 27 planos para `assets/hd/planes_v3/`; o caminho Flux fica em `hd_file_flux` (PNGs Flux preservados em `assets/hd/planes/`) e volta com `regen_planes.py --restore-flux` (verificado: 0 diferenças vs HEAD). Flux preservado lado a lado em `pipeline/manifest_flux.json` (`--hd-manifest pipeline\manifest_flux.json`); justificativa da escolha e evidências em `docs/modo_c_planos.md` (+ `docs/img/modo_c/`).
 - [ ] **G3.3** — *(Opcional, se optar por manter sprites no Modo C)* Corrigir `enforce_silhouette()` em `tools/pipeline/comfy_upscale.py` para máscara alfa suave (anti-aliased) em vez de `NEAREST` 4×4.
 
 ### Etapa G4 — Otimização GPU (OpenGL Compute & CUDA ORT)
@@ -50,7 +86,15 @@
 
 ---
 
-## 2. Pilar 2 — Suporte a Shaders Modulares (`Trilha S`)
+## 2. Pilar 2 — Suporte a Shaders Modulares (`Trilha S`) — *próxima fase, após Pilar 1*
+
+> **Decisões já tomadas (usuário, 2026-11-23) — prevalecem sobre o texto original das etapas abaixo:**
+> - **Formato padrão RetroArch:** carregar `.glslp` + `.glsl` do libretro diretamente (convenção single-file `#if defined(VERTEX)` / `#elif defined(FRAGMENT)`), em vez de um formato `.ecshader` próprio — usuários poderão trazer qualquer shader compatível. Licenças não são bloqueio: shaders de teste baixados do `libretro/glsl-shaders` (crt-lottes, scalefx, fsr/EASU, cas/RCAS, cbod/sgenpt-mix) apenas para garantir compatibilidade. Shaders são um extra; o render próprio (B+/Modo C) segue como principal.
+> - **Sem hotkey em runtime** (F1..F9 já são slots de savestate): seleção apenas por CLI (`--shader-preset`, `--shader-param`) e `settings.ini`; documentar tudo em `docs/CONFIGURATION_AND_CLI.md`. **S3.2 cancelado.**
+> - **Renderer:** no Windows o padrão é `direct3d11`; com preset ativo forçar `opengl` (mesmo mecanismo de `genesis_hd_create_renderer` / `present_gpu_enabled()`), preset `off` mantém D3D11. `present_gpu_enabled()` deve passar a considerar preset ativo mesmo com B+ desligado.
+> - **Versionamento:** `assets/` é ignorado — adicionar exceção `!assets/shaders/` no `.gitignore`.
+> - **Estágio neural nos presets:** usar o B+ ativo (hoje v2; v3 quando G2 concluir).
+> - **Orquestração prevista:** Fase 1 paralela (executor A: `game/ec_shader_chain.{h,c}` FBO ping-pong + parser `.glslp` integrado a `ec_video_present_gpu()`; executor B: baixar/adaptar shaders + presets em `assets/shaders/`); Fase 2: CLI/`settings.ini` + benchmark `GL_TIME_ELAPSED` 1080p/1440p/4K; Fase 3: `revisor` + build limpo + `17/17` `wram_diff=0/65536` + docs.
 
 ### Etapa S1 — Engine de Cadeia de Shaders Multi-Pass (OpenGL)
 - [ ] **S1.1** — Projetar e implementar `game/ec_shader_chain.{h,c}` com pipeline FBO ping-pong em OpenGL 3.3+ encaixado no fluxo `ec_video_present_gpu()` (`game/ec_video.c`), suportando estágios pré-upscale (nativo), upscale analítico e pós-upscale (saída 4× / viewport).
@@ -72,7 +116,7 @@
 
 ### Etapa S3 — Integração CLI, `settings.ini`, Hotkey e Benchmark
 - [ ] **S3.1** — Adicionar `--shader-preset <nome|caminho>` e `--shader-param <chave=valor>` em `game/ec_spec.c` e suporte no `settings.ini`.
-- [ ] **S3.2** — Adicionar hotkey em runtime (`F9` / `Shift+F9`) em `segagenesisrecomp/runner/main.c` para ciclar presets ao vivo com log/OSD, sem conflitar com `F7/F8` (save/load), `F10` (cold reset) e `F12` (screenshot).
+- [ ] ~~**S3.2**~~ *(cancelado — sem hotkey, ver decisões acima)* — Adicionar hotkey em runtime (`F9` / `Shift+F9`) em `segagenesisrecomp/runner/main.c` para ciclar presets ao vivo com log/OSD, sem conflitar com `F7/F8` (save/load), `F10` (cold reset) e `F12` (screenshot).
 - [ ] **S3.3** — Medir latência por passe (`GL_TIME_ELAPSED`) e gerar prancha comparativa em `1080p`, `1440p` e `4K` em `assets/video_compare/shaders/`.
 
 ---

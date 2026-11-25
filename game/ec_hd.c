@@ -692,7 +692,51 @@ int ec_hd_load_manifest(const char *path)
     return s_total_entries;
 }
 
-int ec_hd_is_active(void) { return s_manifest_loaded && s_approved_entries > 0; }
+static int s_hd_mode = EC_HD_MODE_ALL;
+static int s_hd_mode_cli_set = 0;
+static int s_hd_mode_env_checked = 0;
+
+static int hd_parse_mode(const char *m, int *out)
+{
+    if (!m || !*m) return 0;
+    if (strcmp(m, "off") == 0)    { *out = EC_HD_MODE_OFF;    return 1; }
+    if (strcmp(m, "planes") == 0) { *out = EC_HD_MODE_PLANES; return 1; }
+    if (strcmp(m, "all") == 0)    { *out = EC_HD_MODE_ALL;    return 1; }
+    return 0;
+}
+
+int ec_hd_set_mode_str(const char *mode)
+{
+    int v = EC_HD_MODE_ALL;
+    if (!hd_parse_mode(mode, &v)) {
+        fprintf(stderr, "[EC_HD] --hd-mode desconhecido '%s' (off|planes|all)\n", mode ? mode : "");
+        return 0;
+    }
+    s_hd_mode = v;
+    s_hd_mode_cli_set = 1;
+    return 1;
+}
+
+int ec_hd_get_mode(void)
+{
+    if (!s_hd_mode_cli_set && !s_hd_mode_env_checked) {
+        s_hd_mode_env_checked = 1;
+        int v = EC_HD_MODE_ALL;
+        const char *env = getenv("EC_HD_MODE");
+        if (env && *env) {
+            if (hd_parse_mode(env, &v))
+                s_hd_mode = v;
+            else
+                fprintf(stderr, "[EC_HD] EC_HD_MODE desconhecido '%s' (off|planes|all)\n", env);
+        }
+    }
+    return s_hd_mode;
+}
+
+int ec_hd_is_active(void)
+{
+    return s_manifest_loaded && s_approved_entries > 0 && ec_hd_get_mode() != EC_HD_MODE_OFF;
+}
 int ec_hd_frame_active(void) { return s_frame_armed; }
 int ec_hd_total_entries(void) { return s_total_entries; }
 int ec_hd_approved_entries(void) { return s_approved_entries; }
@@ -1081,7 +1125,15 @@ void ec_hd_begin_frame(const GVDP *vdp, uint16_t state_id,
             match_live_plane(vdp, 1, base_a, &s_planes[state_id][1]);
     }
 
-    match_live_sprites(vdp, left, x0, sat_is_hud);
+    if (ec_hd_get_mode() == EC_HD_MODE_ALL)
+        match_live_sprites(vdp, left, x0, sat_is_hud);
+    else {
+        /* --hd-mode planes: nenhum sprite casado -> record_pixel trata todo sprite
+         * vencedor como "unmatched" e deixa a base (B+/nativa) intacta nele. */
+        s_frame_sprite_count = 0;
+        for (int i = 0; i < 80; ++i)
+            s_sat_match_slot[i] = -1;
+    }
     s_frame_armed = 1;
 }
 
@@ -1386,6 +1438,9 @@ static const char s_plane_fs[] =
     "    if (lv == 2u) return 0.5 + 0.5 * c;\n"
     "    return c;\n"
     "}\n"
+    "vec4 sample_plane(uint layer, ivec2 tc) {\n"
+    "    return (layer == 1u) ? texelFetch(u_plane_b, tc, 0) : texelFetch(u_plane_a, tc, 0);\n"
+    "}\n"
     "void main() {\n"
     "    ivec2 op = ivec2(gl_FragCoord.xy);\n"
     "    vec2 uv = ((vec2(op) + 0.5) / vec2(u_out_size)) * u_base_uv;\n"
@@ -1398,12 +1453,38 @@ static const char s_plane_fs[] =
     "    uint lv    = (m.b >> 2) & 3u;\n"
     "    if (layer == 1u || layer == 2u) {\n"
     "        ivec2 tc = ivec2(int(m.r) * 4 + sub.x, int(m.g) * 4 + sub.y);\n"
-    "        vec4 hd = (layer == 1u) ? texelFetch(u_plane_b, tc, 0)\n"
-    "                                : texelFetch(u_plane_a, tc, 0);\n"
-    "        if (hd.a > 0.01) {\n"
-    "            vec3 rgb = apply_level(hd.rgb, lv);\n"
-    "            col.rgb = mix(col.rgb, rgb, hd.a);\n"
+    "        vec4 hd = sample_plane(layer, tc);\n"
+    "        vec3 rgb = apply_level(hd.rgb, lv);\n"
+    "        float a = hd.a;\n"
+    "        /* De-dither de pseudo-transparencia (G3): plano em xadrez opaco/transparente\n"
+    "         * (A sobre B, ou B sobre o backdrop) faz o vencedor VDP alternar a cada pixel\n"
+    "         * nativo. Se >= 3 dos 4 vizinhos sao de outra camada (xadrez):\n"
+    "         *   - vizinho do outro plano HD -> mistura 50/50 com o HD dele, amostrado no\n"
+    "         *     texel REAL do vizinho (opaco; na posicao do centro o outro plano e\n"
+    "         *     transparente justamente por causa do xadrez);\n"
+    "         *   - senao (backdrop/tile sem HD) -> mantem a base B+, ja de-ditherizada. */\n"
+    "        uint lr = texelFetch(u_map, np + ivec2(1, 0), 0).b & 3u;\n"
+    "        uint ll = (np.x > 0) ? (texelFetch(u_map, np - ivec2(1, 0), 0).b & 3u) : layer;\n"
+    "        uint lu = texelFetch(u_map, np + ivec2(0, 1), 0).b & 3u;\n"
+    "        uint ld = (np.y > 0) ? (texelFetch(u_map, np - ivec2(0, 1), 0).b & 3u) : layer;\n"
+    "        int ndiff = int(lr != layer) + int(ll != layer) + int(lu != layer) + int(ld != layer);\n"
+    "        if (ndiff >= 3) {\n"
+    "            uint other = 3u - layer;\n"
+    "            ivec2 d = (lr == other) ? ivec2(1, 0) : (ll == other) ? ivec2(-1, 0)\n"
+    "                    : (lu == other) ? ivec2(0, 1) : (ld == other) ? ivec2(0, -1) : ivec2(0);\n"
+    "            if (d != ivec2(0)) {\n"
+    "                uvec4 mh = texelFetch(u_map, np + d, 0);\n"
+    "                ivec2 tc2 = ivec2(int(mh.r) * 4 + sub.x, int(mh.g) * 4 + sub.y);\n"
+    "                vec4 hd2 = sample_plane(other, tc2);\n"
+    "                vec3 rgb2 = apply_level(hd2.rgb, (mh.b >> 2) & 3u);\n"
+    "                rgb = (a > 0.01 && hd2.a > 0.01) ? 0.5 * (rgb + rgb2) : (a > 0.01 ? rgb : rgb2);\n"
+    "                a = max(a, hd2.a);\n"
+    "            } else {\n"
+    "                a = 0.0;\n"
+    "            }\n"
     "        }\n"
+    "        if (a > 0.01)\n"
+    "            col.rgb = mix(col.rgb, rgb, a);\n"
     "    }\n"
     "    result = col;\n"
     "}\n";
@@ -1767,6 +1848,28 @@ static void maybe_capture_hd(EcHdGpu *gpu)
     }
     SDL_SetRenderTarget(gpu->renderer, old);
     free(buf);
+
+    /* Diagnóstico: EC_HD_CAPTURE_MAP=<png> grava o mapa nativo por pixel
+     * (R = camada*80: 0 base/backdrop, 80 plano B, 160 plano A; G = nível*80;
+     *  B = 255 se sprite HD casado). */
+    const char *cap_map = getenv("EC_HD_CAPTURE_MAP");
+    if (cap_map && *cap_map && s_frame_w > 0 && s_frame_h > 0) {
+        uint32_t *mb = (uint32_t *)malloc((size_t)s_frame_w * (size_t)s_frame_h * sizeof(uint32_t));
+        if (mb) {
+            for (int y = 0; y < s_frame_h; ++y) {
+                for (int x = 0; x < s_frame_w; ++x) {
+                    const uint16_t *m = s_pixel_map[y][x];
+                    uint32_t r = (uint32_t)((m[2] & 3u) * 80u);
+                    uint32_t g = (uint32_t)(((m[2] >> 2) & 3u) * 80u);
+                    uint32_t b = ((m[3] & 0xFFu) != 0xFFu) ? 255u : 0u;
+                    mb[(size_t)y * (size_t)s_frame_w + (size_t)x] = 0xFF000000u | (r << 16) | (g << 8) | b;
+                }
+            }
+            if (save_argb_png(cap_map, mb, s_frame_w, s_frame_h) == 0)
+                fprintf(stderr, "[EC_HD_CAPTURE] map wrote %s (%dx%d)\n", cap_map, s_frame_w, s_frame_h);
+            free(mb);
+        }
+    }
 }
 
 #endif /* EC_HD_HAS_GL */

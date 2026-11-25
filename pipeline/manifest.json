@@ -909,7 +909,7 @@
     },
     "c9d3160fd8d3c46f186dfceba123b97060caf8a1eefff3155c6e66d4843b5d19": {
       "original_png": "assets/catalog/planes/state_07_title_plane_a.png",
-      "hd_file": "assets/hd/planes/c9d3160fd8d3c46f_4x.png",
+      "hd_file": "assets/hd/planes_v3/c9d3160fd8d3c46f_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -931,11 +931,12 @@
       "fighter_p1": null,
       "fighter_p2": null,
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.98202
+      "silhouette_iou": 0.98202,
+      "hd_file_flux": "assets/hd/planes/c9d3160fd8d3c46f_4x.png"
     },
     "26bf5afd08515de093dc95736d52fe720e6bc4a26380283228fb89da9562c2e2": {
       "original_png": "assets/catalog/sprites/26bf5afd08515de0.png",
@@ -15736,7 +15737,7 @@
     },
     "fc7b2abbd60b575c3c683ee9b6bebe4ee30f393e47c771aadf2cd3a2b707996c": {
       "original_png": "assets/catalog/planes/state_09_menu_init_plane_a.png",
-      "hd_file": "assets/hd/planes/fc7b2abbd60b575c_4x.png",
+      "hd_file": "assets/hd/planes_v3/fc7b2abbd60b575c_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -15758,11 +15759,12 @@
       "fighter_p1": null,
       "fighter_p2": null,
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.99734
+      "silhouette_iou": 0.99734,
+      "hd_file_flux": "assets/hd/planes/fc7b2abbd60b575c_4x.png"
     },
     "cf94b9348bf5694c7558a611790ea1de0c160f86f5c488975aafc10893a3938e": {
       "original_png": "assets/catalog/tiles/cf94b9348bf5694c.png",
@@ -24741,7 +24743,7 @@
     },
     "ab603fd6af6b31bbc71a1238ea4a0c1119cd194f63fb5aa0c430fc219b879045": {
       "original_png": "assets/catalog/planes/state_09_menu_init_plane_b.png",
-      "hd_file": "assets/hd/planes/ab603fd6af6b31bb_4x.png",
+      "hd_file": "assets/hd/planes_v3/ab603fd6af6b31bb_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -24763,11 +24765,12 @@
       "fighter_p1": null,
       "fighter_p2": null,
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.999862
+      "silhouette_iou": 0.999862,
+      "hd_file_flux": "assets/hd/planes/ab603fd6af6b31bb_4x.png"
     },
     "8008626760a2271f9bc3569f1ac1e3f11612bdc9cab078c306a6c7ea60e6e28a": {
       "original_png": "assets/catalog/sprites/8008626760a2271f.png",
@@ -27119,7 +27122,7 @@
     },
     "f20ff605c480203c2beffb2bd3b3743eb01c201dfe107b86dc699f30db450db5": {
       "original_png": "assets/catalog/planes/state_17_fight_plane_a.png",
-      "hd_file": "assets/hd/planes/f20ff605c480203c_4x.png",
+      "hd_file": "assets/hd/planes_v3/f20ff605c480203c_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -27141,11 +27144,12 @@
       "fighter_p1": "Shadow",
       "fighter_p2": "Shadow",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.99934
+      "silhouette_iou": 0.99934,
+      "hd_file_flux": "assets/hd/planes/f20ff605c480203c_4x.png"
     },
     "5e1a0b536fee50474bfc8cfdd6212c69d21eab271c105b4f0a63db3193af1390": {
       "original_png": "assets/catalog/tiles/5e1a0b536fee5047.png",
@@ -34695,7 +34699,7 @@
     },
     "90cae71c64d9483f878d37d61569ea1d11dfa8b7a7eedc5512f34b6a5858340b": {
       "original_png": "assets/catalog/planes/state_17_fight_plane_b.png",
-      "hd_file": "assets/hd/planes/90cae71c64d9483f_4x.png",
+      "hd_file": "assets/hd/planes_v3/90cae71c64d9483f_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -34717,11 +34721,12 @@
       "fighter_p1": "Shadow",
       "fighter_p2": "Shadow",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.999992
+      "silhouette_iou": 0.999992,
+      "hd_file_flux": "assets/hd/planes/90cae71c64d9483f_4x.png"
     },
     "e530065aa2116741a54ef654c16729a962398953d80f80c27868f329ecf0d0e4": {
       "original_png": "assets/catalog/sprites/e530065aa2116741.png",
@@ -40951,7 +40956,7 @@
     },
     "2544401f419f9c8afa797e58053ada262299d39b39e8130abc62a3273e57616e": {
       "original_png": "assets/catalog/planes/s21_rax_blade_plane_a.png",
-      "hd_file": "assets/hd/planes/2544401f419f9c8a_4x.png",
+      "hd_file": "assets/hd/planes_v3/2544401f419f9c8a_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -40973,11 +40978,12 @@
       "fighter_p1": "RAX",
       "fighter_p2": "Blade",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.993232
+      "silhouette_iou": 0.993232,
+      "hd_file_flux": "assets/hd/planes/2544401f419f9c8a_4x.png"
     },
     "2ea0f9477bc023a653cbfa0c282f1bd87cd9dfcc69ae821e7b2737c5e12114e2": {
       "original_png": "assets/catalog/tiles/2ea0f9477bc023a6.png",
@@ -45029,7 +45035,7 @@
     },
     "9ff60f28e8479c9f3504a84cedb398f173bbd1fc7cafe74a4f78709945733944": {
       "original_png": "assets/catalog/planes/s21_rax_blade_plane_b.png",
-      "hd_file": "assets/hd/planes/9ff60f28e8479c9f_4x.png",
+      "hd_file": "assets/hd/planes_v3/9ff60f28e8479c9f_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -45051,11 +45057,12 @@
       "fighter_p1": "RAX",
       "fighter_p2": "Blade",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.99589
+      "silhouette_iou": 0.99589,
+      "hd_file_flux": "assets/hd/planes/9ff60f28e8479c9f_4x.png"
     },
     "85878df278066044a9be7591358453d87f2b2a58d3b6d2d8b9feb83c3de628f1": {
       "original_png": "assets/catalog/sprites/85878df278066044.png",
@@ -50881,7 +50888,7 @@
     },
     "476b6032b4e79507efafb838ee5aa4b40716e65f38ddb52e1c74317c5bbe5d0e": {
       "original_png": "assets/catalog/planes/s22_blade_jetta_plane_a.png",
-      "hd_file": "assets/hd/planes/476b6032b4e79507_4x.png",
+      "hd_file": "assets/hd/planes_v3/476b6032b4e79507_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -50903,11 +50910,12 @@
       "fighter_p1": "Blade",
       "fighter_p2": "Jetta",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.99769
+      "silhouette_iou": 0.99769,
+      "hd_file_flux": "assets/hd/planes/476b6032b4e79507_4x.png"
     },
     "5f9a786b595b673c3a9fef1cc82c0bb3b698570abfe37da3195da95bcb05d3d6": {
       "original_png": "assets/catalog/tiles/5f9a786b595b673c.png",
@@ -55487,7 +55495,7 @@
     },
     "a81b0fdadd6a88f14e6c3ebd48d9568bf7987c0fd6b5b4c6b0ee81626ab769e4": {
       "original_png": "assets/catalog/planes/s22_blade_jetta_plane_b.png",
-      "hd_file": "assets/hd/planes/a81b0fdadd6a88f1_4x.png",
+      "hd_file": "assets/hd/planes_v3/a81b0fdadd6a88f1_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -55509,11 +55517,12 @@
       "fighter_p1": "Blade",
       "fighter_p2": "Jetta",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.995453
+      "silhouette_iou": 0.995453,
+      "hd_file_flux": "assets/hd/planes/a81b0fdadd6a88f1_4x.png"
     },
     "4a337b257f92068143d5aba69756aa5a545aa408a5584b15ca657cea177a4038": {
       "original_png": "assets/catalog/sprites/4a337b257f920681.png",
@@ -61335,7 +61344,7 @@
     },
     "e13b583b54a87a5d2018fb26417964f010b21763f019ad15a5f1fe7675e6e93d": {
       "original_png": "assets/catalog/planes/s26_jetta_slash_plane_a.png",
-      "hd_file": "assets/hd/planes/e13b583b54a87a5d_4x.png",
+      "hd_file": "assets/hd/planes_v3/e13b583b54a87a5d_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -61357,11 +61366,12 @@
       "fighter_p1": "Jetta",
       "fighter_p2": "Slash",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.999571
+      "silhouette_iou": 0.999571,
+      "hd_file_flux": "assets/hd/planes/e13b583b54a87a5d_4x.png"
     },
     "25bcc7896a27f9f9f4f8c8c581022ce7b02b54f05cc4552272f7ed04e3264635": {
       "original_png": "assets/catalog/tiles/25bcc7896a27f9f9.png",
@@ -64709,7 +64719,7 @@
     },
     "21055a5725ef70f7cd7954eb89c4930230695b076b7a0409d40367df96159419": {
       "original_png": "assets/catalog/planes/s26_jetta_slash_plane_b.png",
-      "hd_file": "assets/hd/planes/21055a5725ef70f7_4x.png",
+      "hd_file": "assets/hd/planes_v3/21055a5725ef70f7_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -64731,11 +64741,12 @@
       "fighter_p1": "Jetta",
       "fighter_p2": "Slash",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.997202
+      "silhouette_iou": 0.997202,
+      "hd_file_flux": "assets/hd/planes/21055a5725ef70f7_4x.png"
     },
     "f087bd4347e9fc395bbebba2174649411cd2e8f88a16c1a4c08043b36dda154e": {
       "original_png": "assets/catalog/sprites/f087bd4347e9fc39.png",
@@ -69303,7 +69314,7 @@
     },
     "26a296c8b5466f41792e0c8308a7ffff78e0a11801417486dd5aea5761d73976": {
       "original_png": "assets/catalog/planes/s24_slash_trident_plane_a.png",
-      "hd_file": "assets/hd/planes/26a296c8b5466f41_4x.png",
+      "hd_file": "assets/hd/planes_v3/26a296c8b5466f41_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -69325,11 +69336,12 @@
       "fighter_p1": "Slash",
       "fighter_p2": "Trident",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.996715
+      "silhouette_iou": 0.996715,
+      "hd_file_flux": "assets/hd/planes/26a296c8b5466f41_4x.png"
     },
     "f9cd103922a3c3d3944470552934d1d9b47e8c2facbf12b64fa09fa6963e9e17": {
       "original_png": "assets/catalog/tiles/f9cd103922a3c3d3.png",
@@ -75801,7 +75813,7 @@
     },
     "86cb2ec7b0cbbdd28ed38c5607d9f3b4ead2385c6a30489d8e495c4742de022a": {
       "original_png": "assets/catalog/planes/s24_slash_trident_plane_b.png",
-      "hd_file": "assets/hd/planes/86cb2ec7b0cbbdd2_4x.png",
+      "hd_file": "assets/hd/planes_v3/86cb2ec7b0cbbdd2_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -75823,11 +75835,12 @@
       "fighter_p1": "Slash",
       "fighter_p2": "Trident",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.982104
+      "silhouette_iou": 0.982104,
+      "hd_file_flux": "assets/hd/planes/86cb2ec7b0cbbdd2_4x.png"
     },
     "41c924e13e2d5a07152cfa2fe0177bab4110f828101f078760ca6520b94d84ee": {
       "original_png": "assets/catalog/sprites/41c924e13e2d5a07.png",
@@ -80795,7 +80808,7 @@
     },
     "696382dd8afad6b107ef8fd4a7a9ec21b166a58d260ed648227135f5b16764e0": {
       "original_png": "assets/catalog/planes/s20_trident_xavier_plane_a.png",
-      "hd_file": "assets/hd/planes/696382dd8afad6b1_4x.png",
+      "hd_file": "assets/hd/planes_v3/696382dd8afad6b1_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -80817,11 +80830,12 @@
       "fighter_p1": "Trident",
       "fighter_p2": "Xavier",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.998317
+      "silhouette_iou": 0.998317,
+      "hd_file_flux": "assets/hd/planes/696382dd8afad6b1_4x.png"
     },
     "3d65fa272aad8cfe0f3f7183b0f04aa375bef5551b32bb53322a0ae23fb16f15": {
       "original_png": "assets/catalog/tiles/3d65fa272aad8cfe.png",
@@ -84873,7 +84887,7 @@
     },
     "aad420ec6140c220a2278437a2d9dd560fd3da5ee46708633a413f1c2cce8e2f": {
       "original_png": "assets/catalog/planes/s20_trident_xavier_plane_b.png",
-      "hd_file": "assets/hd/planes/aad420ec6140c220_4x.png",
+      "hd_file": "assets/hd/planes_v3/aad420ec6140c220_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -84895,11 +84909,12 @@
       "fighter_p1": "Trident",
       "fighter_p2": "Xavier",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.99505
+      "silhouette_iou": 0.99505,
+      "hd_file_flux": "assets/hd/planes/aad420ec6140c220_4x.png"
     },
     "ace3acf74e2df28b112be45cf1072b1a7e22bd2772888057c89b128eaf42af5f": {
       "original_png": "assets/catalog/sprites/ace3acf74e2df28b.png",
@@ -90507,7 +90522,7 @@
     },
     "21fb768e226555a84a155ab71a394086a4e9d584b5f06055a4bc154826273eb1": {
       "original_png": "assets/catalog/planes/s19_xavier_midknight_plane_a.png",
-      "hd_file": "assets/hd/planes/21fb768e226555a8_4x.png",
+      "hd_file": "assets/hd/planes_v3/21fb768e226555a8_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -90529,11 +90544,12 @@
       "fighter_p1": "Xavier",
       "fighter_p2": "Midknight",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.996576
+      "silhouette_iou": 0.996576,
+      "hd_file_flux": "assets/hd/planes/21fb768e226555a8_4x.png"
     },
     "1dca93758355b4869eb3846614960bb156df3b5a35ea53018ecf8d0511959ce1": {
       "original_png": "assets/catalog/tiles/1dca93758355b486.png",
@@ -95201,7 +95217,7 @@
     },
     "2a7de9b81de3b299f85e3d4b886a1fc0fc8be9c00bdd80346c9bccc63b6ad42a": {
       "original_png": "assets/catalog/planes/s19_xavier_midknight_plane_b.png",
-      "hd_file": "assets/hd/planes/2a7de9b81de3b299_4x.png",
+      "hd_file": "assets/hd/planes_v3/2a7de9b81de3b299_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -95223,11 +95239,12 @@
       "fighter_p1": "Xavier",
       "fighter_p2": "Midknight",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.998938
+      "silhouette_iou": 0.998938,
+      "hd_file_flux": "assets/hd/planes/2a7de9b81de3b299_4x.png"
     },
     "6fd5ee759f20874f31c5246be4fc397d5fff1db9efe71ac5fb85983e77050102": {
       "original_png": "assets/catalog/sprites/6fd5ee759f20874f.png",
@@ -97537,7 +97554,7 @@
     },
     "cbd2168fea9d38b808331c553debbe161fb42ac140c9b45dabb2fd367dacbf5f": {
       "original_png": "assets/catalog/planes/s27_midknight_larcen_plane_a.png",
-      "hd_file": "assets/hd/planes/cbd2168fea9d38b8_4x.png",
+      "hd_file": "assets/hd/planes_v3/cbd2168fea9d38b8_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -97559,11 +97576,12 @@
       "fighter_p1": "Midknight",
       "fighter_p2": "Larcen",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.988778
+      "silhouette_iou": 0.988778,
+      "hd_file_flux": "assets/hd/planes/cbd2168fea9d38b8_4x.png"
     },
     "1109f9b3f9b359c9e2bdd5fe7a28a9a9598379047181bc64fa32b2f0ef2b6a8a": {
       "original_png": "assets/catalog/tiles/1109f9b3f9b359c9.png",
@@ -104475,7 +104493,7 @@
     },
     "faf4f7a044e60fde16a7b0a521da369f8987c9e22391c4188eb2ae2dff8dec05": {
       "original_png": "assets/catalog/planes/s27_midknight_larcen_plane_b.png",
-      "hd_file": "assets/hd/planes/faf4f7a044e60fde_4x.png",
+      "hd_file": "assets/hd/planes_v3/faf4f7a044e60fde_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -104497,11 +104515,12 @@
       "fighter_p1": "Midknight",
       "fighter_p2": "Larcen",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 1.0
+      "silhouette_iou": 1.0,
+      "hd_file_flux": "assets/hd/planes/faf4f7a044e60fde_4x.png"
     },
     "15e6ced7a97d28fbdd04123657f3bf310b179a7d29ebb50f22544a8efab4153a": {
       "original_png": "assets/catalog/sprites/15e6ced7a97d28fb.png",
@@ -110829,7 +110848,7 @@
     },
     "35fbe921677e5f657161c0f0007a7afa8902880cdf9eb8779600ec92c3536060": {
       "original_png": "assets/catalog/planes/s23_larcen_rax_plane_a.png",
-      "hd_file": "assets/hd/planes/35fbe921677e5f65_4x.png",
+      "hd_file": "assets/hd/planes_v3/35fbe921677e5f65_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -110851,11 +110870,12 @@
       "fighter_p1": "Larcen",
       "fighter_p2": "RAX",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.987444
+      "silhouette_iou": 0.987444,
+      "hd_file_flux": "assets/hd/planes/35fbe921677e5f65_4x.png"
     },
     "051157f5f8bda305214ee136aac911ce97e7624966037492a4aeefc50b654414": {
       "original_png": "assets/catalog/tiles/051157f5f8bda305.png",
@@ -113345,7 +113365,7 @@
     },
     "ca8a85cb317b3d75b59facec2f1915efab78b72ee3e01cf02a05f69b30399dd5": {
       "original_png": "assets/catalog/planes/s23_larcen_rax_plane_b.png",
-      "hd_file": "assets/hd/planes/ca8a85cb317b3d75_4x.png",
+      "hd_file": "assets/hd/planes_v3/ca8a85cb317b3d75_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -113367,11 +113387,12 @@
       "fighter_p1": "Larcen",
       "fighter_p2": "RAX",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.991586
+      "silhouette_iou": 0.991586,
+      "hd_file_flux": "assets/hd/planes/ca8a85cb317b3d75_4x.png"
     },
     "6c489d191f75fa8e7afdfbd7457b9084545025b29bca7efd4a881c5d2441e231": {
       "original_png": "assets/catalog/sprites/6c489d191f75fa8e.png",
@@ -123651,7 +123672,7 @@
     },
     "51e6b0cac111e58ecd10d58958bf1b7a5003fe34c77a83d650d20de7bca49a69": {
       "original_png": "assets/catalog/planes/s25_shadow_larcen_plane_a.png",
-      "hd_file": "assets/hd/planes/51e6b0cac111e58e_4x.png",
+      "hd_file": "assets/hd/planes_v3/51e6b0cac111e58e_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -123673,11 +123694,12 @@
       "fighter_p1": "Shadow",
       "fighter_p2": "Larcen",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.995338
+      "silhouette_iou": 0.995338,
+      "hd_file_flux": "assets/hd/planes/51e6b0cac111e58e_4x.png"
     },
     "7089b216548b76431d02d4a650f16aa6ef5fd3efc8badaf7ab6de27cdee3a094": {
       "original_png": "assets/catalog/tiles/7089b216548b7643.png",
@@ -128697,7 +128719,7 @@
     },
     "c327f5d1d17159c87ab3273f621f2424536ef4aa8bce4f622a06e7ee90e970b6": {
       "original_png": "assets/catalog/planes/s25_shadow_larcen_plane_b.png",
-      "hd_file": "assets/hd/planes/c327f5d1d17159c8_4x.png",
+      "hd_file": "assets/hd/planes_v3/c327f5d1d17159c8_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -128719,11 +128741,12 @@
       "fighter_p1": "Shadow",
       "fighter_p2": "Larcen",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.997394
+      "silhouette_iou": 0.997394,
+      "hd_file_flux": "assets/hd/planes/c327f5d1d17159c8_4x.png"
     },
     "8c4d7c62f12c46f50d8252a16ab2d6ee6fa01126b27bf2bf279943c67da40a16": {
       "original_png": "assets/catalog/sprites/8c4d7c62f12c46f5.png",
@@ -129427,7 +129450,7 @@
     },
     "364ae0e5e17866353dc400ead6da402cc3529d3002fb64eaa22d49b51358eaf5": {
       "original_png": "assets/catalog/planes/s14_holo_trainer_plane_a.png",
-      "hd_file": "assets/hd/planes/364ae0e5e1786635_4x.png",
+      "hd_file": "assets/hd/planes_v3/364ae0e5e1786635_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -129449,11 +129472,12 @@
       "fighter_p1": "Shadow",
       "fighter_p2": "Shadow",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.999462
+      "silhouette_iou": 0.999462,
+      "hd_file_flux": "assets/hd/planes/364ae0e5e1786635_4x.png"
     },
     "63e0b63b74ee161465875f283d11a76b24f0629cbbc7ccc31685affa9cbe13f3": {
       "original_png": "assets/catalog/tiles/63e0b63b74ee1614.png",
@@ -130183,7 +130207,7 @@
     },
     "85be6b519f960f065fb3c9ee70fe25f98e295e20bffc823e1713ae205f1eb502": {
       "original_png": "assets/catalog/planes/s14_holo_trainer_plane_b.png",
-      "hd_file": "assets/hd/planes/85be6b519f960f06_4x.png",
+      "hd_file": "assets/hd/planes_v3/85be6b519f960f06_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -130205,11 +130229,12 @@
       "fighter_p1": "Shadow",
       "fighter_p2": "Shadow",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 1.0
+      "silhouette_iou": 1.0,
+      "hd_file_flux": "assets/hd/planes/85be6b519f960f06_4x.png"
     },
     "051dafe81f6a5ffe95a87098fc016fc7644a68cbd891880385225fbd31494734": {
       "original_png": "assets/catalog/sprites/051dafe81f6a5ffe.png",
@@ -138785,7 +138810,7 @@
     },
     "6d31e7ba1deae76ac4c6424d6a4178b1a071c582edf44d9b2ff6899a72f336d3": {
       "original_png": "assets/catalog/planes/s18_boss_sanctuary_plane_a.png",
-      "hd_file": "assets/hd/planes/6d31e7ba1deae76a_4x.png",
+      "hd_file": "assets/hd/planes_v3/6d31e7ba1deae76a_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -138807,11 +138832,12 @@
       "fighter_p1": "Shadow",
       "fighter_p2": "Eternal Champion",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.998804
+      "silhouette_iou": 0.998804,
+      "hd_file_flux": "assets/hd/planes/6d31e7ba1deae76a_4x.png"
     },
     "63c4c827343d712fb83919b55626073aecada0353f82ab2a9588c770c9743965": {
       "original_png": "assets/catalog/tiles/63c4c827343d712f.png",
@@ -140663,7 +140689,7 @@
     },
     "0d55682580583305af3257253488db64078471e3368905598d7e75831629bcfa": {
       "original_png": "assets/catalog/planes/s18_boss_sanctuary_plane_b.png",
-      "hd_file": "assets/hd/planes/0d55682580583305_4x.png",
+      "hd_file": "assets/hd/planes_v3/0d55682580583305_4x.png",
       "scale": 4,
       "width": 512,
       "height": 256,
@@ -140685,11 +140711,12 @@
       "fighter_p1": "Shadow",
       "fighter_p2": "Eternal Champion",
       "status": "approved",
-      "workflow": "remaster_flux_usdu",
-      "workflow_version": "1.0",
-      "model": "flux1-dev-fp8.safetensors",
+      "workflow": "predither_both+animesharp",
+      "workflow_version": "g3.2",
+      "model": "4x-AnimeSharp.pth",
       "seed": 19931211,
-      "silhouette_iou": 0.993421
+      "silhouette_iou": 0.993421,
+      "hd_file_flux": "assets/hd/planes/0d55682580583305_4x.png"
     }
   }
 }

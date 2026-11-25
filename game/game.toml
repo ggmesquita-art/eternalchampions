@@ -306,3 +306,16 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x000A28
 kind = "game_hook"
+
+# Hooks passivos de widescreen (ec_video.c): observam Sub_E684 ($E684), que monta a SAT.
+#   $00E684 = entrada de Sub_E684 (zera a lista de sub-sprites descartados do quadro)
+#   $00E7B0 = loc_E7B0: sub-sprite de objeto fl20&$4000 descartado por estar fora de
+#             [-32,320] x [-32,224]; registrado para ser desenhado so nas margens 16:9.
+# SEMPRE retornam 0 e nunca alteram g_cpu/g_ram/VDP.
+[[widescreen_site]]
+addr = 0x00E684
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x00E7B0
+kind = "game_hook"

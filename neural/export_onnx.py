@@ -280,6 +280,11 @@ def compute_array_metrics(pred: np.ndarray, ref: np.ndarray) -> tuple[float, flo
     return max_abs_err, psnr_db, ssim
 
 
+# Limiares do gate de paridade PyTorch<->ORT (CPU FP32); ajustaveis via CLI.
+PARITY_MAX_ABS = 1e-4
+PARITY_MIN_PSNR = 90.0
+
+
 def validate_case(
     name: str,
     model_cpu: torch.nn.Module,
@@ -299,7 +304,7 @@ def validate_case(
         raise RuntimeError(f"Shape inválido em {name}: {ort_out.shape} != (1, 4, {expected_hw[0]}, {expected_hw[1]})")
 
     max_err, psnr_db, ssim = compute_array_metrics(ort_out, pt_out)
-    if not (max_err < 1e-4 and psnr_db > 90.0):
+    if not (max_err < PARITY_MAX_ABS and psnr_db > PARITY_MIN_PSNR):
         raise RuntimeError(
             f"Paridade falhou em {name}: max_abs_err={max_err:.3e}, psnr={psnr_db:.2f} dB"
         )
@@ -359,7 +364,13 @@ def main() -> int:
     ap.add_argument("--capture", type=Path, default=DEFAULT_CAPTURE)
     ap.add_argument("--out-png", type=Path, default=DEFAULT_OUT_PNG)
     ap.add_argument("--no-update-manifest", action="store_true")
+    ap.add_argument("--parity-max-abs", type=float, default=1e-4,
+                    help="gate max_abs_err PyTorch<->ORT (default 1e-4; 1 LSB 8-bit = 3.9e-3)")
+    ap.add_argument("--parity-min-psnr", type=float, default=90.0,
+                    help="gate PSNR minimo PyTorch<->ORT em dB (default 90)")
     args = ap.parse_args()
+    global PARITY_MAX_ABS, PARITY_MIN_PSNR
+    PARITY_MAX_ABS, PARITY_MIN_PSNR = args.parity_max_abs, args.parity_min_psnr
 
     if not args.pt.exists():
         print(f"ERRO: checkpoint PyTorch ausente: {args.pt}", file=sys.stderr)
