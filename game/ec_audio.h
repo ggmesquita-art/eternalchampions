@@ -37,6 +37,7 @@ int ec_audio_load_voices(const char *path);
 
 /* Self-test do hash (vetor ce6df9ba). Retorna 1 se OK. EC_AUDIO_SELFTEST=1 imprime no init. */
 int ec_audio_selftest(void);
+uint32_t ec_audio_fm_patch_hash(int ch);   /* hash do patch atual do canal FM 0..5 (diagnostico) */
 
 /* Hook da mascara de audicao do chip (ex.: audio_mixer_set_audition). Em `hybrid` canais
  * cujo instrumento esta no SF2 ficam mudos no chip: bits0..5 FM1..6, 6 DAC, 7..9 PSG tom,

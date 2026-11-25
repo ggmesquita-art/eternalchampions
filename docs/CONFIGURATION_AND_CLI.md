@@ -125,9 +125,10 @@ A precedência de configuração segue rigorosamente a regra: **Flags de Linha d
 | `--audio-remaster` | `<off \| dsp \| hybrid \| ost>` | Seleciona a estratégia de áudio: `off` (YM2612 + PSG puros), `dsp` (apenas processamento de estúdio EQ/reverb), `hybrid` (instrumentos acústicos SoundFont substituindo canais FM melódicos mantendo DAC/FM de percussão), `ost` (trilha sonora sintetizada em tempo real). |
 | `--audio-sf2` | `<caminho.sf2>` | Aponta para o arquivo SoundFont (`.sf2`) usado no banco de amostras melódicas. |
 | `--audio-profiles-dir` | `<diretório>` | Diretório contendo os perfis de canais instrumentais em formato TOML. |
+| `--audio-voices` | `<voices.toml>` | Catálogo de instrumentos FM por hash de patch (padrão: `<profiles_dir>/../voices.toml`, i.e. `assets/audio_remaster/voices.toml`). Por vozes: `mode` (`gm`/`percussion`/`chip`/`off`), `program`, `bank`, `transpose`, `volume_db`, `drum_note`. Também via `voices =` em `[ec.audio]` e `EC_AUDIO_VOICES`; precedência CLI > settings.ini > env > padrão. Um `[voices.<hash>]` dentro do `.toml` da faixa (mesmos campos) vence o global. |
 | `--audio-bgm-vol` | `<float>` | Ajusta o volume relativo da música de fundo (BGM), ex.: `1.0` (padrão), `0.8`, `1.5`. |
 | `--audio-sfx-vol` | `<float>` | Ganho (`0.0` a `2.0`, padrão `1.0`) aplicado a **todo o barramento do chip** (YM2612 + PSG + DAC, ou seja, BGM do chip, SFX e vozes) nos modos `dsp`/`hybrid`/`ost`; não atua só nos SFX nem na síntese SoundFont (essa usa `--audio-bgm-vol`). Valores fora da faixa são ajustados com aviso `[EC-AUDIO]`; valor não numérico é ignorado com aviso `valor invalido`. |
-| `--audio-chip-blend` | `<float>` | **Override explícito** (`0.0` a `1.0`) da presença do chip original em `hybrid`/`ost`; vence o `chip_blend` do perfil da faixa, o do `settings.ini` e os defaults do modo. Precedência completa: `--audio-chip-blend` > `chip_blend` do perfil `.toml` da faixa > `chip_blend` de `[ec.audio]` no `settings.ini` (default do usuário) > default do modo (`hybrid` 0.65, `ost` 0.18). Sem efeito em `off`/`dsp`. |
+| `--audio-chip-blend` | `<float>` | **Override explícito** (`0.0` a `1.0`) do blend global chip/SF2. Só atua em `ost` (em `hybrid` a substituição é por canal, sem blend). Precedência em `ost`: `--audio-chip-blend` > `chip_blend_ost` do perfil `.toml` da faixa > 0,18. Sem efeito em `off`/`dsp`/`hybrid`. |
 | `--audio-manifest` | `<arquivo>` | **Obsoleto**: ignorado com aviso (o módulo usa síntese em tempo real: `--audio-sf2` + `--audio-profiles-dir`). |
 | `--audio-dsp-reverb` | `<float>` | Quantidade de reverberação de estúdio Schroeder injetada no barramento mestre (`0.0` a `1.0`). |
 | `--wav` | `<caminho.wav>` | Grava a sessão em WAV estéreo 16-bit na **taxa interna do mixer (223 721 Hz)** (mesma taxa do `[audio] DRC bridge: 223721 Hz internal`); reamostre para 44,1/48 kHz para players comuns. |
@@ -240,13 +241,14 @@ dsp_reverb = 0.35
 - **`remaster`**: Modo de remasterização em tempo real:
   - `off`: Somente hardware emulado original (chips YM2612 + PSG).
   - `dsp`: Chips originais enriquecidos com equalização de 3 bandas, alargador estéreo sutil e reverberador Schroeder.
-  - `hybrid`: Substituição melódica ao vivo via SoundFont 2 combinada com percussão e ruídos do chip original.
-  - `ost`: Reprodução 100% sintetizada SoundFont com perfis de estúdio.
+  - `hybrid`: **Substituição por canal, sem blend**: cada canal FM cujo instrumento (hash do patch no `voices.toml`; senão o `mode` do canal no perfil) vai para o SoundFont fica **mudo no chip** (máscara de audição do mixer); instrumentos `chip` ficam no chip. PSG/ruído: `mode` `gm`/`percussion` do perfil = SF2 (mudo no chip), `chip`/`auto` = chip. DAC (vozes/SFX PCM) sempre no chip. O chip restante entra com ganho 1,0 (`chip_level` opcional no `[track]` do perfil) e o SF2 com o makeup fixo.
+  - `ost`: Blend global SF2/chip (sem máscara): chip atenuado preservando SFX/DAC. Default 0,18; `chip_blend_ost` no `[track]` do perfil da faixa ou `--audio-chip-blend`.
 - **`sf2`**: Caminho relativo ou absoluto para o arquivo de banco SoundFont 2.
 - **`profiles_dir`**: Diretório com os mapeamentos TOML de instrumentos para cada uma das faixas do jogo.
 - **`bgm_vol`**: Ganho de volume para a trilha sonora (0.0 a 2.0).
 - **`sfx_vol`**: Ganho de todo o barramento do chip (BGM do chip + SFX + vozes DAC) nos modos `dsp`/`hybrid`/`ost` (0.0 a 2.0). Ver `--audio-sfx-vol`.
-- **`chip_blend`**: Default do usuário (`0.0` a `1.0`) para a presença do chip em `hybrid`/`ost`. Só é usado quando o perfil da faixa **não** define `chip_blend`; a CLI `--audio-chip-blend` vence ambos (ver precedência em `--audio-chip-blend`).
+- **`chip_blend`**: Legado (A5.1): lido por compatibilidade, **sem efeito** em `hybrid` (substituição por canal) nem em `ost` (usa `chip_blend_ost` do perfil, default 0,18, ou `--audio-chip-blend`).
+- **`voices`**: Caminho do `voices.toml` (ver `--audio-voices`).
 - Valores de `[ec.audio]` aceitam aspas externas (`sf2 = "caminho com espaço.sf2"`) e comentário final (` ;` ou ` #`).
 - **`dsp_reverb`**: Intensidade do efeito de reverberação de sala aplicado à saída final (`0.0` a `1.0`).
 

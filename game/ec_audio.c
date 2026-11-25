@@ -1580,6 +1580,15 @@ int ec_audio_selftest(void)
     return (h == 0xce6df9bau) ? 1 : 0;
 }
 
+/* Hash do patch atual de um canal FM (0..5) a partir do shadow; para testes/diagnostico. */
+uint32_t ec_audio_fm_patch_hash(int ch)
+{
+    if (ch < 0 || ch > 5) {
+        return 0u;
+    }
+    return ec_fm_patch_hash(&s_audio.chip.fm[ch]);
+}
+
 static const EcVoice *ec_find_voice(const EcTrackProfile *prof, uint32_t hash)
 {
     if (prof) {

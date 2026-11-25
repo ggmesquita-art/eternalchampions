@@ -251,6 +251,23 @@ notes, note_min/max/median, avg_dur_ms, suggestion
 3. Edite `voices.toml` (programa/nome/modo); reexecute sem perder as edições.
 4. `python tools/audio/voice_catalog.py --selftest` valida o hash contra o vetor do contrato.
 
+### A5.3 — Motor por instrumento e `hybrid` por substituição de canal
+
+**Shadow e hash.** `ec_audio.c` mantém por canal FM o shadow de `$30-$9F` (por slot de hardware), `$B0` e `$B4`. No key-on calcula o hash FNV-1a de 31 bytes (contrato em [`audio_voice_hash.md`](audio_voice_hash.md)); o vetor `ce6df9ba` é verificado por `ec_audio_selftest()` (e impresso com `EC_AUDIO_SELFTEST=1`).
+
+**Resolução do instrumento** (por key-on): `[voices.<hash>]` do `.toml` da faixa > `voices.toml` global > `mode` do canal no perfil (comportamento anterior). Fontes do `voices.toml`: `--audio-voices` > `voices =` em `[ec.audio]` > `EC_AUDIO_VOICES` > `<profiles_dir>/../voices.toml`. Modos: `gm` (program/bank/transpose/volume_db no canal tsf do canal FM; program change só quando muda), `percussion` (bank 128 no próprio canal tsf; nota = `drum_note` se > 0, senão a nota calculada; sem retune), `chip` (nada no SF2, canal audível no chip), `off` (nada no SF2, canal mudo no chip). O `volume_db` da voz multiplica o volume do canal tsf e convive com o fade por TL.
+
+**`hybrid` = substituição por canal, sem blend.** O runner expõe `audio_mixer_set_audition(enabled, mask)` (bits 0..5 FM1..6, 6 DAC, 7..9 PSG tom, 10 ruído). A máscara é aplicada **dentro do ymfm/SN76489 por amostra**, antes do filtro de apresentação e antes de `audio_set_extra_source`, então o `ec_audio_mix_callback` e o `--wav` recebem o chip já mascarado (e o filtro LPF do FM mantém o histórico do canal completo; máscara cheia equivale a desligada). O callback recalcula a máscara no início de cada mix (após o drain, como exige o runner) e só chama o hook quando ela muda. Regras:
+- FM: canal mudo no chip enquanto o SF2 é dono (`owns`): nota realmente emitida, voz `off`, ou canal em mute/solo. `chip`, TL mudo (>= 100), nota fora de faixa, patch desconhecido (após state load/troca de modo) ou música sem síntese ativa deixam o canal audível.
+- PSG tom/ruído: `mode` `gm`/`percussion`/`off` do perfil = SF2 (mudo no chip); `chip`/`auto` = chip.
+- DAC (PCM de vozes/SFX): o SF2 nunca o converte, então fica sempre no chip (só some com `mode = "off"` explícito).
+- O chip restante entra com ganho 1,0 (`chip_level` opcional no `[track]`, vezes o `sfx_vol` e o ganho do DSP) e o SF2 com o makeup fixo, sem ducking nem normalização de potência.
+- Latência/cliques: a máscara vale a partir do próximo drain (até 1 frame, ~16 ms) depois do key-on, então pode haver sobreposição de uma fração de frame entre chip e SF2; o runner não tem rampa de máscara, a troca é seca (ocorre em key-on, tipicamente com o canal em release). Aceito e documentado.
+
+**`ost`** mantém o blend global (sem máscara): `--audio-chip-blend` > `chip_blend_ost` do perfil > 0,18. `chip_blend` (perfil e settings.ini) é lido por compatibilidade e não tem efeito nos modos novos.
+
+**Pausa/turbo/state load.** `owns` é zerado quando as notas SF2 são derrubadas (pausa, parada, troca de perfil, turbo) e reavaliado no re-key; após state load o shadow é desconhecido e todos os canais ficam audíveis no chip até o driver reescrever o patch (melhor o original que silêncio).
+
 ### A5.4 — Mixer Studio por instrumento
 
 Quando existem `assets/audio_remaster/voices.toml` e `assets/audio_remaster/midi_voices/<slug>.mid` da música, `tools/audio/mixer_studio.py` passa a trabalhar por **voz (patch FM)** em vez de por canal FM (o modo antigo por canal continua para `default` e músicas sem MIDI por voz).
