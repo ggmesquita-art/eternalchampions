@@ -59,6 +59,8 @@ static int s_diag_boss_sanctuary = 0;
 static int      s_audio_mode_cli         = 0;
 static int      s_audio_sf2_cli          = 0;
 static int      s_audio_profiles_dir_cli = 0;
+static int      s_audio_voices_cli       = 0;
+static char     s_audio_voices_path[1024] = "";
 static int      s_audio_bgm_vol_cli      = 0;
 static int      s_audio_sfx_vol_cli      = 0;
 static int      s_audio_blend_cli        = 0;
@@ -183,6 +185,8 @@ static void ec_load_settings(const char *settings_path)
             (void)ec_audio_set_mode_str(val);
         } else if (strcmp(key, "sf2") == 0 && !s_audio_sf2_cli) {
             snprintf(s_audio_sf2_path, sizeof(s_audio_sf2_path), "%s", val);
+        } else if (strcmp(key, "voices") == 0 && !s_audio_voices_cli) {
+            snprintf(s_audio_voices_path, sizeof(s_audio_voices_path), "%s", val);
         } else if (strcmp(key, "profiles_dir") == 0 && !s_audio_profiles_dir_cli) {
             snprintf(s_audio_profiles_dir, sizeof(s_audio_profiles_dir), "%s", val);
         } else if (strcmp(key, "bgm_vol") == 0 && !s_audio_bgm_vol_cli && ec_parse_double_strict(val, &dv)) {
@@ -196,6 +200,12 @@ static void ec_load_settings(const char *settings_path)
         }
     }
     fclose(fp);
+}
+
+/* hybrid: mascara de audicao do chip (canais cujo instrumento esta no SF2 ficam mudos). */
+static void ec_audio_mask_hook(int enabled, unsigned mask)
+{
+    audio_mixer_set_audition(enabled, mask);
 }
 
 static void ec_on_state_loaded(void)
@@ -250,6 +260,11 @@ static void ec_on_post_reset(void)
         if (env_sf2 && *env_sf2)
             snprintf(s_audio_sf2_path, sizeof(s_audio_sf2_path), "%s", env_sf2);
     }
+    if (!s_audio_voices_cli) {
+        const char *env_voices = getenv("EC_AUDIO_VOICES");
+        if (env_voices && *env_voices)
+            snprintf(s_audio_voices_path, sizeof(s_audio_voices_path), "%s", env_voices);
+    }
     if (!s_audio_profiles_dir_cli) {
         const char *env_profiles = getenv("EC_AUDIO_PROFILES_DIR");
         if (env_profiles && *env_profiles)
@@ -277,6 +292,13 @@ static void ec_on_post_reset(void)
             fprintf(stderr, "[EC-AUDIO] aviso: SoundFont default nao encontrado (degradando para DSP)\n");
     }
 
+    /* voices.toml explicito (CLI > settings.ini > env); senao o motor procura
+     * <profiles_dir>/../voices.toml ao carregar os perfis. */
+    if (s_audio_voices_path[0] != '\0') {
+        if (ec_audio_load_voices(s_audio_voices_path) < 0)
+            fprintf(stderr, "[EC-AUDIO] aviso: falha ao carregar voices '%s'\n", s_audio_voices_path);
+    }
+
     if (s_audio_profiles_dir[0] != '\0') {
         if (ec_audio_load_profiles_dir(s_audio_profiles_dir) < 0)
             fprintf(stderr, "[EC-AUDIO] aviso: falha ao carregar perfis '%s'\n", s_audio_profiles_dir);
@@ -291,6 +313,7 @@ static void ec_on_post_reset(void)
         }
     }
 
+    ec_audio_set_chip_mask_hook(ec_audio_mask_hook);
     audio_mixer_set_chip_observer(ec_audio_on_chip_write);
     audio_set_extra_source(ec_audio_mix_callback);
 }
@@ -455,6 +478,11 @@ static int ec_handle_arg(const char *key, const char *val)
     if (strcmp(key, "--audio-sf2") == 0 && val && *val) {
         snprintf(s_audio_sf2_path, sizeof(s_audio_sf2_path), "%s", val);
         s_audio_sf2_cli = 1;
+        return 2;
+    }
+    if (strcmp(key, "--audio-voices") == 0 && val && *val) {
+        snprintf(s_audio_voices_path, sizeof(s_audio_voices_path), "%s", val);
+        s_audio_voices_cli = 1;
         return 2;
     }
     if (strcmp(key, "--audio-profiles-dir") == 0 && val && *val) {

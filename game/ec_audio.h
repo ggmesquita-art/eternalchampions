@@ -30,6 +30,19 @@ int ec_audio_load_soundfont(const char *sf2_path);
  * Retorna quantidade de perfis carregados (>= 0) ou -1 em erro. */
 int ec_audio_load_profiles_dir(const char *profiles_dir);
 
+/* Instrumentos FM por hash de patch (docs/audio_voice_hash.md). Carrega voices.toml
+ * (campos editaveis de cada [voices.<hash>]); marca o caminho como explicito (o default
+ * <profiles_dir>/../voices.toml deixa de ser procurado). Retorna n de vozes ou -1. */
+int ec_audio_load_voices(const char *path);
+
+/* Self-test do hash (vetor ce6df9ba). Retorna 1 se OK. EC_AUDIO_SELFTEST=1 imprime no init. */
+int ec_audio_selftest(void);
+
+/* Hook da mascara de audicao do chip (ex.: audio_mixer_set_audition). Em `hybrid` canais
+ * cujo instrumento esta no SF2 ficam mudos no chip: bits0..5 FM1..6, 6 DAC, 7..9 PSG tom,
+ * 10 ruido; enabled=0 restaura o chip completo. */
+void ec_audio_set_chip_mask_hook(void (*hook)(int enabled, unsigned mask));
+
 /* Controles de mixagem e DSP. */
 void ec_audio_set_bgm_vol(float vol);        /* 0.0 .. 2.0, default 1.0 */
 void ec_audio_set_sfx_vol(float vol);        /* 0.0 .. 2.0, default 1.0 (ganho do chip) */

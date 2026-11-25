@@ -250,6 +250,12 @@ dsp_reverb = 0.35
 - Valores de `[ec.audio]` aceitam aspas externas (`sf2 = "caminho com espaço.sf2"`) e comentário final (` ;` ou ` #`).
 - **`dsp_reverb`**: Intensidade do efeito de reverberação de sala aplicado à saída final (`0.0` a `1.0`).
 
+**Ganho e limiter (modo `dsp`)**: o chip recebe ganho fixo `EC_CHIP_DSP_GAIN = 1.75` (+4,9 dB) antes do soft-limiter (joelho em 0,92). Medido nos filmes de regressão 02, 06, 13 e 17 (`--wav` em `off` vs `dsp`): pico do chip 0,326 -> 0,606 em `dsp`, **0 %** das amostras acima de 0,80 (limiter nunca atua; alvo < 0,5 %), RMS +6 dB sobre `off`. Valor mantido em 1,75.
+
+**Variáveis de depuração**: `EC_AUDIO_TRACE=1` registra em stderr eventos de ciclo de vida do motor (`bgm_play`, pausa, resync de notas, state load).
+
+**Estado do motor após pausa/turbo/state load**: o motor mantém por canal o estado `keyed` (key-on no hardware); ao fim da pausa, do turbo e na troca/recarga de perfil as notas `keyed` voltam a soar a partir do shadow. Após carregar um savestate o shadow de registradores é tratado como *desconhecido* (o runner não expõe leitura do YM2612/PSG): o SoundFont só volta a soar depois que o driver reescreve patch (algoritmo + 4 TL) e frequência do canal; `bgm_id`/perfil ativo são preservados. Bytes de streaming DAC (`$2A`) e dados sem endereço conhecido nunca viram eventos. TL dos carriers vira volume da voz SF2 (fades do driver audíveis); canais com TL >= 100 (< -75 dB) não disparam nota.
+
 ### 4.4.1 Seção `[ec.video]`
 
 ```ini
