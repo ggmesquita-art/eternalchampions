@@ -192,6 +192,53 @@ std::wstring quote_arg(const std::wstring& a) {
 }
 }  // namespace
 
+std::string quote_arg(const std::string& utf8) {
+    std::wstring w = quote_arg(widen(utf8));
+    if (w.empty()) return "";
+    int n = WideCharToMultiByte(CP_UTF8, 0, w.data(), (int)w.size(), nullptr, 0, nullptr, nullptr);
+    std::string s((size_t)n, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, w.data(), (int)w.size(), &s[0], n, nullptr, nullptr);
+    return s;
+}
+
+bool spawn_process_w(const wchar_t* app, wchar_t* cmdline, const wchar_t* cwd, void* env_block, unsigned long flags,
+                     void* log_handle, void* pip, unsigned long* err) {
+    PROCESS_INFORMATION* pi = static_cast<PROCESS_INFORMATION*>(pip);
+    HANDLE hlog = static_cast<HANDLE>(log_handle);
+    const bool have_log = hlog && hlog != INVALID_HANDLE_VALUE;
+    STARTUPINFOEXW si{};
+    si.StartupInfo.cb = sizeof(si);
+    std::vector<char> attr_buf;
+    HANDLE nul = INVALID_HANDLE_VALUE;
+    HANDLE list[2] = {nullptr, nullptr};
+    bool attr_ok = false;
+    if (have_log) {
+        SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
+        nul = CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        SIZE_T sz = 0;
+        InitializeProcThreadAttributeList(nullptr, 1, 0, &sz);
+        attr_buf.resize(sz);
+        LPPROC_THREAD_ATTRIBUTE_LIST al = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attr_buf.data());
+        if (nul != INVALID_HANDLE_VALUE && InitializeProcThreadAttributeList(al, 1, 0, &sz)) {
+            list[0] = hlog; list[1] = nul;
+            if (UpdateProcThreadAttribute(al, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, list, sizeof(list), nullptr, nullptr)) {
+                si.lpAttributeList = al;
+                si.StartupInfo.dwFlags |= STARTF_USESTDHANDLES;
+                si.StartupInfo.hStdInput = nul;
+                si.StartupInfo.hStdOutput = si.StartupInfo.hStdError = hlog;
+                attr_ok = true;
+            } else DeleteProcThreadAttributeList(al);
+        }
+    }
+    const bool inherit = have_log && attr_ok;   // sem lista valida nao herda nada (melhor sem log do que vazar handles)
+    BOOL ok = CreateProcessW(app, cmdline, nullptr, nullptr, inherit ? TRUE : FALSE,
+                             flags | (inherit ? EXTENDED_STARTUPINFO_PRESENT : 0), env_block, cwd, &si.StartupInfo, pi);
+    if (!ok && err) *err = GetLastError();
+    if (attr_ok) DeleteProcThreadAttributeList(si.lpAttributeList);
+    if (nul != INVALID_HANDLE_VALUE) CloseHandle(nul);
+    return ok != FALSE;
+}
+
 int run_process(const ProcessSpec& spec, const std::function<bool()>& poll, std::string* err) {
     std::wstring cmd = quote_arg(widen(spec.exe));
     for (auto& a : spec.args) cmd += L" " + quote_arg(widen(a));
@@ -227,26 +274,18 @@ int run_process(const ProcessSpec& spec, const std::function<bool()>& poll, std:
     block += L'\0';
 
     HANDLE hlog = INVALID_HANDLE_VALUE;
-    STARTUPINFOW si{};
-    si.cb = sizeof(si);
     if (!spec.log_path.empty()) {
         SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
         hlog = CreateFileW(widen(spec.log_path).c_str(), GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS,
                            FILE_ATTRIBUTE_NORMAL, nullptr);
-        if (hlog != INVALID_HANDLE_VALUE) {
-            si.dwFlags |= STARTF_USESTDHANDLES;
-            si.hStdOutput = hlog;
-            si.hStdError = hlog;
-            si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-        }
     }
     PROCESS_INFORMATION pi{};
     std::wstring cwd = widen(spec.cwd);
-    BOOL ok = CreateProcessW(nullptr, &cmd[0], nullptr, nullptr, hlog != INVALID_HANDLE_VALUE,
-                             CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT, &block[0],
-                             cwd.empty() ? nullptr : cwd.c_str(), &si, &pi);
+    unsigned long le = 0;
+    bool ok = spawn_process_w(nullptr, &cmd[0], cwd.empty() ? nullptr : cwd.c_str(), &block[0],
+                              CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT, hlog, &pi, &le);
     if (!ok) {
-        if (err) *err = "CreateProcess falhou (" + std::to_string(GetLastError()) + "): " + spec.exe;
+        if (err) *err = "CreateProcess falhou (" + std::to_string(le) + "): " + spec.exe;
         if (hlog != INVALID_HANDLE_VALUE) CloseHandle(hlog);
         return -1;
     }

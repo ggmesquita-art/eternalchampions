@@ -147,7 +147,7 @@ private:
             s = std::min(std::max(s, 0.0), clamp_hi);
             e = std::min(std::max(e, 0.0), clamp_hi);
             int note = drum > 0 ? drum : n.note;
-            int key = clampi(note + (mode == 1 ? 0 : c.map.transpose), 0, 127);
+            int key = clampi(note + (mode == 1 ? 0 : clampi(c.map.transpose, -48, 48)), 0, 127);
             int vel = clampi(n.vel, 1, 127);
             int64_t on = std::llround(s * sr), off = std::llround(e * sr);
             if (off <= 0 || on >= total_) continue;
@@ -215,7 +215,8 @@ private:
             return;
         }
         const int mode = mode_int(c.map.mode);
-        const float g = (float)std::pow(10.0, c.map.volume_db / 20.0);
+        const double vdb = std::isfinite(c.map.volume_db) ? std::max(-60.0, std::min(24.0, c.map.volume_db)) : 0.0;
+        const float g = (float)std::pow(10.0, vdb / 20.0);
         const float pan = (float)std::max(-1.0, std::min(1.0, c.map.pan));
         const float gl = g * (1.0f - std::max(0.0f, pan)), gr = g * (1.0f - std::max(0.0f, -pan));
         float tmp[kRenderBlock * 2];

@@ -502,8 +502,8 @@ VoiceEdit parse_edit(const Sec& s) {
     e.mode = to_str(kv_val(s, "mode"), "gm");
     e.program = to_int(kv_val(s, "program"), 0);
     e.bank = to_int(kv_val(s, "bank"), 0);
-    e.transpose = to_int(kv_val(s, "transpose"), 0);
-    e.volume_db = to_dbl(kv_val(s, "volume_db"), 0.0);
+    e.transpose = std::max(-48, std::min(48, to_int(kv_val(s, "transpose"), 0)));
+    e.volume_db = std::max(-60.0, std::min(24.0, to_dbl(kv_val(s, "volume_db"), 0.0)));
     e.drum_note = to_int(kv_val(s, "drum_note"), 0);
     return e;
 }
@@ -660,6 +660,8 @@ struct VoicesFile::Impl {
     std::vector<VoiceEntry> voices;
     bool dirty = false;
     bool exists = false;
+    bool bad = false;        // existe mas nao foi possivel ler: save() bloqueado
+    bool bak_done = false;   // .bak (estado ANTERIOR a sessao) so no primeiro save
 
     void rebuild() {
         voices.clear();
@@ -688,24 +690,34 @@ VoicesFile& VoicesFile::operator=(VoicesFile&& o) noexcept {
 
 bool VoicesFile::load(const std::string& path, std::string* err) {
     p_->path = path;
+    p_->bad = false;
+    p_->bak_done = false;
     std::string text;
+    std::error_code fec;
+    const bool existing = fs::exists(fs::u8path(path), fec);
     if (read_file(path, &text)) {
         p_->exists = true;
         p_->doc.set_text(text);
         p_->dirty = false;
+    } else if (existing) {   // existe mas nao le (permissao/bloqueio): NAO tratar como arquivo novo
+        p_->bad = true;
+        p_->exists = true;
+        if (err) *err = "nao foi possivel ler " + path;
+        return false;
     } else {
         p_->exists = false;
         p_->doc.set_text(kVoicesHeader);  // so cabecalho; save() cria o arquivo
         p_->dirty = true;
     }
     p_->rebuild();
-    (void)err;
     return true;
 }
 
 bool VoicesFile::save(std::string* err) {
+    if (p_->bad) { if (err) *err = "voices.toml nao foi lido (erro de leitura): gravacao bloqueada"; return false; }
     if (!p_->dirty && p_->exists) return true;
-    if (!write_file_atomic(p_->path, p_->doc.text(), true, err)) return false;
+    if (!write_file_atomic(p_->path, p_->doc.text(), !p_->bak_done, err)) return false;
+    p_->bak_done = true;
     p_->dirty = false;
     p_->exists = true;
     return true;
@@ -783,6 +795,7 @@ struct ProfileFile::Impl {
     std::vector<ProfileChannel> channels;
     std::vector<VoiceOverride> overrides;
     bool dirty = false;
+    bool bak_done = false;
 
     void rebuild() {
         channels.clear();
@@ -807,14 +820,14 @@ struct ProfileFile::Impl {
                 c.mode = to_str(kv_val(s, "mode"), "auto");
                 c.program = to_int(kv_val(s, "program"), 0);
                 c.bank = to_int(kv_val(s, "bank"), 0);
-                c.volume_db = to_dbl(kv_val(s, "volume_db"), 0.0);
+                c.volume_db = std::max(-60.0, std::min(24.0, to_dbl(kv_val(s, "volume_db"), 0.0)));
                 c.pan = to_dbl(kv_val(s, "pan"), 0.0);
                 c.mute = to_bool(kv_val(s, "mute"), false);
                 c.solo = to_bool(kv_val(s, "solo"), false);
                 c.eq_low_db = to_dbl(kv_val(s, "eq_low_db"), 0.0);
                 c.eq_mid_db = to_dbl(kv_val(s, "eq_mid_db"), 0.0);
                 c.eq_high_db = to_dbl(kv_val(s, "eq_high_db"), 0.0);
-                c.transpose = to_int(kv_val(s, "transpose"), 0);
+                c.transpose = std::max(-48, std::min(48, to_int(kv_val(s, "transpose"), 0)));
                 channels.push_back(std::move(c));
             } else if (starts_with(s.name, "voices.") && is_hash8(s.name.substr(7))) {
                 VoiceOverride o;
@@ -837,9 +850,10 @@ ProfileFile& ProfileFile::operator=(ProfileFile&& o) noexcept {
 
 bool ProfileFile::load(const std::string& path, std::string* err) {
     p_->path = path;
+    p_->bak_done = false;
     std::string text;
     if (!read_file(path, &text)) {
-        if (err) *err = "perfil nao encontrado: " + path;
+        if (err) *err = "perfil nao encontrado ou ilegivel: " + path;
         return false;
     }
     p_->doc.set_text(text);
@@ -850,7 +864,8 @@ bool ProfileFile::load(const std::string& path, std::string* err) {
 
 bool ProfileFile::save(std::string* err) {
     if (!p_->dirty) return true;
-    if (!write_file_atomic(p_->path, p_->doc.text(), true, err)) return false;
+    if (!write_file_atomic(p_->path, p_->doc.text(), !p_->bak_done, err)) return false;
+    p_->bak_done = true;
     p_->dirty = false;
     return true;
 }
