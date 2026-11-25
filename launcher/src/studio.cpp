@@ -1,6 +1,6 @@
 #include "studio.h"
 #include <SDL.h>
-#include <windows.h>
+#include "os.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -478,7 +478,7 @@ int studio_selftest(const std::string& root_s, const std::string& dumps_s, const
     auto check = [&](bool ok, const std::string& what) { report += std::string(ok ? "PASS " : "FAIL ") + what + "\n"; if (!ok) ++fails; };
     fs::path root = root_s.empty() ? fs::current_path() : fs::u8path(root_s);
     const bool own_out = out_s.empty();   // diretorio criado por nos (so este e apagado no fim)
-    fs::path out = own_out ? fs::temp_directory_path() / ("ec_studio_selftest_" + std::to_string((unsigned long long)GetTickCount64())) : fs::u8path(out_s);
+    fs::path out = own_out ? fs::temp_directory_path() / ("ec_studio_selftest_" + std::to_string(os::tick_ms())) : fs::u8path(out_s);
     std::error_code ec;
     if (!own_out && fs::exists(out, ec) && !fs::is_empty(out, ec)) {   // nunca remove_all num --out arbitrario
         fprintf(stderr, "--out deve ser um diretorio novo ou vazio: %s\n", out.string().c_str());

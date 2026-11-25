@@ -78,9 +78,9 @@ Row option_row(App& app, const Opt& o) {
         r.value = [po](App& a) { return short_path(a.cfg.get(*po)); };
         r.activate = [po](App& a) {
             std::string p;
-            if (po->type == OType::Folder) p = pick_folder(a, L"Escolher pasta");
-            else if (po->type == OType::SaveFile) p = pick_save_file(a, L"Gravar como", L"WAV (*.wav)\0*.wav\0Todos (*.*)\0*.*\0", L"wav");
-            else p = pick_open_file(a, L"Escolher arquivo", L"Todos os arquivos (*.*)\0*.*\0", a.root_dir);
+            if (po->type == OType::Folder) p = pick_folder(a, "Escolher pasta");
+            else if (po->type == OType::SaveFile) p = pick_save_file(a, "Gravar como", {{"WAV (*.wav)", "*.wav"}, {"Todos (*.*)", "*.*"}}, "wav");
+            else p = pick_open_file(a, "Escolher arquivo", {{"Todos os arquivos (*.*)", "*.*"}}, a.root_dir);
             if (!p.empty()) a.cfg.set(*po, p);
         };
         r.rebuild = true;

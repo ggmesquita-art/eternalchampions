@@ -2,19 +2,12 @@
 #include <png.h>
 #include <cstdio>
 #include <new>
-#include <windows.h>
+#include "os.h"
 
-static FILE* open_utf8(const std::string& p, const wchar_t* mode) {
-    int n = MultiByteToWideChar(CP_UTF8, 0, p.c_str(), -1, nullptr, 0);
-    std::wstring w(n ? n - 1 : 0, L'\0');
-    if (n) MultiByteToWideChar(CP_UTF8, 0, p.c_str(), -1, &w[0], n);
-    FILE* f = nullptr;
-    _wfopen_s(&f, w.c_str(), mode);
-    return f;
-}
+static FILE* open_utf8(const std::string& p, const char* mode) { return os::fopen_utf8(p, mode); }
 
 bool png_write_rgba(const std::string& path, const uint8_t* rgba, int w, int h) {
-    FILE* f = open_utf8(path, L"wb");
+    FILE* f = open_utf8(path, "wb");
     if (!f) return false;
     png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
     png_infop info = png ? png_create_info_struct(png) : nullptr;
@@ -32,7 +25,7 @@ bool png_write_rgba(const std::string& path, const uint8_t* rgba, int w, int h) 
 }
 
 static bool read_impl(const std::string& path, std::vector<uint8_t>& out, int& w, int& h) {
-    FILE* f = open_utf8(path, L"rb");
+    FILE* f = open_utf8(path, "rb");
     if (!f) return false;
     png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
     png_infop info = png ? png_create_info_struct(png) : nullptr;

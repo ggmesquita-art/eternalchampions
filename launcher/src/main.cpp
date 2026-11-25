@@ -17,7 +17,8 @@
 #include <filesystem>
 #include <sstream>
 #include <string>
-#include <windows.h>
+#include <chrono>
+#include "os.h"
 
 struct Args {
     std::string shot, screen = "main";
@@ -246,11 +247,9 @@ int main(int argc, char** argv) {
     // temporaria do settings.ini, nunca no real (a menos que se passe --ini <arq> ou --real-ini explicitamente)
     std::filesystem::path temp_ini;
     if ((!a.apply_profile.empty() || !a.controls_preset.empty() || a.run_preview) && a.ini.empty() && !a.real_ini) {
-        wchar_t exe[MAX_PATH * 2];
-        DWORD n = GetModuleFileNameW(nullptr, exe, (DWORD)(sizeof exe / sizeof exe[0]));
         std::error_code ec;
-        std::filesystem::path real = std::filesystem::path(std::wstring(exe, n)).parent_path() / "settings.ini";
-        temp_ini = std::filesystem::temp_directory_path(ec) / ("ec_launcher_test_" + std::to_string((unsigned long long)GetTickCount64()) + ".ini");
+        std::filesystem::path real = os::exe_path().parent_path() / "settings.ini";
+        temp_ini = std::filesystem::temp_directory_path(ec) / ("ec_launcher_test_" + std::to_string(os::tick_ms()) + ".ini");
         if (std::filesystem::exists(real, ec)) std::filesystem::copy_file(real, temp_ini, std::filesystem::copy_options::overwrite_existing, ec);
         app.ini_override = path_to_utf8(temp_ini);
     }

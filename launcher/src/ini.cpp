@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <fstream>
 #include <sstream>
-#include <windows.h>
+#include "os.h"
 
 namespace fs = std::filesystem;
 
@@ -160,13 +160,13 @@ bool Ini::save() {
     std::error_code ec;
     if (!bak_done_) {   // estado ANTERIOR a sessao
         if (fs::is_regular_file(path_, ec)) {
-            fs::path bak = path_; bak += L".bak";
+            fs::path bak = path_; bak += ".bak";
             fs::copy_file(path_, bak, fs::copy_options::overwrite_existing, ec);
             if (ec) { error_ = "backup .bak: " + ec.message(); return false; }
         }
         bak_done_ = true;
     }
-    fs::path tmp = path_; tmp += L".launcher.tmp";   // nome proprio: o runner usa settings.ini.tmp
+    fs::path tmp = path_; tmp += ".launcher.tmp";   // nome proprio: o runner usa settings.ini.tmp
     {
         std::ofstream o(tmp, std::ios::binary | std::ios::trunc);
         if (!o) { error_ = "nao foi possivel criar " + tmp.filename().string(); return false; }
@@ -175,9 +175,9 @@ bool Ini::save() {
         o.flush();
         if (!o) { error_ = "falha ao escrever " + tmp.filename().string(); fs::remove(tmp, ec); return false; }
     }
-    if (!MoveFileExW(tmp.c_str(), path_.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-        error_ = "MoveFileEx falhou (" + std::to_string(GetLastError()) + ")";
-        DeleteFileW(tmp.c_str());
+    std::string rerr;
+    if (!os::replace_file(tmp, path_, &rerr)) {
+        error_ = rerr;
         return false;
     }
     dirty_ = false;
@@ -294,7 +294,7 @@ int ini_selftest(const std::string& utf8_path) {
     auto check = [&](bool ok, const std::string& what) { report += std::string(ok ? "PASS " : "FAIL ") + what + "\n"; if (!ok) ++fails; };
 
     std::string orig = slurp(src);
-    fs::path work = src; work += L".selftest";
+    fs::path work = src; work += ".selftest";
     write_text(work, orig);
     std::error_code ec;
     fs::remove(work.string() + ".bak", ec);
@@ -424,7 +424,7 @@ int ini_selftest(const std::string& utf8_path) {
     fs::remove(work.string() + ".bak", ec);
     report += fails ? "RESULT FAIL\n" : "RESULT OK\n";
     fputs(report.c_str(), stdout);
-    fs::path rp = src; rp += L".selftest.txt";
+    fs::path rp = src; rp += ".selftest.txt";
     write_text(rp, report);
     return fails ? 1 : 0;
 }

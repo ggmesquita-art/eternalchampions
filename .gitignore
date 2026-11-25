@@ -86,3 +86,6 @@ Optiscaler_*/
 screenshots/
 /graphify-out/
 /docs/frame_data/fight_probe_summary.md
+
+# Desmontagem do codigo da ROM (material de pesquisa, nao usado pelo build): fica so no disco
+/disasm/

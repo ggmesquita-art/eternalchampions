@@ -2,8 +2,27 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
+#include <cstdint>
 #include <vector>
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <string>
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wmisleading-indentation"
+#endif
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "../third_party/stb_truetype.h"
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+#endif
 
 std::u32string utf8_to_u32(const std::string& s) {
     std::u32string out;
@@ -33,8 +52,9 @@ float Font::measure(const std::string& utf8, float scale) const {
 }
 
 // ---------------------------------------------------------------------------
-// SystemFont (GDI)
+// SystemFont (Windows: GDI; demais: stb_truetype sobre TTFs do sistema)
 // ---------------------------------------------------------------------------
+#ifdef _WIN32
 namespace {
 
 class SystemFont : public Font {
@@ -125,11 +145,186 @@ private:
 
 }  // namespace
 
-std::unique_ptr<Font> make_system_font(Render& r, const wchar_t* face, int px, bool bold) {
+std::unique_ptr<Font> make_system_font(Render& r, const char* face, int px, bool bold) {
+    std::wstring wface;
+    for (const char* c = face; *c; ++c) wface += (wchar_t)(unsigned char)*c;   // nomes de familia ASCII
+    auto f = std::make_unique<SystemFont>();
+    if (!f->build(r, wface.c_str(), px, bold)) return nullptr;
+    return f;
+}
+
+#else   // !_WIN32: TTF do sistema rasterizado com stb_truetype (public domain, third_party/)
+
+namespace {
+
+bool file_exists(const std::string& p) {
+    std::error_code ec;
+    return std::filesystem::is_regular_file(p, ec);
+}
+
+struct Ttf {
+    std::vector<unsigned char> data;
+    stbtt_fontinfo info{};
+    bool load(const std::string& path) {
+        std::FILE* f = std::fopen(path.c_str(), "rb");
+        if (!f) return false;
+        std::fseek(f, 0, SEEK_END);
+        long n = std::ftell(f);
+        std::fseek(f, 0, SEEK_SET);
+        if (n <= 0) { std::fclose(f); return false; }
+        data.resize((size_t)n);
+        size_t got = std::fread(data.data(), 1, data.size(), f);
+        std::fclose(f);
+        if (got != data.size()) return false;
+        int off = stbtt_GetFontOffsetForIndex(data.data(), 0);   // .ttc: primeira fonte da colecao
+        return off >= 0 && stbtt_InitFont(&info, data.data(), off) != 0;
+    }
+};
+
+const char* const kFontDirs[] = {
+    "/usr/share/fonts/truetype/dejavu", "/usr/share/fonts/truetype/liberation", "/usr/share/fonts/truetype/liberation2",
+    "/usr/share/fonts/truetype/noto", "/usr/share/fonts/truetype/ubuntu", "/usr/share/fonts/truetype/freefont",
+    "/usr/share/fonts/dejavu", "/usr/share/fonts/TTF", "/usr/share/fonts/liberation", "/usr/share/fonts/liberation-fonts",
+    "/usr/share/fonts/noto", "/usr/share/fonts/opentype/noto", "/usr/share/fonts/google-noto", "/usr/share/fonts/truetype",
+    "/usr/local/share/fonts",
+    "/System/Library/Fonts", "/System/Library/Fonts/Supplemental", "/Library/Fonts",
+};
+
+// Nomes de arquivo por estilo; a ordem e a preferencia. Windows usa "Georgia" (serifada) e "Segoe UI" (sem serifa).
+std::vector<std::string> font_names(bool serif, bool bold) {
+    if (serif) {
+        if (bold) return {"Georgia Bold.ttf", "DejaVuSerif-Bold.ttf", "LiberationSerif-Bold.ttf", "NotoSerif-Bold.ttf", "FreeSerifBold.ttf", "Times New Roman Bold.ttf"};
+        return {"Georgia.ttf", "DejaVuSerif.ttf", "LiberationSerif-Regular.ttf", "NotoSerif-Regular.ttf", "FreeSerif.ttf", "Times New Roman.ttf"};
+    }
+    if (bold) return {"DejaVuSans-Bold.ttf", "LiberationSans-Bold.ttf", "NotoSans-Bold.ttf", "Ubuntu-B.ttf", "FreeSansBold.ttf", "Arial Bold.ttf"};
+    return {"DejaVuSans.ttf", "LiberationSans-Regular.ttf", "NotoSans-Regular.ttf", "Ubuntu-R.ttf", "FreeSans.ttf", "Arial.ttf"};
+}
+
+std::string find_font_file(bool serif, bool bold) {
+    if (const char* env = std::getenv("EC_LAUNCHER_FONT"))
+        if (*env && file_exists(env)) return env;
+    for (const std::string& n : font_names(serif, bold))
+        for (const char* d : kFontDirs) {
+            std::string p = std::string(d) + "/" + n;
+            if (file_exists(p)) return p;
+        }
+    if (bold || serif) return find_font_file(false, false);   // estilo indisponivel: cai no sans regular
+    // ultimo recurso: qualquer .ttf achado sob as pastas de fontes
+    for (const char* d : {"/usr/share/fonts", "/usr/local/share/fonts", "/System/Library/Fonts", "/Library/Fonts"}) {
+        std::error_code ec;
+        for (std::filesystem::recursive_directory_iterator it(d, std::filesystem::directory_options::skip_permission_denied, ec), end;
+             !ec && it != end; it.increment(ec))
+            if (it->is_regular_file(ec) && it->path().extension() == ".ttf") return it->path().string();
+    }
+    return "";
+}
+
+std::string find_symbol_font() {
+    for (const char* n : {"DejaVuSans.ttf", "NotoSansSymbols2-Regular.ttf", "NotoSansSymbols-Regular.ttf", "Apple Symbols.ttf", "Arial Unicode.ttf", "FreeSans.ttf"})
+        for (const char* d : kFontDirs) {
+            std::string p = std::string(d) + "/" + n;
+            if (file_exists(p)) return p;
+        }
+    return "";
+}
+
+class SystemFont : public Font {
+public:
+    ~SystemFont() override { if (tex_) SDL_DestroyTexture(tex_); }
+    float line_height() const override { return lh_; }
+    const Glyph* glyph(char32_t cp) const override {
+        auto it = glyphs_.find(cp);
+        return it == glyphs_.end() ? nullptr : &it->second;
+    }
+    SDL_Texture* texture() const override { return tex_; }
+
+    bool build(Render& r, const char* face, int px, bool bold) {
+        const bool serif = face && (!std::strcmp(face, "Georgia") || !std::strcmp(face, "Times New Roman"));
+        const std::string main_path = find_font_file(serif, bold);
+        Ttf main_font;
+        if (main_path.empty() || !main_font.load(main_path)) {
+            std::fprintf(stderr, "launcher: nenhuma fonte TTF do sistema encontrada (instale fonts-dejavu-core ou fonts-liberation; ou defina EC_LAUNCHER_FONT=<arquivo.ttf>)\n");
+            return false;
+        }
+        Ttf sym_font;
+        const std::string sym_path = find_symbol_font();
+        const bool have_sym = !sym_path.empty() && sym_path != main_path && sym_font.load(sym_path);
+
+        std::vector<char32_t> cps;
+        for (char32_t c = 32; c < 127; ++c) cps.push_back(c);
+        for (char32_t c = 160; c < 256; ++c) cps.push_back(c);
+        const char32_t extra[] = {0x2026, 0x2022, 0x25C4, 0x25BA, 0x25CF, 0x2713, 0x2717, 0x21BB, 0x2190, 0x2191, 0x2192, 0x2193, 0x2014, 0x2013, 0x25B2, 0x25BC, 0x26A0, 0x2248, 0x25B6, 0x25A0, 0x27F2, 0x2500, 0x25BE, 0x25B8, 0x2264, 0x2265};
+        for (char32_t c : extra) cps.push_back(c);
+
+        const float msc = stbtt_ScaleForMappingEmToPixels(&main_font.info, (float)px);
+        int asc = 0, desc = 0, gap = 0;
+        stbtt_GetFontVMetrics(&main_font.info, &asc, &desc, &gap);
+        const int ascent = (int)std::ceil(asc * msc);
+        const int cellh = std::max(1, ascent + (int)std::ceil(-desc * msc));
+        lh_ = (float)cellh;
+        const int pad = 3;
+        const int maxw = px * 3;
+
+        const int AW = 1024;
+        int ah = 256;
+        std::vector<uint8_t> atlas((size_t)AW * ah * 4, 0);
+        int cx = 0, cy = 0;
+        std::vector<unsigned char> gbuf;
+        for (char32_t cp : cps) {
+            Ttf* f = &main_font;
+            if (!stbtt_FindGlyphIndex(&f->info, (int)cp)) {
+                if (have_sym && stbtt_FindGlyphIndex(&sym_font.info, (int)cp)) f = &sym_font;
+                else if (cp != 32 && cp != 0xA0) continue;   // sem glifo: o draw_text cai no '?'
+            }
+            const float sc = stbtt_ScaleForMappingEmToPixels(&f->info, (float)px);
+            int adv_u = 0, lsb = 0;
+            stbtt_GetCodepointHMetrics(&f->info, (int)cp, &adv_u, &lsb);
+            const int adv = (int)std::lround(adv_u * sc);
+            const int cw = std::min(adv + pad * 2, maxw);
+            int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+            stbtt_GetCodepointBitmapBox(&f->info, (int)cp, sc, sc, &x0, &y0, &x1, &y1);
+            const int gw = x1 - x0, gh = y1 - y0;
+            if (cx + cw + 1 > AW) { cx = 0; cy += cellh + 1; }
+            while (cy + cellh > ah) { ah *= 2; atlas.resize((size_t)AW * ah * 4, 0); }
+            if (gw > 0 && gh > 0) {
+                gbuf.assign((size_t)gw * gh, 0);
+                stbtt_MakeCodepointBitmap(&f->info, gbuf.data(), gw, gh, gw, sc, sc, (int)cp);
+                for (int y = 0; y < gh; ++y) {
+                    const int ty = ascent + y0 + y;
+                    if (ty < 0 || ty >= cellh) continue;
+                    for (int x = 0; x < gw; ++x) {
+                        const int tx = pad + x0 + x;
+                        if (tx < 0 || tx >= cw) continue;
+                        uint8_t* d = &atlas[((size_t)(cy + ty) * AW + cx + tx) * 4];
+                        d[0] = d[1] = d[2] = 255; d[3] = gbuf[(size_t)y * gw + x];
+                    }
+                }
+            }
+            Glyph g;
+            g.ax = cx; g.ay = cy; g.aw = cw; g.ah = cellh;
+            g.xoff = (float)-pad; g.yoff = 0; g.adv = (float)adv;
+            glyphs_[cp] = g;
+            cx += cw + 1;
+        }
+        tex_ = r.make_texture(atlas.data(), AW, ah, true);
+        return tex_ != nullptr;
+    }
+
+private:
+    SDL_Texture* tex_ = nullptr;
+    float lh_ = 16;
+    std::unordered_map<char32_t, Glyph> glyphs_;
+};
+
+}  // namespace
+
+std::unique_ptr<Font> make_system_font(Render& r, const char* face, int px, bool bold) {
     auto f = std::make_unique<SystemFont>();
     if (!f->build(r, face, px, bold)) return nullptr;
     return f;
 }
+
+#endif
 
 // ---------------------------------------------------------------------------
 // draw_text

@@ -1,6 +1,7 @@
 #include "preview_job.h"
 #include "app.h"
 #include "dumps.h"
+#include "os.h"
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -119,7 +120,7 @@ void PreviewJob::start(App& app) {
     }
     if (!app.ini_override.empty()) { state_ = State::Failed; msg_ = "Indisponível com --ini / cópia de teste: o jogo lê o settings.ini real (use --real-ini)."; return; }
     if (!app.rom_valid || !app.rom_exists) { state_ = State::Failed; msg_ = "Configure uma ROM válida primeiro."; return; }
-    if (!fs::exists(app.game_exe, ec)) { state_ = State::Failed; msg_ = "EternalChampionsRecomp.exe não encontrado."; return; }
+    if (!fs::exists(app.game_exe, ec)) { state_ = State::Failed; msg_ = os::game_exe_name() + " não encontrado."; return; }
     app.cfg.save();   // o jogo da previa le o settings.ini: grava mudancas adiadas antes
     fs::create_directories(d, ec);
     if (th_.joinable()) th_.join();

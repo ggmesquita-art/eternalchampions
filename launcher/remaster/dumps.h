@@ -6,6 +6,8 @@
 #include <utility>
 #include <vector>
 
+#include "proc.h"
+
 namespace ecr {
 
 // fraction em [0,1] (ou < 0 se indeterminado) e texto da etapa.
@@ -43,25 +45,7 @@ void build_char_select_script(const std::string& script_path, const std::string&
 bool build_single_music_script(const std::string& script_path, int bgm_id, int track_frames, int* f_start,
                                int* f_end);
 
-struct ProcessSpec {
-    std::string exe;
-    std::vector<std::string> args;
-    std::string cwd;
-    std::vector<std::pair<std::string, std::string>> env;  // somadas ao ambiente atual
-    std::string log_path;                                   // stdout+stderr (opcional)
-};
-// Argumento de linha de comando do Windows (regras do CommandLineToArgvW), em UTF-8.
-std::string quote_arg(const std::string& utf8);
-#ifdef _WIN32
-// CreateProcessW herdando SO `log_handle` (stdout/stderr) + um NUL como stdin, via PROC_THREAD_ATTRIBUTE_HANDLE_LIST
-// (STARTUPINFOEX). `log_handle` = HANDLE inheritavel ou nullptr/INVALID_HANDLE_VALUE (nada herdado).
-// `pi` = PROCESS_INFORMATION*; `cmdline` e modificavel (exigencia da API). Retorna false e GetLastError() em `err`.
-bool spawn_process_w(const wchar_t* app, wchar_t* cmdline, const wchar_t* cwd, void* env_block, unsigned long flags,
-                     void* log_handle, void* pi, unsigned long* err);
-#endif
-// Executa sem janela e espera. `poll` (opcional) roda a cada ~200 ms e devolve true para cancelar.
-// Retorna o exit code; -1 se falhou ao iniciar; -2 se cancelado.
-int run_process(const ProcessSpec& spec, const std::function<bool()>& poll, std::string* err);
+// ProcessSpec / run_process / quote_arg: ver proc.h (camada portatil de processos).
 
 // Ultimo "f=N" no fim de um arquivo de texto em crescimento (-1 se nao achou).
 long long last_frame_in_file(const std::string& path);

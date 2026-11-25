@@ -9,11 +9,8 @@
 #include <cstring>
 #include <filesystem>
 
+#include "proc.h"
 #include "voices_toml.h"
-
-#ifdef _WIN32
-#include <windows.h>
-#endif
 
 namespace fs = std::filesystem;
 
@@ -118,11 +115,7 @@ bool capture_original(const GameRun& run, int bgm_id, OriginalAudio* out, Progre
     static std::atomic<int> counter{0};
     std::error_code ec;
     fs::path td = fs::temp_directory_path(ec) / ("ec_orig_" + std::to_string(
-#ifdef _WIN32
-                                                     (int)GetCurrentProcessId()
-#else
-                                                     0
-#endif
+                                                     (int)current_pid()
                                                          ) + "_" + std::to_string(counter++));
     fs::create_directories(td, ec);
     struct Cleanup {

@@ -11,13 +11,13 @@ O projeto suporta compilação e execução nativa em dois ambientes principais,
 | Binário | Plataforma Alvo | Toolchain / Backend | Tecnologias Utilizadas |
 |---|---|---|---|
 | `build/EternalChampionsRecomp.exe` | **Windows Nativo (x64)** | MSVC (Visual Studio 2022) + CMake (Ninja) | SDL2 nativo, Direct3D11/12, OpenGL 4.3+, ONNX Runtime nativo (`onnxruntime.dll`), XInput/DirectInput |
-| `build/native/EternalChampionsRecomp` | **Linux / WSL (x64)** | GCC / Clang + CMake (Ninja) | SDL2 (X11 / Wayland), Mesa D3D12/OpenGL, ALSA / PulseAudio |
+| `build/EternalChampionsRecomp` | **Linux (x64) / macOS (não testado)** | GCC / Clang + CMake (Ninja) | SDL2 (X11 / Wayland), Mesa D3D12/OpenGL, ALSA / PulseAudio |
 
 Ambos os binários operam com recompilação estática 100% C do código Motorola 68000 original do cartucho Sega Genesis/Mega Drive (`eternal_champions_us.gen`), acoplados a módulos nativos de vídeo com suporte widescreen em tempo real (`game/ec_video.c`), motor neural B+ v1/v2/v3 (`neural/infer/`), síntese SoundFont em tempo real (`game/ec_audio.c`) e persistência determinística.
 
 ### 1.1 Launcher gráfico (`EternalChampions.exe`)
 
-`build/EternalChampions.exe` (Windows, compilado por `build.cmd`; opção CMake `EC_BUILD_LAUNCHER`) é o frontend que edita este mesmo `settings.ini`, escolhe a ROM e inicia o jogo com `--no-launcher`. Guia de uso: [`LAUNCHER.md`](LAUNCHER.md). As opções que não têm chave no ini (`--interlace-display`, `--widescreen`, `--pacing`, `--target-fps`, `--audio-chip-blend`, `--port`, `--fresh-evidence`, `--yield-log`, `--wav`) ficam na seção `[launcher.args]` (ver §4.5) e o launcher as converte em flags ao iniciar a partida.
+`build/EternalChampions.exe` (Windows, `build.cmd`) / `build/EternalChampions` (Linux e macOS, `build.sh`) (opção CMake `EC_BUILD_LAUNCHER`) é o frontend que edita este mesmo `settings.ini`, escolhe a ROM e inicia o jogo com `--no-launcher`. Guia de uso: [`LAUNCHER.md`](LAUNCHER.md). As opções que não têm chave no ini (`--interlace-display`, `--widescreen`, `--pacing`, `--target-fps`, `--audio-chip-blend`, `--port`, `--fresh-evidence`, `--yield-log`, `--wav`) ficam na seção `[launcher.args]` (ver §4.5) e o launcher as converte em flags ao iniciar a partida.
 
 ---
 

@@ -1,31 +1,15 @@
 #include "screens.h"
 #include "../sha256.h"
 #include "../widgets.h"
-#include <SDL_syswm.h>
-#include <commdlg.h>
-#include <windows.h>
+#include "../platform.h"
 
 namespace {
 enum { ID_BROWSE = 1, ID_RECENT = 2, ID_FORCE = 3, ID_BACK = 4 };
 
 std::string browse_rom(App& app) {
-    HWND owner = nullptr;
-    SDL_SysWMinfo wm;
-    SDL_VERSION(&wm.version);
-    if (SDL_GetWindowWMInfo(app.render.window, &wm)) owner = wm.info.win.window;
-    wchar_t file[MAX_PATH * 2] = L"";
-    std::wstring init = (app.root_dir / "roms").wstring();
-    OPENFILENAMEW ofn{};
-    ofn.lStructSize = sizeof ofn;
-    ofn.hwndOwner = owner;
-    ofn.lpstrFilter = L"ROMs Mega Drive (*.gen;*.md;*.bin;*.smd)\0*.gen;*.md;*.bin;*.smd\0Todos os arquivos (*.*)\0*.*\0";
-    ofn.lpstrFile = file;
-    ofn.nMaxFile = (DWORD)(sizeof file / sizeof file[0]);
-    ofn.lpstrInitialDir = init.c_str();
-    ofn.lpstrTitle = L"Selecionar a ROM de Eternal Champions (US)";
-    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR | OFN_EXPLORER;
-    if (!GetOpenFileNameW(&ofn)) return "";
-    return path_to_utf8(std::filesystem::path(file));
+    return pick_open_file(app, "Selecionar a ROM de Eternal Champions (US)",
+                          {{"ROMs Mega Drive (*.gen;*.md;*.bin;*.smd)", "*.gen;*.md;*.bin;*.smd"}, {"Todos os arquivos (*.*)", "*.*"}},
+                          app.root_dir / "roms");
 }
 
 class RomScreen : public Screen {

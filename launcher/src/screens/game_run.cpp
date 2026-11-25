@@ -17,9 +17,7 @@ public:
 
     void update(App& app, const InputState& in, float) override {
         if (state_ == Running) {
-            if (WaitForSingleObject(gp_.handle, 0) == WAIT_OBJECT_0) {
-                GetExitCodeProcess(gp_.handle, &code_);
-                CloseHandle(gp_.handle); gp_.handle = nullptr;
+            if (ecr::try_wait(gp_.proc, &code_)) {
                 app.game_running = false;
                 SDL_RestoreWindow(app.render.window);
                 SDL_RaiseWindow(app.render.window);
@@ -27,8 +25,7 @@ public:
                 state_ = Done;
                 build_menu(app);
                 if (app.autoplay) {
-                    FILE* f = nullptr;
-                    _wfopen_s(&f, (app.exe_dir / "launcher_autoplay.txt").c_str(), L"wb");
+                    FILE* f = os::fopen_utf8(path_to_utf8(app.exe_dir / "launcher_autoplay.txt"), "wb");
                     if (f) { fprintf(f, "exit_code=%d\n", (int)code_); fclose(f); }
                     app.quit = true;
                 }
@@ -40,8 +37,8 @@ public:
         if (a < 0) return;
         switch (menu_.items[a].id) {
         case ID_BACK: app.pop(); break;
-        case ID_LOGS: shell_open(app.logs_dir); break;
-        case ID_LASTERR: shell_open(find_last_error_log(app)); break;
+        case ID_LOGS: os::shell_open(app.logs_dir); break;
+        case ID_LASTERR: os::shell_open(find_last_error_log(app)); break;
         }
     }
 
@@ -90,7 +87,7 @@ private:
     State state_ = Failed;
     GameProcess gp_;
     std::string err_;
-    DWORD code_ = 0;
+    int code_ = 0;
     MenuList menu_;
 };
 }  // namespace

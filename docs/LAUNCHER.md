@@ -2,13 +2,13 @@
 
 Frontend gráfico do projeto: escolhe a ROM, edita as opções do `settings.ini`, mapeia os controles, abre o Estúdio de Remaster e inicia o jogo. O visual vem das telas do próprio jogo (arte extraída da ROM do usuário). O plano de projeto e o histórico de decisões estão em [`launcher/PLAN.md`](../launcher/PLAN.md); a referência completa de flags e chaves do ini está em [`CONFIGURATION_AND_CLI.md`](CONFIGURATION_AND_CLI.md).
 
-> Somente Windows (x64). O launcher usa as caixas de diálogo e a API de processos do Win32.
+> Windows x64 e Linux x86_64 (verificados); macOS compila pelo mesmo CMake, mas ainda não foi testado. No Windows os diálogos são os nativos (comdlg32); no Linux usam `zenity` ou `kdialog` (sem nenhum dos dois, o launcher avisa e os diálogos ficam indisponíveis); no macOS, `osascript`. Fora do Windows as fontes da interface vêm de TTFs do sistema (DejaVu, Liberation, Noto…; override com `EC_LAUNCHER_FONT=<arquivo.ttf>`). Nos caminhos abaixo, `%APPDATA%\EternalChampionsRecomp` corresponde a `$XDG_CONFIG_HOME/EternalChampionsRecomp` (padrão `~/.config/…`) no Linux e a `~/Library/Application Support/EternalChampionsRecomp` no macOS.
 
 ---
 
 ## 1. Como executar
 
-- O launcher é o alvo `EternalChampions` do CMake, compilado junto com o jogo por `build.cmd` (`game/CMakeLists.txt`, opção `EC_BUILD_LAUNCHER`, ligada por padrão no Windows). Para desligar: `build.cmd reconfigure -DEC_BUILD_LAUNCHER=OFF`.
+- O launcher é o alvo `EternalChampions` do CMake, compilado junto com o jogo por `build.cmd` (Windows) ou `build.sh` (Linux/macOS) (`game/CMakeLists.txt`, opção `EC_BUILD_LAUNCHER`, ligada por padrão). Para desligar: `build.cmd reconfigure -DEC_BUILD_LAUNCHER=OFF` / `./build.sh reconfigure -DEC_BUILD_LAUNCHER=OFF`.
 - Saída: `build\EternalChampions.exe`, ao lado de `build\EternalChampionsRecomp.exe` (o jogo). O launcher procura o jogo na própria pasta e trata a pasta-pai como raiz do projeto quando ela tem `assets\` (é daí que vêm `assets\shaders`, `assets\models`, `assets\audio_remaster`, `assets\soundfonts` e `pipeline\`).
 - Uso normal: dê dois cliques em `EternalChampions.exe` (ou rode sem argumentos). A janela é 1280×720 virtuais, escalada para a janela real.
 - Abertura: "PRESS START" aparece até o primeiro input. Se a ROM já estiver configurada, a abertura passa sozinha em 3 s.
@@ -19,7 +19,7 @@ Frontend gráfico do projeto: escolhe a ROM, edita as opções do `settings.ini`
 
 ### 2.1 Escolher a ROM
 
-Menu **ROM** › "Selecionar arquivo…" (diálogo do Windows). Também aparecem as ROMs recentes (até 8) e as encontradas em `roms\` (extensões `.gen`, `.md`, `.bin`, `.smd`).
+Menu **ROM** › "Selecionar arquivo…" (diálogo do sistema). Também aparecem as ROMs recentes (até 8) e as encontradas em `roms\` (extensões `.gen`, `.md`, `.bin`, `.smd`).
 
 - O launcher calcula o **SHA-256** do arquivo e compara com o da versão US suportada (`6d8bdaf8c994d9f718c8f991900c58cdf1af84e030524b57f6dda263cc4ea247`).
 - ROM válida: é gravada em `rom-EC.cfg` (uma linha com o caminho absoluto, o mesmo formato que o runner lê) e a extração da arte começa.
@@ -285,7 +285,7 @@ build\EternalChampions.exe --autoplay --game-args "--max-frames 120"
 
 ## 8. Limitações conhecidas e pendências
 
-- Somente Windows.
+- macOS não testado (código escrito, nunca compilado num Mac). No macOS, se o launcher morrer por crash ou SIGKILL, processos filhos (jogo, extração) não são encerrados junto.
 - **QA em andamento (fase L7):** revisão independente, teste em 1080p/1440p/4K e checklist de acessibilidade ainda não concluídos.
 - A navegação **por controle físico** (Xbox, PlayStation etc.) não foi testada de ponta a ponta; o caminho por teclado e mouse é o mais exercitado.
 - O preset **Stick de luta** é aproximado (mapeia os botões do SDL, não o layout físico de cada stick); os rótulos de **Nintendo** também são aproximados.

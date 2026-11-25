@@ -1,13 +1,18 @@
 #include "app.h"
+#include "os.h"
+#include "proc.h"
 #include "sha256.h"
 #include <algorithm>
 #include <cstdio>
+#include <ctime>
 #include <fstream>
-#include <shlobj.h>
+#ifdef _WIN32
 #include <windows.h>
+#endif
 
 namespace fs = std::filesystem;
 
+#ifdef _WIN32
 std::string path_to_utf8(const fs::path& p) {
     std::wstring w = p.wstring();
     if (w.empty()) return "";
@@ -24,37 +29,29 @@ fs::path utf8_to_path(const std::string& s) {
     MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), &w[0], n);
     return fs::path(w);
 }
+#else
+std::string path_to_utf8(const fs::path& p) { return p.string(); }
+fs::path utf8_to_path(const std::string& s) { return fs::path(s); }
+#endif
 
 bool App::init(bool hidden, int win_w, int win_h) {
-    wchar_t buf[MAX_PATH * 2];
-    DWORD n = GetModuleFileNameW(nullptr, buf, (DWORD)(sizeof buf / sizeof buf[0]));
-    exe_dir = fs::path(std::wstring(buf, n)).parent_path();
+    exe_dir = os::exe_path().parent_path();
     std::error_code ec;
     fs::path parent = exe_dir.parent_path();
     root_dir = fs::exists(parent / "assets", ec) ? parent : exe_dir;
-    game_exe = exe_dir / "EternalChampionsRecomp.exe";
+    game_exe = exe_dir / os::game_exe_name();
     settings_ini = ini_override.empty() ? exe_dir / "settings.ini" : utf8_to_path(ini_override);
     rom_cfg = exe_dir / "rom-EC.cfg";
     recent_file = exe_dir / "launcher_recent.txt";
     assets_dir = exe_dir / "ui_cache";
-    {   // arte extraida: %APPDATA%\EternalChampionsRecomp\ui (o extrator recebe --out explicito)
-        PWSTR roaming = nullptr;
-        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &roaming)) && roaming) {
-            assets_dir = fs::path(roaming) / "EternalChampionsRecomp" / "ui";
-            CoTaskMemFree(roaming);
-        }
+    {   // arte extraida: <dados do usuario>/EternalChampionsRecomp/ui (o extrator recebe --out explicito)
+        fs::path ud = os::user_data_dir();
+        if (!ud.empty()) assets_dir = ud / "ui";
     }
     logs_dir = exe_dir / "logs";
 
-    {   // Job Object KILL_ON_JOB_CLOSE: todo filho (jogo, extrator, previa, dumps, captura) morre junto com o launcher
-        HANDLE job = CreateJobObjectW(nullptr, nullptr);
-        if (job) {
-            JOBOBJECT_EXTENDED_LIMIT_INFORMATION li{};
-            li.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-            if (SetInformationJobObject(job, JobObjectExtendedLimitInformation, &li, sizeof li) && AssignProcessToJobObject(job, GetCurrentProcess())) job_ = job;
-            else CloseHandle(job);
-        }
-    }
+    // todo filho (jogo, extrator, previa, dumps, captura) morre junto com o launcher (Windows: Job Object; Linux: PDEATHSIG; macOS: rastreio)
+    ecr::enable_kill_children_on_exit();
     SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) != 0) return false;
     if (!render.init(win_w, win_h, hidden, "Eternal Champions")) return false;
@@ -72,11 +69,8 @@ void App::shutdown() {
     pending_.clear();
     preview.cancel();
     preview.free_textures();
-    if (art_proc_) {   // extrator ainda rodando: encerra e espera (sem orfaos)
-        TerminateProcess((HANDLE)art_proc_, 1);
-        WaitForSingleObject((HANDLE)art_proc_, 3000);
-        CloseHandle((HANDLE)art_proc_);
-        art_proc_ = nullptr;
+    if (art_proc_.valid()) {   // extrator ainda rodando: encerra e espera (sem orfaos)
+        ecr::terminate(art_proc_, 3000);
         art_state = ArtState::Failed;
     }
     input.shutdown();
@@ -84,8 +78,7 @@ void App::shutdown() {
     theme.fonts = Fonts{};
     render.shutdown();
     SDL_Quit();
-    // job_ NAO e fechado aqui: com KILL_ON_JOB_CLOSE isso mataria o proprio launcher (membro do job) antes de main() terminar;
-    // o SO fecha o handle na saida do processo e encerra qualquer filho remanescente.
+    ecr::kill_all_children();   // POSIX: filhos ainda rastreados (Windows: o Job Object cuida, ver proc.cpp)
 }
 
 // ---- pilha de telas ---------------------------------------------------------
@@ -172,9 +165,9 @@ void App::scan_roms() {
     if (!fs::is_directory(dir, ec)) return;
     for (auto& e : fs::directory_iterator(dir, ec)) {
         if (!e.is_regular_file(ec)) continue;
-        std::wstring ext = e.path().extension().wstring();
-        std::transform(ext.begin(), ext.end(), ext.begin(), ::towlower);
-        if (ext == L".gen" || ext == L".md" || ext == L".bin" || ext == L".smd")
+        std::string ext = path_to_utf8(e.path().extension());
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+        if (ext == ".gen" || ext == ".md" || ext == ".bin" || ext == ".smd")
             detected.push_back(path_to_utf8(fs::absolute(e.path(), ec)));
     }
 }
@@ -233,8 +226,14 @@ void App::log(const std::string& line) {
     std::error_code ec;
     std::filesystem::create_directories(logs_dir, ec);
     std::ofstream f(logs_dir / "launcher.log", std::ios::binary | std::ios::app);
-    SYSTEMTIME t; GetLocalTime(&t);
+    std::time_t now = std::time(nullptr);
+    std::tm t{};
+#ifdef _WIN32
+    localtime_s(&t, &now);
+#else
+    localtime_r(&now, &t);
+#endif
     char ts[40];
-    snprintf(ts, sizeof ts, "%04d-%02d-%02d %02d:%02d:%02d ", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+    snprintf(ts, sizeof ts, "%04d-%02d-%02d %02d:%02d:%02d ", t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
     f << ts << line << "\n";
 }

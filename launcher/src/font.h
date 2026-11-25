@@ -27,7 +27,7 @@ public:
     float measure(const std::string& utf8, float scale = 1.f) const;
 };
 
-std::unique_ptr<Font> make_system_font(Render& r, const wchar_t* face, int px, bool bold);
+std::unique_ptr<Font> make_system_font(Render& r, const char* face, int px, bool bold);
 
 // Fonte pixel do jogo (bitmap_font.cpp): atlas PNG + font_menu.json do extrator ({"glyphs":{"A":{x,y,w,h}},"advance":8}); compoe acentos PT-BR.
 // smooth()==false: use scale inteiro, sem contorno (a fonte ja traz sombra).

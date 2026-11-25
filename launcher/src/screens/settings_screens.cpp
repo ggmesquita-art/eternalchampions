@@ -108,9 +108,9 @@ std::vector<Page> build_advanced(App& app) {
     }
 
     files.rows.push_back(header_row("Arquivos"));
-    files.rows.push_back(action_row("Abrir settings.ini", "Abre o arquivo de configurações no editor padrão.", [](App& a) { shell_open(a.settings_ini); }));
+    files.rows.push_back(action_row("Abrir settings.ini", "Abre o arquivo de configurações no editor padrão.", [](App& a) { os::shell_open(a.settings_ini); }));
     files.rows.push_back(action_row("Abrir pasta de logs", "Abre build\\logs (launcher.log, last_error.log e logs do jogo).", [](App& a) {
-        std::error_code ec; fs::create_directories(a.logs_dir, ec); shell_open(a.logs_dir); }));
+        std::error_code ec; fs::create_directories(a.logs_dir, ec); os::shell_open(a.logs_dir); }));
     files.rows.push_back(header_row("Restaurar padrões"));
     struct { const char* label; const char* what; const char* tab; } rs[] = {
         {"Restaurar Vídeo", "as opções de Vídeo", "video"}, {"Restaurar Aprimoramento", "as opções de Aprimoramento", "enh"},
@@ -185,7 +185,7 @@ std::vector<Page> build_enhance(App& app) {
         pr.rebuild = true;
         sh.rows.push_back(pr);
         sh.rows.push_back(action_row("Escolher .glslp…", "Usa um preset do RetroArch (.glslp) de qualquer pasta.", [](App& a) {
-            std::string f = pick_open_file(a, L"Escolher preset de shader", L"Presets RetroArch (*.glslp)\0*.glslp\0Todos (*.*)\0*.*\0", a.root_dir / "assets" / "shaders");
+            std::string f = pick_open_file(a, "Escolher preset de shader", {{"Presets RetroArch (*.glslp)", "*.glslp"}, {"Todos (*.*)", "*.*"}}, a.root_dir / "assets" / "shaders");
             if (!f.empty()) { a.cfg.set("ec.video.shader_preset", f); a.cfg.set("ec.video.shader_params", ""); }
         }, true));
 

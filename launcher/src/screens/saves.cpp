@@ -9,7 +9,6 @@
 #include <cstring>
 #include <ctime>
 #include <fstream>
-#include <windows.h>
 
 namespace fs = std::filesystem;
 
@@ -115,12 +114,9 @@ private:
             if (!s.exists) continue;
             s.size = fs::file_size(b, ec);
             // data/hora local da ultima gravacao
-            WIN32_FILE_ATTRIBUTE_DATA fa;
-            if (GetFileAttributesExW(b.c_str(), GetFileExInfoStandard, &fa)) {
-                FILETIME lf; SYSTEMTIME st;
-                FileTimeToLocalFileTime(&fa.ftLastWriteTime, &lf);
-                FileTimeToSystemTime(&lf, &st);
-                char buf[40]; snprintf(buf, sizeof buf, "%02d/%02d/%04d %02d:%02d:%02d", st.wDay, st.wMonth, st.wYear, st.wHour, st.wMinute, st.wSecond);
+            std::tm tmv;
+            if (os::file_mtime_local(b, &tmv)) {
+                char buf[40]; snprintf(buf, sizeof buf, "%02d/%02d/%04d %02d:%02d:%02d", tmv.tm_mday, tmv.tm_mon + 1, tmv.tm_year + 1900, tmv.tm_hour, tmv.tm_min, tmv.tm_sec);
                 s.when = buf;
             }
             std::ifstream f(thumb(app, i + 1), std::ios::binary);
@@ -171,7 +167,7 @@ private:
     void do_import(App& app, int slot, const std::string& path) {
         std::error_code ec;
         if (fs::is_regular_file(bin(app, slot), ec)) {
-            fs::path bk = bin(app, slot); bk += L".bak";
+            fs::path bk = bin(app, slot); bk += ".bak";
             fs::copy_file(bin(app, slot), bk, fs::copy_options::overwrite_existing, ec);
             if (ec) { app.toast("Falha ao criar o .bak do slot atual; importação cancelada."); return; }
         }
@@ -194,7 +190,7 @@ private:
             break;
         case ID_EXPORT: {
             menu_open_ = false;
-            std::string p = pick_save_file(app, L"Exportar savestate", L"Savestate (*.bin)\0*.bin\0Todos (*.*)\0*.*\0", L"bin");
+            std::string p = pick_save_file(app, "Exportar savestate", {{"Savestate (*.bin)", "*.bin"}, {"Todos (*.*)", "*.*"}}, "bin");
             if (!p.empty()) {
                 std::error_code ec;
                 fs::copy_file(bin(app, slot), utf8_to_path(p), fs::copy_options::overwrite_existing, ec);
@@ -204,7 +200,7 @@ private:
         }
         case ID_IMPORT: {
             menu_open_ = false;
-            std::string p = pick_open_file(app, L"Importar savestate", L"Savestate (*.bin)\0*.bin\0Todos (*.*)\0*.*\0", app.exe_dir);
+            std::string p = pick_open_file(app, "Importar savestate", {{"Savestate (*.bin)", "*.bin"}, {"Todos (*.*)", "*.*"}}, app.exe_dir);
             if (!p.empty()) {
                 std::string why = validate_import(app, p);
                 if (!why.empty()) { app.toast("Importação recusada: " + why, 5.f); break; }

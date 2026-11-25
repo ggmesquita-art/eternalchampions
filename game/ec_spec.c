@@ -37,6 +37,11 @@ extern uint32_t game_dispatch_table_addr(int i);
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef _MSC_VER
+#include <strings.h>
+#define _stricmp strcasecmp
+#endif
+
 static uint16_t spec_ram16(unsigned a)
 {
     a &= 0xFFFFu;

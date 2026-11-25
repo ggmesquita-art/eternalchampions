@@ -64,10 +64,10 @@ std::string json_str(const std::string& j, const std::string& key) {
 }  // namespace
 
 bool Theme::init(Render& r, const std::string& assets_dir) {
-    fonts.logo = make_system_font(r, L"Georgia", 84, true);
-    fonts.title = make_system_font(r, L"Georgia", 54, true);
-    fonts.menu = make_system_font(r, L"Segoe UI", 30, true);
-    fonts.help = make_system_font(r, L"Segoe UI", 20, false);
+    fonts.logo = make_system_font(r, "Georgia", 84, true);
+    fonts.title = make_system_font(r, "Georgia", 54, true);
+    fonts.menu = make_system_font(r, "Segoe UI", 30, true);
+    fonts.help = make_system_font(r, "Segoe UI", 20, false);
     if (!fonts.logo || !fonts.title || !fonts.menu || !fonts.help) return false;
     gen_stone(r);
     gen_yinyang(r);

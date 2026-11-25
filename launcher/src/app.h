@@ -3,6 +3,7 @@
 #include "input.h"
 #include "render.h"
 #include "preview_job.h"
+#include "proc.h"
 #include "schema.h"
 #include "theme.h"
 #include <filesystem>
@@ -108,8 +109,7 @@ private:
     std::vector<std::unique_ptr<Screen>> stack_;
     std::vector<Pending> pending_;
     std::string toast_msg_; float toast_t_ = 0;
-    void* art_proc_ = nullptr; float art_poll_t_ = 0;
-    void* job_ = nullptr;
+    ecr::ChildProcess art_proc_; float art_poll_t_ = 0;
     void poll_art(float dt);
     void scan_roms();
     void save_recents();
