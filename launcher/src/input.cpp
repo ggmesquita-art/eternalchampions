@@ -40,6 +40,8 @@ void Input::poll(Render& r, float dt) {
     st_.mouse_right_click = false;
     st_.wheel = 0;
     st_.any_input = false;
+    st_.text.clear();
+    memset(st_.new_key, 0, sizeof st_.new_key);
     bool click_now[A_COUNT] = {};   // acoes por evento discreto (ex.: botao do mouse nao usado aqui)
     (void)click_now;
 
@@ -68,6 +70,7 @@ void Input::poll(Render& r, float dt) {
             last_pad_ = false;
             break;
         }
+        case SDL_TEXTINPUT: if (text_input) st_.text += e.text.text; break;
         case SDL_MOUSEWHEEL: st_.wheel += e.wheel.y > 0 ? 1 : (e.wheel.y < 0 ? -1 : 0); break;
         case SDL_KEYDOWN:
             if (!e.key.repeat) { st_.any_input = true; last_pad_ = false; }
@@ -92,6 +95,9 @@ void Input::poll(Render& r, float dt) {
     held[A_HELP] = K(SDL_SCANCODE_F1) || K(SDL_SCANCODE_H);
     held[A_RESET] = K(SDL_SCANCODE_X) || K(SDL_SCANCODE_DELETE);
     held[A_START] = K(SDL_SCANCODE_F5);
+    held[A_SELECT] = K(SDL_SCANCODE_F2);
+    st_.ctrl = K(SDL_SCANCODE_LCTRL) || K(SDL_SCANCODE_RCTRL);
+    st_.shift = K(SDL_SCANCODE_LSHIFT) || K(SDL_SCANCODE_RSHIFT);
 
     for (auto* c : pads_) {
         auto B = [&](SDL_GameControllerButton b) { return SDL_GameControllerGetButton(c, b) != 0; };
@@ -108,6 +114,7 @@ void Input::poll(Render& r, float dt) {
         held[A_TABPREV] |= B(SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
         held[A_TABNEXT] |= B(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
         held[A_START] |= B(SDL_CONTROLLER_BUTTON_START);
+        held[A_SELECT] |= B(SDL_CONTROLLER_BUTTON_BACK);
         if (B(SDL_CONTROLLER_BUTTON_A) || std::fabs(lx) > 0.55f || std::fabs(ly) > 0.55f) last_pad_ = true;
     }
     for (int a = 0; a < A_COUNT; ++a) if (inject_[a]) { held[a] = true; inject_[a] = false; }
@@ -139,6 +146,7 @@ void Input::poll(Render& r, float dt) {
     for (int sc = 1; sc < SDL_NUM_SCANCODES; ++sc) {
         unsigned char now = k[sc];
         if (capture_enabled && now && !prev_keys_[sc] && !st_.cap.kind) { st_.cap.kind = 1; st_.cap.code = sc; }
+        st_.new_key[sc] = now && !prev_keys_[sc];
         prev_keys_[sc] = now;
     }
     for (size_t i = 0; i < pads_.size() && i < 8; ++i) {
@@ -163,4 +171,9 @@ int Input::pad_family(int i) const {
     case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_PRO: return 2;
     default: return 0;
     }
+}
+
+void Input::set_text_input(bool on) {
+    text_input = on;
+    if (on) SDL_StartTextInput(); else SDL_StopTextInput();
 }

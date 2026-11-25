@@ -218,7 +218,45 @@ std::vector<Page> build_enhance(App& app) {
             sh.rows.push_back(r);
         }
     }
-    return {prof, bp, hd, sh};
+    // --- Pre-visualizacao (L6)
+    Page pv{"Pré-visualizar", {}};
+    {
+        if (app.preview.state() == PreviewJob::State::Idle && app.preview.cached(app)) app.preview.start(app);   // so carrega o cache
+        Row go = action_row("Gerar pré-visualização", "Roda o jogo por alguns segundos (janela rápida) até a tela de abertura com as opções atuais e mostra o resultado ao lado do original. Fica em cache enquanto as opções não mudam.",
+                            [](App& a) { a.preview.start(a); });
+        go.value = [](App& a) {
+            switch (a.preview.state()) {
+            case PreviewJob::State::Running: { char b[48]; snprintf(b, sizeof b, "Gerando… %.0f s", a.preview.elapsed()); return std::string(b); }
+            case PreviewJob::State::Done: return std::string("Enter para refazer");
+            default: return std::string("Enter");
+            }
+        };
+        pv.rows.push_back(go);
+        Row st; st.label = "Estado"; st.arrows = false; st.value = [](App& a) { return a.preview.message().empty() ? std::string("—") : a.preview.message(); };
+        st.activate = [](App&) {};
+        pv.rows.push_back(st);
+        pv.extra = [](App& a, const Rect& r) {
+            Render& rd = a.render; Theme& th = a.theme;
+            PreviewJob& pj = a.preview;
+            float w = (r.w - 24) / 2, h = w * 224.f / 320.f;
+            if (h > r.h - 40) { h = r.h - 40; w = h * 320.f / 224.f; }
+            float x0 = r.x + (r.w - 2 * w - 24) / 2, y0 = r.y + 30;
+            TextStyle hs = th.help_style(); hs.align = Align::Center;
+            draw_text(rd, *th.fonts.help, x0 + w / 2, r.y + 2, "Original (nativo 320×224)", hs);
+            std::string kind = pj.enh_kind().empty() ? "" : " (" + pj.enh_kind() + ")";
+            bool stale = pj.original() && pj.shown_key() != pj.current_key(a);
+            draw_text(rd, *th.fonts.help, x0 + w + 24 + w / 2, r.y + 2, "Com as opções atuais" + kind + (stale ? " — desatualizada" : ""), hs);
+            for (int i = 0; i < 2; ++i) {
+                Rect box{x0 + i * (w + 24), y0, w, h};
+                rd.fill(box, Color::hex(0x050a12, 230));
+                SDL_Texture* t = i == 0 ? pj.original() : pj.enhanced();
+                if (t) rd.sprite(t, nullptr, box);
+                else draw_text(rd, *th.fonts.help, box.x + w / 2, box.y + h / 2 - 12, pj.state() == PreviewJob::State::Running ? "gerando…" : "(sem imagem)", hs);
+                rd.line_rect(box, Color::hex(0x6aa9b0, 160), 2);
+            }
+        };
+    }
+    return {prof, bp, hd, sh, pv};
 }
 
 }  // namespace

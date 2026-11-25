@@ -24,6 +24,7 @@ public:
             {"JOGO", ID_GAME}, {"SAVES", ID_SAVES}, {"AVANÇADO", ID_ADV}, {"SOBRE", ID_ABOUT}, {"SAIR", ID_QUIT}};
         for (auto& i : its) menu_.items.push_back({i.label, true, i.id});
         menu_.y = app.theme.has_header_art() ? 158.f : 160.f; menu_.row_h = app.theme.has_header_art() ? 34.f : 35.f; menu_.x = CANVAS_W / 2.f;
+        menu_.pixel_scale = 3;   // 12 itens a 34 px: so escala 3 (24 px) deixa folga p/ os acentos e a cedilha entre as linhas
         menu_.set_focus(0);
     }
     void update(App& app, const InputState& in, float) override {
@@ -38,6 +39,7 @@ public:
         case ID_ENH: app.push(make_enhance_screen()); break;
         case ID_AUDIO: app.push(make_audio_screen()); break;
         case ID_GAME: app.push(make_game_screen()); break;
+        case ID_STUDIO: app.push(make_studio_screen()); break;
         case ID_CONTROLS: app.push(make_controls_screen()); break;
         case ID_SAVES: app.push(make_saves_screen()); break;
         case ID_ADV: app.push(make_advanced_screen()); break;

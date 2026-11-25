@@ -6,6 +6,8 @@
 // (renderiza a tela N frames a 60 fps simulados e grava o canvas 1280x720 em PNG, sem interacao)
 #include "app.h"
 #include "ini.h"
+#include "studio.h"
+#include "widgets.h"
 #include "png_io.h"
 #include "screens/screens.h"
 #include <algorithm>
@@ -21,7 +23,8 @@ struct Args {
     bool autoplay = false;
     std::string game_args, selftest_ini, apply_profile;
     int tab = 0, focus = 0, state = 0;
-    std::string ini, controls_preset;
+    std::string ini, controls_preset, dumps, voices, root, out;
+    bool selftest_studio = false, run_preview = false;
     bool dev = false;
 };
 
@@ -37,6 +40,12 @@ static Args parse_args(int argc, char** argv) {
         else if (!strcmp(argv[i], "--tab")) a.tab = atoi(next());
         else if (!strcmp(argv[i], "--focus")) a.focus = atoi(next());
         else if (!strcmp(argv[i], "--dev")) a.dev = true;
+        else if (!strcmp(argv[i], "--run-preview")) a.run_preview = true;
+        else if (!strcmp(argv[i], "--selftest-studio")) a.selftest_studio = true;
+        else if (!strcmp(argv[i], "--dumps")) a.dumps = next();
+        else if (!strcmp(argv[i], "--voices")) a.voices = next();
+        else if (!strcmp(argv[i], "--root")) a.root = next();
+        else if (!strcmp(argv[i], "--out")) a.out = next();
         else if (!strcmp(argv[i], "--state")) a.state = atoi(next());
         else if (!strcmp(argv[i], "--ini")) a.ini = next();
         else if (!strcmp(argv[i], "--apply-controls-preset")) a.controls_preset = next();
@@ -50,10 +59,43 @@ static Args parse_args(int argc, char** argv) {
     return a;
 }
 
+// --screen fonttest: amostra da fonte pixel do jogo com os acentos compostos (diagnostico)
+class FontTest : public Screen {
+public:
+    void update(App&, const InputState&, float) override {}
+    void draw(App& app) override {
+        app.theme.draw_stone_bg(app.render, 0);
+        const Font* f = app.theme.fonts.pixel ? app.theme.fonts.pixel.get() : app.theme.fonts.menu.get();
+        const char* lines[] = {"ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", "0123456789 !?.,:;-+()",
+                               "ÁÀÂÃÉÊÍÓÔÕÚÜÇ", "áàâãéêíóôõúüç", "VÍDEO ÁUDIO ESTÚDIO AVANÇADO", "Configurações: não é ação"};
+        float y = 20;
+        if (app.shot_focus == 7) {   // --focus 7: mesmos itens do menu, via MenuList
+            MenuList m;
+            for (const char* s : {"JOGAR", "ROM", "VÍDEO", "APRIMORAMENTO", "ÁUDIO", "ESTÚDIO DE REMASTER", "AVANÇADO"}) m.items.push_back({s, true, 0});
+            m.y = 100; m.row_h = 34;
+            m.draw(app);
+            TextStyle a = TextStyle::solid(Color::hex(0xffffff)); a.scale = 4; a.align = Align::Center;
+            draw_text(app.render, *app.theme.fonts.pixel, 400, 400, "ÁUDIO VÍDEO", a);
+            TextStyle b = app.theme.item_style(false, true); b.outline_px = 0; b.shadow_dx = b.shadow_dy = 0; b.scale = 4; b.align = Align::Center;
+            draw_text(app.render, *app.theme.fonts.pixel, 400, 500, "ÁUDIO VÍDEO", b);
+            draw_text(app.render, *app.theme.fonts.pixel, 900, 400, "ÁUDIO", a);
+            draw_text(app.render, *app.theme.fonts.pixel, 900, 434, "AUDIO", a);
+            return;
+        }
+        for (const char* l : lines) {
+            TextStyle st = TextStyle::solid(Color::hex(0xffffff)); st.scale = 4; st.align = Align::Center;
+            draw_text(app.render, *f, CANVAS_W / 2.f, y, l, st);
+            y += 90;
+        }
+    }
+};
+
 static std::unique_ptr<Screen> make_named(const std::string& n, App& app) {
     if (n == "splash") return make_splash();
     if (n == "about") return make_about_screen();
     if (n == "placeholder") return make_placeholder("V\xC3\x8D""DEO");
+    if (n == "fonttest") return std::make_unique<FontTest>();
+    if (n == "studio") return make_studio_screen();
     if (n == "rom") return make_rom_screen();
     if (n == "controls") return make_controls_screen();
     if (n == "video") return make_video_screen();
@@ -71,6 +113,12 @@ static int run_shot(App& app, const Args& a) {
     app.shot_mode = true;
     if (!a.controls_preset.empty()) apply_controls_preset(app, 0, a.controls_preset);   // (use --ini p/ nao tocar no settings.ini real)
     // pilha: para rom/about/placeholder, o menu fica por baixo (como na navegacao real)
+    if (!a.apply_profile.empty()) apply_profile(app.cfg, a.apply_profile);   // (so com --ini ou ini de teste)
+    if (a.run_preview) {   // L6: roda a pre-visualizacao de verdade e espera (a UI normal nao bloqueia)
+        app.preview.start(app);
+        for (int i = 0; i < 4800 && app.preview.state() == PreviewJob::State::Running; ++i) { app.preview.poll(app, 0.025f); SDL_Delay(25); }
+        fprintf(stdout, "preview: %s - %s\n", app.preview.state() == PreviewJob::State::Done ? "OK" : "FALHOU", app.preview.message().c_str());
+    }
     app.shot_page = a.tab; app.shot_focus = a.focus; app.shot_state = a.state; app.dev_visible = a.dev;
     if (a.screen != "splash" && a.screen != "main") app.push(make_main_menu());
     if (a.screen == "confirm") app.push(make_video_screen());
@@ -135,9 +183,11 @@ static int run_interactive(App& app, const Args& a) {
 int main(int argc, char** argv) {
     Args a = parse_args(argc, argv);
     if (!a.selftest_ini.empty()) return ini_selftest(a.selftest_ini);
+    if (a.selftest_studio) return studio_selftest(a.root, a.dumps, a.out);
     bool shot = !a.shot.empty();
     App app;
     app.ini_override = a.ini;
+    app.studio_dumps = a.dumps; app.studio_voices = a.voices;
     if (!app.init(shot, shot ? a.w : 1280, shot ? a.h : 720)) {
         fprintf(stderr, "Falha ao iniciar o launcher: %s\n", SDL_GetError());
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Eternal Champions", "Falha ao iniciar o launcher (SDL).", nullptr);

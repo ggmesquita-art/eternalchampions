@@ -60,6 +60,8 @@ bool App::init(bool hidden, int win_w, int win_h) {
 void App::shutdown() {
     stack_.clear();
     pending_.clear();
+    preview.cancel();
+    preview.free_textures();
     input.shutdown();
     theme.shutdown();
     theme.fonts = Fonts{};
@@ -94,6 +96,7 @@ void App::apply_pending() {
 
 void App::update(const InputState& in, float dt) {
     poll_art(dt);
+    preview.poll(*this, dt);
     if (toast_t_ > 0) toast_t_ -= dt;
     if (fade > 0) fade = std::max(0.f, fade - dt);
     if (!stack_.empty()) stack_.back()->update(*this, in, dt);

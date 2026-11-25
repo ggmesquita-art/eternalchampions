@@ -86,7 +86,7 @@ public:
                     if (a.base == 'i' && y <= 2) continue;
                     memcpy(px(cx + x, cy + 4 + y), px(b.ax + x, b.ay + y), 4);
                 }
-            int shift = lower ? 1 : 0;
+            int shift = lower ? 2 : 1;   // acento mais rente a letra (a linha de cima do menu fica a ~8 px)
             // sombra preta primeiro, depois o branco
             for (int pass = 0; pass < 2; ++pass)
                 for (int y = 0; y < 4; ++y)
@@ -100,11 +100,16 @@ public:
                         if (pass == 0) { d[0] = d[1] = d[2] = 0; d[3] = 255; }
                         else { d[0] = d[1] = d[2] = 255; d[3] = 255; }
                     }
-            if (a.accent == 5) {   // cedilha: cauda sob a letra
-                const char* tail[2] = {"...#....", "..##...."};
-                for (int y = 0; y < 2; ++y)
-                    for (int x = 0; x < 8; ++x)
-                        if (tail[y][x] == '#') { uint8_t* d = px(cx + x, cy + 12 + y); d[0] = d[1] = d[2] = 255; d[3] = 255; }
+            if (a.accent == 5) {   // cedilha: gancho de 1 linha sob a letra, com a mesma sombra preta dos demais pixels
+                const char* tail = "..##....";
+                for (int pass = 0; pass < 2; ++pass)
+                    for (int x = 0; x < 8; ++x) {
+                        if (tail[x] != '#') continue;
+                        int tx = cx + x + (pass == 0 ? 1 : 0), ty = cy + 12 + (pass == 0 ? 1 : 0);
+                        uint8_t* d = px(tx, ty);
+                        if (pass == 0 && d[3]) continue;
+                        d[0] = d[1] = d[2] = pass == 0 ? 0 : 255; d[3] = 255;
+                    }
             }
             Glyph o;
             o.ax = cx; o.ay = cy; o.aw = ccw; o.ah = cch; o.xoff = 0; o.yoff = -4; o.adv = (float)adv;

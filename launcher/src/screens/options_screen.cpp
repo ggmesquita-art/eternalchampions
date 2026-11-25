@@ -212,6 +212,7 @@ public:
             if (foc && en && r.adjust && r.arrows) txt = "◄  " + val + "  ►";
             draw_text(rd, mf, rr.x + rr.w - 14, ty, txt, vs);
         }
+        if (pg.extra) pg.extra(app, Rect{panel_.x + 18, panel_.y + 12 + (float)pg.rows.size() * row_h_ + 6, panel_.w - 36, panel_.h - 24 - (float)pg.rows.size() * row_h_});
         // rolagem
         if (scroll_ > 0) draw_text(rd, *th.fonts.help, panel_.x + panel_.w - 30, panel_.y + 4, "▲", th.help_style());
         if (end < (int)pg.rows.size()) draw_text(rd, *th.fonts.help, panel_.x + panel_.w - 30, panel_.y + panel_.h - 28, "▼", th.help_style());

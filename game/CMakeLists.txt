@@ -80,9 +80,3 @@ option(EC_BUILD_LAUNCHER "Compila o EternalChampions.exe (launcher)" ON)
 if(EC_BUILD_LAUNCHER AND WIN32)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../launcher ${CMAKE_BINARY_DIR}/launcher_build)
 endif()
-
-# Estudio de Remaster (L6b-core): biblioteca + remaster_core_selftest (temporario: o orquestrador
-# integra ao launcher depois).
-if(WIN32)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../launcher/remaster ${CMAKE_BINARY_DIR}/remaster_build)
-endif()

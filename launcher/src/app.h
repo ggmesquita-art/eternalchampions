@@ -2,6 +2,7 @@
 #pragma once
 #include "input.h"
 #include "render.h"
+#include "preview_job.h"
 #include "schema.h"
 #include "theme.h"
 #include <filesystem>
@@ -30,6 +31,7 @@ public:
     Render render;
     Theme theme;
     Input input;
+    PreviewJob preview;                  // L6: pre-visualizacao do aprimoramento
     Config cfg;                          // settings.ini (preserva o que o launcher nao conhece)
     bool dev_visible = false;            // area "Desenvolvedor" (AVANCADO) visivel
 
@@ -56,6 +58,7 @@ public:
     bool quit = false;
     bool shot_mode = false;
     int shot_state = 0;                  // --state: 1 = captura de bind aberta, 2 = editor de combo (so em shot)
+    std::string studio_dumps, studio_voices;   // --dumps / --voices (testes: dumps prontos / copia do voices.toml)
     std::string ini_override;            // --ini: usa outro settings.ini (testes/capturas)
     int shot_page = 0, shot_focus = 0;   // --tab / --focus (so no modo de captura)
     bool game_running = false;

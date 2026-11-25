@@ -26,6 +26,7 @@ struct Row {
 struct Page {
     std::string tab;
     std::vector<Row> rows;
+    std::function<void(App&, const Rect&)> extra;   // area livre abaixo das linhas (ex.: pre-visualizacao)
 };
 
 using PageBuilder = std::function<std::vector<Page>(App&)>;

@@ -576,9 +576,9 @@
     "semantic_hash": ""
   },
   "game/CMakeLists.txt": {
-    "mtime": 1795588255.9126165,
-    "seen": 1795588782.7512565,
-    "ast_hash": "f84d9768faa5233b89d83a2ef1c6f8d7",
+    "mtime": 1795590886.3338149,
+    "seen": 1795591368.1005514,
+    "ast_hash": "17b1ff358430bef28d5c5fa323b30000",
     "semantic_hash": ""
   },
   "game/ec_code_addrs.txt": {
@@ -750,39 +750,39 @@
     "semantic_hash": ""
   },
   "launcher/src/app.cpp": {
-    "mtime": 1795589334.7848394,
-    "seen": 1795589463.7984207,
-    "ast_hash": "287f03abfddc28b8dd55f8ab340f4942",
+    "mtime": 1795590961.3739023,
+    "seen": 1795591368.100275,
+    "ast_hash": "11ac67d279b27e64809ded0274fd469e",
     "semantic_hash": ""
   },
   "launcher/src/app.h": {
-    "mtime": 1795589230.2916875,
-    "seen": 1795589267.2383518,
-    "ast_hash": "a2b9ee029260d883a7501fb252ad557f",
+    "mtime": 1795590987.6439195,
+    "seen": 1795591368.1002772,
+    "ast_hash": "13ffd55e486072af9f90b98641f252b1",
     "semantic_hash": ""
   },
   "launcher/src/font.cpp": {
-    "mtime": 1795589375.2810328,
-    "seen": 1795589463.7984245,
-    "ast_hash": "f32060f1b99a5bc83cfa7fede4ed1b7d",
+    "mtime": 1795591260.3596983,
+    "seen": 1795591368.100283,
+    "ast_hash": "fb9313c8b461a031254f0109f4a84474",
     "semantic_hash": ""
   },
   "launcher/src/font.h": {
-    "mtime": 1795588360.5832922,
-    "seen": 1795588782.7508373,
-    "ast_hash": "96828dd677bbb9aea51f6d59a8d3bd1f",
+    "mtime": 1795590029.6415992,
+    "seen": 1795590372.1590283,
+    "ast_hash": "447bc042d0164830dcdef2e11cc43d10",
     "semantic_hash": ""
   },
   "launcher/src/input.cpp": {
-    "mtime": 1795588382.9200993,
-    "seen": 1795588782.7508404,
-    "ast_hash": "048c0ef8ec598431a86f00d4b99f9edf",
+    "mtime": 1795590886.4195504,
+    "seen": 1795591368.1002908,
+    "ast_hash": "5efc3a400345b5f36c32f8b4a281f72c",
     "semantic_hash": ""
   },
   "launcher/src/input.h": {
-    "mtime": 1795588382.6206646,
-    "seen": 1795588782.7508428,
-    "ast_hash": "6aa9409bc6497aa80b28c28447db89c4",
+    "mtime": 1795590886.3795738,
+    "seen": 1795591368.100293,
+    "ast_hash": "d82bb5982e8ba8bd24853457e1b1f080",
     "semantic_hash": ""
   },
   "launcher/src/launch.cpp": {
@@ -798,9 +798,9 @@
     "semantic_hash": ""
   },
   "launcher/src/main.cpp": {
-    "mtime": 1795589304.8628287,
-    "seen": 1795589463.7984402,
-    "ast_hash": "5a100b64540eedc77e9894bb34b80cf7",
+    "mtime": 1795591299.2979038,
+    "seen": 1795591368.1003017,
+    "ast_hash": "99f98348688ff98808534a7e6a2917c7",
     "semantic_hash": ""
   },
   "launcher/src/png_io.cpp": {
@@ -828,9 +828,9 @@
     "semantic_hash": ""
   },
   "launcher/src/screens/about.cpp": {
-    "mtime": 1795588596.9761238,
-    "seen": 1795588782.7508652,
-    "ast_hash": "495711596d8a1a33811398fabe1c57d3",
+    "mtime": 1795590141.3287354,
+    "seen": 1795590372.159062,
+    "ast_hash": "8a77f8e7501bdee4ddd26ea4dce1ef26",
     "semantic_hash": ""
   },
   "launcher/src/screens/game_run.cpp": {
@@ -840,9 +840,9 @@
     "semantic_hash": ""
   },
   "launcher/src/screens/main_menu.cpp": {
-    "mtime": 1795589304.812892,
-    "seen": 1795589463.7984629,
-    "ast_hash": "925a6a6051e8bc8faee23b42f454a720",
+    "mtime": 1795591333.5938327,
+    "seen": 1795591368.1003323,
+    "ast_hash": "e14a7d242108fd3b264f98037619e25e",
     "semantic_hash": ""
   },
   "launcher/src/screens/placeholder.cpp": {
@@ -852,21 +852,21 @@
     "semantic_hash": ""
   },
   "launcher/src/screens/rom_screen.cpp": {
-    "mtime": 1795588645.4200506,
-    "seen": 1795588782.7508767,
-    "ast_hash": "ce6da0e598d19179edc10bb349210530",
+    "mtime": 1795590141.3277328,
+    "seen": 1795590372.159077,
+    "ast_hash": "0ac3773dde5e843d7c744eab2158ad7a",
     "semantic_hash": ""
   },
   "launcher/src/screens/screens.h": {
-    "mtime": 1795589170.070318,
-    "seen": 1795589267.2384012,
-    "ast_hash": "858eaf3b0aaebb5141cc3b09b96f319f",
+    "mtime": 1795591143.9632027,
+    "seen": 1795591368.1003432,
+    "ast_hash": "187e4bb6e4185efd3775ca77d9a74d43",
     "semantic_hash": ""
   },
   "launcher/src/screens/splash.cpp": {
-    "mtime": 1795588584.9877925,
-    "seen": 1795588782.7508821,
-    "ast_hash": "9f736572ac3fd1c1bdaf618b7a622242",
+    "mtime": 1795590156.7416174,
+    "seen": 1795590372.1590843,
+    "ast_hash": "16db881f0f08a61509a388c9c2b6a83d",
     "semantic_hash": ""
   },
   "launcher/src/sha256.cpp": {
@@ -882,27 +882,27 @@
     "semantic_hash": ""
   },
   "launcher/src/theme.cpp": {
-    "mtime": 1795588457.4790647,
-    "seen": 1795588782.7508907,
-    "ast_hash": "4cf2ad9b769d9e62f52b265e30b05932",
+    "mtime": 1795590082.8617122,
+    "seen": 1795590372.159094,
+    "ast_hash": "1ee45974e018e92401911f2d50c4325c",
     "semantic_hash": ""
   },
   "launcher/src/theme.h": {
-    "mtime": 1795588457.197235,
-    "seen": 1795588782.7508936,
-    "ast_hash": "0fec4c321b8802b80a7119ac170eb1b9",
+    "mtime": 1795590082.8617122,
+    "seen": 1795590372.1590955,
+    "ast_hash": "06b5dba3c36c132e4ffdbba116a6e31e",
     "semantic_hash": ""
   },
   "launcher/src/widgets.cpp": {
-    "mtime": 1795589170.02399,
-    "seen": 1795589267.2384176,
-    "ast_hash": "476fc109a7c4c3b0d63437a8f56794aa",
+    "mtime": 1795590156.7416174,
+    "seen": 1795590372.1590974,
+    "ast_hash": "554490e2ba406e2705805bf6eec8b7be",
     "semantic_hash": ""
   },
   "launcher/src/widgets.h": {
-    "mtime": 1795589169.97835,
-    "seen": 1795589267.2384195,
-    "ast_hash": "f9c6012331c7931a6be5083d63956bcc",
+    "mtime": 1795590156.73304,
+    "seen": 1795590372.1590989,
+    "ast_hash": "0a2a5a7c7e5ea514da27f076ddef7999",
     "semantic_hash": ""
   },
   "tools/launcher/extract_ui_assets.py": {
@@ -912,9 +912,9 @@
     "semantic_hash": ""
   },
   "launcher/CMakeLists.txt": {
-    "mtime": 1795589304.810892,
-    "seen": 1795589463.798688,
-    "ast_hash": "3ae2f6c7957a5c99ee96e5cc549deb28",
+    "mtime": 1795590886.3635702,
+    "seen": 1795591368.1005552,
+    "ast_hash": "2da65cf866640cb04f7beab0ae1cadb2",
     "semantic_hash": ""
   },
   "launcher/remaster/tests/ref_catalog.py": {
@@ -948,15 +948,15 @@
     "semantic_hash": ""
   },
   "launcher/src/schema.cpp": {
-    "mtime": 1795589094.409328,
-    "seen": 1795589267.2383833,
-    "ast_hash": "23efd76f7646082397aab4ffe1d14762",
+    "mtime": 1795589571.7330067,
+    "seen": 1795590372.1590583,
+    "ast_hash": "21168710b0d10d5292973e839f721569",
     "semantic_hash": ""
   },
   "launcher/src/schema.h": {
-    "mtime": 1795589045.231458,
-    "seen": 1795589267.238385,
-    "ast_hash": "5b214b7ecd6d39bf3fa430af30861da3",
+    "mtime": 1795589571.7330067,
+    "seen": 1795590372.1590602,
+    "ast_hash": "d4df18a68abcc157700bf042e75a3aab",
     "semantic_hash": ""
   },
   "launcher/src/screens/confirm.cpp": {
@@ -966,15 +966,15 @@
     "semantic_hash": ""
   },
   "launcher/src/screens/options_screen.cpp": {
-    "mtime": 1795589375.2810328,
-    "seen": 1795589463.798465,
-    "ast_hash": "5d4926a33587e774f0eb24add8f9540f",
+    "mtime": 1795590961.3739023,
+    "seen": 1795591368.1003344,
+    "ast_hash": "522653ec71df83a648223356e646fc49",
     "semantic_hash": ""
   },
   "launcher/src/screens/options_screen.h": {
-    "mtime": 1795589210.409883,
-    "seen": 1795589267.2383955,
-    "ast_hash": "9889f8e8cbc26a66527924b711e7bdfa",
+    "mtime": 1795590961.3739023,
+    "seen": 1795591368.100336,
+    "ast_hash": "ab9a530d6173e3a7b6dedc7f289983dd",
     "semantic_hash": ""
   },
   "launcher/src/shader_params.cpp": {
@@ -1002,15 +1002,15 @@
     "semantic_hash": ""
   },
   "launcher/remaster/voices_toml.cpp": {
-    "mtime": 1795589422.1516702,
-    "seen": 1795589463.7984169,
-    "ast_hash": "87c8764d9f8ec98a4ffb91e196e4c47c",
+    "mtime": 1795590336.0429077,
+    "seen": 1795590372.1590164,
+    "ast_hash": "4f59d643500701997b5e839b5929da0a",
     "semantic_hash": ""
   },
   "launcher/remaster/voices_toml.h": {
-    "mtime": 1795589337.8541386,
-    "seen": 1795589463.7984188,
-    "ast_hash": "6aff6374634aa120f060c984b428a74a",
+    "mtime": 1795589739.5687952,
+    "seen": 1795590372.159018,
+    "ast_hash": "b2bf33a5b51b434754eba95c41e02c63",
     "semantic_hash": ""
   },
   "launcher/src/screens/saves.cpp": {
@@ -1020,9 +1020,159 @@
     "semantic_hash": ""
   },
   "launcher/src/screens/settings_screens.cpp": {
-    "mtime": 1795589262.2472427,
-    "seen": 1795589463.7984762,
-    "ast_hash": "bc046857f0d32e4c43efe8a6aefa657a",
+    "mtime": 1795590961.3739023,
+    "seen": 1795591368.1003451,
+    "ast_hash": "75526914b8144bc12834bb5600c16ccc",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/catalog.cpp": {
+    "mtime": 1795590336.041456,
+    "seen": 1795590372.1589885,
+    "ast_hash": "662e6859980063ceaac39de2f0239bbe",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/dumps.cpp": {
+    "mtime": 1795590336.0418935,
+    "seen": 1795590372.1589937,
+    "ast_hash": "940718a689f87cda83e3e18a9195af05",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/dumps.h": {
+    "mtime": 1795589722.1653233,
+    "seen": 1795590372.1589954,
+    "ast_hash": "ccb1cce7788b4dfc7e62ddbec32fb483",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/original_capture.cpp": {
+    "mtime": 1795590336.042214,
+    "seen": 1795590372.1589973,
+    "ast_hash": "5e2e8a50c956f2ec208964e1e424813c",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/original_capture.h": {
+    "mtime": 1795589798.6941514,
+    "seen": 1795590372.158999,
+    "ast_hash": "30b792b01ef2ada1bdc065bf99e216be",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/preview_synth.cpp": {
+    "mtime": 1795590336.0425715,
+    "seen": 1795590372.1590006,
+    "ast_hash": "b9ee39132612ca96235751f33bf2ea1a",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/preview_synth.h": {
+    "mtime": 1795589659.98035,
+    "seen": 1795590372.1590023,
+    "ast_hash": "6eeb55004d33197c5894720415a2536f",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/tests/ref_original.py": {
+    "mtime": 1795590117.6659331,
+    "seen": 1795590372.159006,
+    "ast_hash": "654fcbee4a64e8ae20f1e6ce129ba378",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/tests/ref_preview.py": {
+    "mtime": 1795589911.6942928,
+    "seen": 1795590372.1590078,
+    "ast_hash": "a9bc2556afc1f8ae547c2cdd87b5c230",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/tests/ref_toml.py": {
+    "mtime": 1795589878.190974,
+    "seen": 1795590372.159009,
+    "ast_hash": "580fc5d48f6f53aa9b29e6664e5bf05e",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/tests/selftest.cpp": {
+    "mtime": 1795590336.0435822,
+    "seen": 1795590372.1590106,
+    "ast_hash": "f75fccdce91df725513e071d07868cb9",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/tsf_impl.c": {
+    "mtime": 1795590336.0432358,
+    "seen": 1795590372.1590123,
+    "ast_hash": "bee67db897ba39025730e8b61d569d02",
+    "semantic_hash": ""
+  },
+  "launcher/src/art_job.cpp": {
+    "mtime": 1795590126.6590781,
+    "seen": 1795590372.159023,
+    "ast_hash": "451425471f1270fabc4d322855fddee3",
+    "semantic_hash": ""
+  },
+  "launcher/src/bitmap_font.cpp": {
+    "mtime": 1795590673.41395,
+    "seen": 1795591368.100281,
+    "ast_hash": "44c5470eef39250c63d51c5f2f23004b",
+    "semantic_hash": ""
+  },
+  "launcher/src/json.cpp": {
+    "mtime": 1795590004.288558,
+    "seen": 1795590372.1590376,
+    "ast_hash": "8ea288529d3986d9eb83369a74355b95",
+    "semantic_hash": ""
+  },
+  "launcher/src/json.h": {
+    "mtime": 1795590003.8905647,
+    "seen": 1795590372.1590393,
+    "ast_hash": "2b3e7273b5190d005b6b31e59a4da1c5",
+    "semantic_hash": ""
+  },
+  "launcher/src/screens/controls.cpp": {
+    "mtime": 1795589902.6849322,
+    "seen": 1795590372.1590655,
+    "ast_hash": "577db3d2c53d5659141cdce7a879fc42",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/CMakeLists.txt": {
+    "mtime": 1795589834.3878703,
+    "seen": 1795590372.1592946,
+    "ast_hash": "d9aa315afeab0685131412f787ec6c16",
+    "semantic_hash": ""
+  },
+  "launcher/src/preview_job.cpp": {
+    "mtime": 1795590938.561604,
+    "seen": 1795591368.100311,
+    "ast_hash": "6ca12c198eda65856b8271ed5f3931d8",
+    "semantic_hash": ""
+  },
+  "launcher/src/preview_job.h": {
+    "mtime": 1795590938.3188138,
+    "seen": 1795591368.1003125,
+    "ast_hash": "67c046771ba1d26ec1be96e4bcb34ad5",
+    "semantic_hash": ""
+  },
+  "launcher/src/screens/fm_view.cpp": {
+    "mtime": 1795591194.3155537,
+    "seen": 1795591368.1003273,
+    "ast_hash": "fc7de4346525a66d3679792970cfaee1",
+    "semantic_hash": ""
+  },
+  "launcher/src/screens/fm_view.h": {
+    "mtime": 1795590886.9240212,
+    "seen": 1795591368.1003287,
+    "ast_hash": "52e0eb6741f96815f6636277371045fd",
+    "semantic_hash": ""
+  },
+  "launcher/src/screens/studio_screen.cpp": {
+    "mtime": 1795591299.3027759,
+    "seen": 1795591368.1003485,
+    "ast_hash": "1e1f5afd0159a3006ca6280e1f0bf828",
+    "semantic_hash": ""
+  },
+  "launcher/src/studio.cpp": {
+    "mtime": 1795591144.0285225,
+    "seen": 1795591368.1003578,
+    "ast_hash": "59c3fa85acf2994c70a50bab9e093af6",
+    "semantic_hash": ""
+  },
+  "launcher/src/studio.h": {
+    "mtime": 1795591143.9610667,
+    "seen": 1795591368.1003597,
+    "ast_hash": "5ea39c737a4df0d5bdc6cde48ee896e4",
     "semantic_hash": ""
   },
   "package-lock.json": {

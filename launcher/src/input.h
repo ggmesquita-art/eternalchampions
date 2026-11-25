@@ -3,7 +3,7 @@
 #include "render.h"
 #include <vector>
 
-enum Action { A_UP, A_DOWN, A_LEFT, A_RIGHT, A_ACCEPT, A_BACK, A_TABPREV, A_TABNEXT, A_HELP, A_RESET, A_START, A_COUNT };
+enum Action { A_UP, A_DOWN, A_LEFT, A_RIGHT, A_ACCEPT, A_BACK, A_TABPREV, A_TABNEXT, A_HELP, A_RESET, A_START, A_SELECT, A_COUNT };
 
 struct Capture {          // primeira entrada fisica nova neste frame (so quando capture_enabled)
     int kind = 0;           // 0 nada, 1 tecla, 2 botao do controle, 3 eixo
@@ -25,6 +25,9 @@ struct InputState {
     bool any_input = false;       // qualquer tecla/botao/clique neste frame
     bool using_pad = false;       // ultimo dispositivo usado foi controle
     Capture cap;                  // captura de bind
+    std::string text;             // SDL_TEXTINPUT deste frame (so com text_input ligado)
+    bool new_key[SDL_NUM_SCANCODES] = {};   // tecla apertada neste frame (borda)
+    bool ctrl = false, shift = false;
     bool p(Action a) const { return pressed[a]; }
 };
 
@@ -40,6 +43,8 @@ public:
     void inject(Action a) { inject_[a] = true; }   // uso interno/teste
     SDL_GameController* pad(int i) const { return i >= 0 && i < (int)pads_.size() ? pads_[i] : nullptr; }
     int pad_family(int i) const;                    // 0 Xbox/generico, 1 PlayStation, 2 Nintendo
+    bool text_input = false;                        // liga SDL_StartTextInput (edicao de nome)
+    void set_text_input(bool on);
     bool capture_enabled = false;                   // ligar so durante a captura de bind
 
 private:
