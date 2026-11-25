@@ -142,6 +142,7 @@ A precedência de configuração segue rigorosamente a regra: **Flags de Linha d
 |---|---|---|
 | `--unlock-boss` | Nenhum | Desbloqueia o *Eternal Champion* para seleção no modo de torneio e versus. |
 | `--turbo` | Nenhum | Roda na velocidade máxima possível do processador, desativando a espera de sincronização e o áudio SDL. |
+| `--load-slot` | `<N>` (1..9) | Após o boot carrega `native_save_N.bin` (ao lado do executável), com o mesmo staging de F1..F9, aplicado no ponto seguro pós-frame. Slot inexistente: aviso e o jogo segue normalmente. |
 | `--launcher` | Nenhum | Força a exibição do Launcher gráfico antes do início da partida. |
 | `--no-launcher` | Nenhum | Pula qualquer tela de launcher e inicializa o jogo instantaneamente. |
 | `--max-frames` | `<inteiro>` | Executa exatamente o número especificado de quadros e fecha o emulador com retorno de sucesso. |
@@ -268,6 +269,31 @@ shader_params = hardScan=-10,maskDark=0.4
 
 Equivalem a `--shader-preset` / `--shader-param` (aspas externas e comentário final ` ;`/` #` são removidos); a CLI e as variáveis `EC_SHADER_PRESET` / `EC_SHADER_PARAMS` têm precedência.
 
+### 4.4.2 Seções `[ec.bplus]`, `[ec.hd]` e `[ec.game]`
+
+```ini
+[ec.bplus]
+enabled = 1            ; liga o aprimoramento neural B+ (= --neural-bplus)
+model = v3_fast        ; v3_fast | v3_hq | v3_hq_janai | v2 | v1 | caminho do *_weights.bin
+backend = auto         ; auto | cuda | gl
+dedither = both        ; off | cbod | both (v2/v3 exigem both)
+intensity = 1.0        ; 0..4
+budget_ms = 0          ; >= 0 (0 = sem limite)
+
+[ec.hd]
+manifest = animesharp  ; animesharp (pipeline/manifest.json) | flux (pipeline/manifest_flux.json) | caminho
+mode = planes          ; off | planes | all
+
+[ec.game]
+unlock_boss = 0        ; 1 = desbloqueia o chefe (= --unlock-boss)
+```
+
+- Aliases de `model`: `v3_fast` -> `assets/models/ec_bplus_v3_fast_weights.bin`, `v3_hq`, `v3_hq_janai` (idem), `v2` -> `ec_bplus_v2_flux_weights.bin`, `v1` -> `ec_bplus_espcn4x_weights.bin`. Aliases de `manifest` são procurados em `.`, `../` e `../../` a partir do diretório atual.
+- **Precedência: CLI > variável de ambiente > settings.ini.** Mapeamento: `enabled` = `--neural-bplus`/`EC_NEURAL_BPLUS`; `model` = `--bplus-model`/`EC_BPLUS_MODEL`; `backend` = `--bplus-backend`/`EC_BPLUS_BACKEND`; `dedither` = `--bplus-dedither`/`EC_BPLUS_DEDITHER`; `intensity` = `--bplus-intensity`/`EC_BPLUS_INTENSITY`; `budget_ms` = `--bplus-budget-ms`/`EC_BPLUS_BUDGET_MS`; `manifest` = `--hd-manifest`/`EC_HD_MANIFEST`; `mode` = `--hd-mode`/`EC_HD_MODE`. `unlock_boss` só liga (CLI/env `EC_UNLOCK_BOSS=1` também ligam; o ini não desliga). Aspas externas e comentário final (` ;`/` #`) são removidos; valores inválidos geram `[EC] settings.ini [ec.bplus] <chave> invalido: ...` e são ignorados.
+- A seção `[ec.audio]` ganhou `hot_reload` (abaixo); `voices` está documentado em `--audio-voices`.
+
+**Hot-reload de áudio (`hot_reload`)**: em `hybrid`/`ost` o motor verifica a cada ~30 frames (dois `stat` com cache de mtime, fora do drain) se `voices.toml` ou o `.toml` do perfil da faixa ativa mudou; ao mudar, recarrega e loga `[EC-AUDIO] hot-reload: voices.toml (N vozes)` / `perfil <arquivo>`. O novo mapeamento vale a partir do próximo key-on (notas soando não são cortadas). É host-only e não afeta o determinismo. Ligado por padrão; `hot_reload = 0` em `[ec.audio]` ou `EC_AUDIO_HOT_RELOAD=0` (o ambiente vence o ini) desligam.
+
 ### 4.5 Seção `[launcher]`
 
 ```ini
@@ -299,47 +325,56 @@ enabled = 1
 
 - **`enabled`**: Registra dados de telemetria e diagnóstico determinístico da partida em `logs/EC-feedback.replay`.
 
-### 4.8 Seções `[input.p1]` e `[input.p2]`
+### 4.8 Seções `[input.p1]` a `[input.p6]` e `[input]`
 
-Mapeamento de teclado e gamepads para o Jogador 1 e Jogador 2:
+Mapeamento de teclado e gamepads para até 6 jogadores (`[input.p1]` ... `[input.p6]`; por padrão só P1 está ativo, P2 é opt-in e P3-P6 usam só gamepad):
 
 ```ini
+[input]
+pad_hotkeys = 1        ; 0 libera LB/RB/Back do pad (quicksave/quickload/turbo/overlay)
+
 [input.p1]
-device = -1
-pad_type = 1
-deadzone = 15
-key.up = 82
+device = 3
+pad_type = 0
+deadzone = 25
+key.up = 82            ; scancodes SDL2
 key.down = 81
 key.left = 80
 key.right = 79
-key.a = 4
-key.b = 22
-key.c = 7
-key.x = 20
-key.y = 26
-key.z = 8
-key.start = 40
-key.mode = 42
+key.a = 29             ; Z
+key.b = 27             ; X
+key.c = 6              ; C
+key.x = 4              ; A
+key.y = 22             ; S
+key.z = 7              ; D
+key.start = 40         ; Enter
+key.mode = 42          ; Backspace
 
-pad.up = btn:11
-pad.down = btn:12
-pad.left = btn:13
-pad.right = btn:14
-pad.a = btn:0
-pad.b = btn:1
-pad.c = btn:5
-pad.x = btn:2
-pad.y = btn:3
-pad.z = btn:4
-pad.start = btn:6
-pad.mode = btn:7
+pad.up = button:11
+pad.down = button:12
+pad.left = button:13
+pad.right = button:14
+pad.a = button:2       ; face esquerda (X do Xbox)
+pad.b = button:0       ; face baixo (A)
+pad.c = button:1       ; face direita (B)
+pad.x = button:3       ; Y
+pad.y = button:9       ; LB
+pad.z = button:10      ; RB
+pad.start = button:6
+pad.mode = button:4    ; Back
+
+combo.1 = pad:button:10 -> a+b+c   ; opcional: um botão físico aciona vários botões do Mega Drive
+autofire.x = 0                     ; opcional: Hz (0 = desligado, máx. 60)
 ```
 
-- **`device`**: `-1` para teclado; `>= 0` para o índice de joystick/gamepad detectado na SDL2.
-- **`pad_type`**: `0` para controle padrão de 3 botões (A, B, C); `1` para controle arcade de 6 botões (A, B, C, X, Y, Z).
+- **`device`**: máscara de dispositivos: `0` nenhum, `1` teclado, `2` gamepad, `3` ambos.
+- **`pad_type`**: `0` para controle de 3 botões (A, B, C); `1` para controle de 6 botões (A, B, C, X, Y, Z).
 - **`deadzone`**: Porcentagem de zona morta para analógicos (0 a 100%).
-- **`key.*`**: Código Scancode SDL2 da tecla mapeada para a respectiva ação.
-- **`pad.*`**: Botão ou eixo do controle (ex.: `btn:0`, `axis:0:+`, `axis:1:-`).
+- **`key.<botão>`**: Scancode SDL2 da tecla.
+- **`pad.<botão>`**: `button:N` (índice `SDL_GameControllerButton`), `axis:N:+` / `axis:N:-` (eixo/gatilho com a zona morta) ou `none`. **O formato é `button:N`; `btn:N` não é aceito.**
+- **`combo.K`** (K = 1..8 por jogador): `combo.K = <origem> -> <btn>+<btn>...`. Origem: `pad:button:N`, `pad:axis:N:+|-` (ex.: gatilhos LT/RT = eixos 4/5; o limiar é a `deadzone` do jogador) ou `key:<scancode SDL>`. Destinos: `up down left right a b c start x y z mode`. O combo é somado (OR) aos binds normais, uma vez por frame, de forma determinística, e só dispara se o `device` do jogador permitir a origem (`key:` exige teclado, `pad:` exige controle). Exemplo: `combo.1 = pad:button:10 -> a+b+c`. Combos inválidos geram `[input] ignoring invalid combo.K = ...` e são ignorados. Ao salvar, o runner reescreve os destinos em ordem canônica.
+- **`autofire.<botão>`** (`up down left right a b c start x y z mode`): repetição automática em Hz (0 = desligado, máx. 60). Alterna a cada `round(30/Hz)` frames do jogo pelo contador de frames, portanto é determinística e vale em replay/netplay. Exemplo: `autofire.x = 15`.
+- **`[input] pad_hotkeys`** (`0|1`, padrão `1`): `1` = LB quicksave, RB quickload, Back turbo e Back+RB / Back+R3 overlays; `0` libera esses botões do pad para binds e combos. As teclas F e Tab não mudam.
 
 ---
 
@@ -351,15 +386,17 @@ Durante a execução da partida, as seguintes teclas de atalho estão ativas em 
 |---|---|---|
 | **`F1` a **`F9`** (Segurar 1.5s) | **Carregar Quickstate** | Segurar a tecla por 1.5 segundo carrega o estado salvo do slot correspondente (`native_save_<slot>.bin`). |
 | **`Shift + F1` a **`F9`** | **Salvar Quickstate** | Salva instantaneamente o estado atual do jogo no slot especificado. |
-| **`F5`** ou **`Tab`** | **Modo Turbo** | Ativa a velocidade máxima sem limite de FPS e suspende o áudio enquanto mantido pressionado. |
-| **`F7`** | **Gerenciador de Saves** | Abre a interface visual de gerenciamento e seleção de slots de Savestates. |
-| **`F8`** | **Histórico de Rebobinamento** | Abre o visualizador gráfico de snapshots da linha do tempo para voltar no tempo. |
+| **`Tab`** (teclado) / **`Back`** (pad, com `pad_hotkeys = 1`) | **Modo Turbo** | Segurar: velocidade máxima sem limite de FPS e áudio suspenso. (F5 **não** é turbo; F5 é o slot 5 do quickstate.) |
+| **`LB`** / **`RB`** (pad, tap / segurar) | **Quicksave / Quickload** | LB salva e RB (segurado) carrega o quickstate; ativos só com `[input] pad_hotkeys = 1`. |
+| **`Back + RB`** / **`Back + R3`** (pad) | **Gerenciador de Saves / Rebobinar** | Abrem o gerenciador de saves e o histórico de rebobinamento. |
+| **`F7`** | **Gerenciador de Saves** | Abre a interface visual de gerenciamento e seleção de slots de savestates (também `Back + RB` no pad). |
+| **`F8`** | **Histórico de Rebobinamento** | Abre o visualizador de snapshots da linha do tempo (também `Back + R3` no pad). |
 | **`F10`** | **Cold Reset** | Reinicia completamente a máquina virtual e o cartucho (a memória SRAM de bateria é preservada). |
 | **`F11`** / **`Alt+Enter`** | **Alternar Tela Cheia** | Alterna entre o modo janela e o modo tela cheia configurado no `settings.ini`. |
 | **`F12`** | **Captura de Tela (PNG)** | Tira um print de alta qualidade e salva em `screenshots/screenshot_YYYYMMDD_HHMMSS.png`. |
 | **`Shift + F12`** / **`Ctrl + F12`** | **Dump de Áudio Dev** | Despeja imediatamente os buffers de rastreamento dos chips para `chip_ring.txt` e `snd_ring.txt`. |
-| **`Backspace`** | **Rebobinar / Botão Mode** | Rebobina a ação nos últimos quadros ou atua como o botão *Mode* do gamepad de 6 botões. |
-| **`Esc`** | **Menu de Pausa / Sair** | Abre o menu de configurações do runtime UI ou fecha o jogo se o launcher estiver desativado. |
+| **`Backspace`** | **Botão Mode** | Botão *Mode* do controle de 6 botões (bind padrão `key.mode = 42`); não rebobina (rebobinar é `F8`). |
+| **`Esc`** | **Sair / Menu** | Fecha o jogo (com `--no-launcher`/sem launcher); no build com runtime UI abre o menu de pausa. |
 
 ---
 

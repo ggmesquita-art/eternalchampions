@@ -1,4 +1,4 @@
-# Perfil de remasterização em tempo real (editável manualmente ou via mixer_studio.py)
+# Perfil de remasterização por canal (editável manualmente ou via mixer_studio.py)
 [track]
 name = "bgm_11_stage_s24"
 bgm_id = 11
@@ -8,7 +8,7 @@ loop_start = 0
 loop_end = 0
 master_gain_db = 0.0
 target_rms_dbfs = -16.5
-chip_blend = 0.65
+chip_blend = 1.0
 
 [channels.fm0]
 role = "auto"
@@ -111,7 +111,7 @@ transpose = 0
 [channels.psg0]
 role = "psg_arp"
 mode = "gm"
-program = 80
+program = 75
 bank = 0
 volume_db = -9.0
 pan = -0.45
@@ -125,7 +125,7 @@ transpose = 0
 [channels.psg1]
 role = "psg_arp"
 mode = "gm"
-program = 80
+program = 72
 bank = 0
 volume_db = -9.0
 pan = 0.45

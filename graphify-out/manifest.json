@@ -18,15 +18,15 @@
     "semantic_hash": ""
   },
   "game/ec_audio.c": {
-    "mtime": 1795583188.8259792,
-    "seen": 1795583623.285875,
-    "ast_hash": "f488113b85ed428905a4264244a64d4c",
+    "mtime": 1795586643.5514348,
+    "seen": 1795586895.253646,
+    "ast_hash": "4ed76394d53083f73f530cbf51673b66",
     "semantic_hash": ""
   },
   "game/ec_audio.h": {
-    "mtime": 1795583188.826979,
-    "seen": 1795583623.2858775,
-    "ast_hash": "2e28441f0a3fe245c9f7aa26fbf12259",
+    "mtime": 1795586643.5514348,
+    "seen": 1795586895.2536483,
+    "ast_hash": "9575d5fa551334987d71685d5ce4acb6",
     "semantic_hash": ""
   },
   "game/ec_boss.c": {
@@ -54,9 +54,9 @@
     "semantic_hash": ""
   },
   "game/ec_spec.c": {
-    "mtime": 1795583147.1579642,
-    "seen": 1795583155.2154477,
-    "ast_hash": "ac2c8b5c321a488bd2edcbaad8f04d54",
+    "mtime": 1795586618.3713076,
+    "seen": 1795586895.253663,
+    "ast_hash": "ea275a093ffa0119fa132ad43ba287e4",
     "semantic_hash": ""
   },
   "game/ec_video.c": {
@@ -504,8 +504,8 @@
     "semantic_hash": ""
   },
   "docs/frame_data/fight_probe_summary.md": {
-    "mtime": 1795583978.2215884,
-    "seen": 1795583997.9201443,
+    "mtime": 1795586960.4815738,
+    "seen": 1795588016.0994134,
     "ast_hash": "5091a62b1b0f21c0eff331fd1436756a",
     "semantic_hash": ""
   },
@@ -612,9 +612,9 @@
     "semantic_hash": ""
   },
   "docs/CONFIGURATION_AND_CLI.md": {
-    "mtime": 1795583244.7906423,
-    "seen": 1795583623.2860565,
-    "ast_hash": "9a0f04e0dc04ca58f5496d5b4d516aea",
+    "mtime": 1795586910.2312033,
+    "seen": 1795588016.0994036,
+    "ast_hash": "436fec249b16b37896ab832f5085fbd2",
     "semantic_hash": ""
   },
   "tools/pipeline/upscaler_lab.py": {
@@ -741,6 +741,12 @@
     "mtime": 1795581312.8318644,
     "seen": 1795581389.159313,
     "ast_hash": "7862844c026ce5458218749d47d42de3",
+    "semantic_hash": ""
+  },
+  "launcher/PLAN.md": {
+    "mtime": 1795586488.6813576,
+    "seen": 1795586895.2538664,
+    "ast_hash": "920625b551439ffdc4d0465f6ec062cb",
     "semantic_hash": ""
   },
   "package-lock.json": {

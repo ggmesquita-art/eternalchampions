@@ -124,7 +124,118 @@ static int ec_audio_cli_number(const char *key, const char *val, void (*setter)(
     return 2;
 }
 
-/* Optional [ec.audio] / [ec.video] sections in runner settings.ini (CLI flags take precedence). */
+/* Opcoes de aprimoramento ja definidas por CLI (o ini nao pode sobrepor CLI nem env). */
+enum {
+    EC_CLI_BPLUS_ENABLED = 1 << 0, EC_CLI_BPLUS_MODEL = 1 << 1, EC_CLI_BPLUS_BACKEND = 1 << 2,
+    EC_CLI_BPLUS_DEDITHER = 1 << 3, EC_CLI_BPLUS_INTENSITY = 1 << 4, EC_CLI_BPLUS_BUDGET = 1 << 5,
+    EC_CLI_HD_MANIFEST = 1 << 6, EC_CLI_HD_MODE = 1 << 7
+};
+static unsigned s_enh_cli_bits = 0;
+
+static int ec_env_set(const char *name)
+{
+    const char *e = getenv(name);
+    return e && *e;
+}
+
+static int ec_ini_parse_bool(const char *v, int *out)
+{
+    if (!_stricmp(v, "1") || !_stricmp(v, "true") || !_stricmp(v, "on") || !_stricmp(v, "yes")) {
+        *out = 1;
+        return 1;
+    }
+    if (!_stricmp(v, "0") || !_stricmp(v, "false") || !_stricmp(v, "off") || !_stricmp(v, "no")) {
+        *out = 0;
+        return 1;
+    }
+    return 0;
+}
+
+/* Resolve um caminho relativo ao repo tentando "", "../", "../../" (exe em build/ ou build/x/). */
+static void ec_resolve_repo_path(const char *rel, char *out, size_t cap)
+{
+    static const char *const k_prefix[] = { "", "../", "../../" };
+    for (size_t i = 0; i < sizeof(k_prefix) / sizeof(k_prefix[0]); ++i) {
+        snprintf(out, cap, "%s%s", k_prefix[i], rel);
+        FILE *f = fopen(out, "rb");
+        if (f) {
+            fclose(f);
+            return;
+        }
+    }
+    snprintf(out, cap, "%s", rel);
+}
+
+/* [ec.bplus] / [ec.hd] / [ec.game] do settings.ini. Precedencia CLI > env > ini. */
+static void ec_ini_enhance_key(const char *section, const char *key, const char *val)
+{
+    double dv = 0.0;
+    int b = 0;
+    char path[1100];
+    if (strcmp(section, "bplus") == 0) {
+        if (strcmp(key, "enabled") == 0) {
+            if (s_enh_cli_bits & EC_CLI_BPLUS_ENABLED || ec_env_set("EC_NEURAL_BPLUS")) return;
+            if (ec_ini_parse_bool(val, &b)) ec_video_enable_bplus(b);
+            else fprintf(stderr, "[EC] settings.ini [ec.bplus] enabled invalido: '%s' (0|1)\n", val);
+        } else if (strcmp(key, "model") == 0) {
+            if (s_enh_cli_bits & EC_CLI_BPLUS_MODEL || ec_env_set("EC_BPLUS_MODEL")) return;
+            static const struct { const char *name; const char *file; } k_models[] = {
+                { "v3_fast", "assets/models/ec_bplus_v3_fast_weights.bin" },
+                { "v3_hq", "assets/models/ec_bplus_v3_hq_weights.bin" },
+                { "v3_hq_janai", "assets/models/ec_bplus_v3_hq_janai_weights.bin" },
+                { "v2", "assets/models/ec_bplus_v2_flux_weights.bin" },
+                { "v1", "assets/models/ec_bplus_espcn4x_weights.bin" },
+            };
+            const char *rel = val;
+            for (size_t i = 0; i < sizeof(k_models) / sizeof(k_models[0]); ++i)
+                if (!_stricmp(val, k_models[i].name)) rel = k_models[i].file;
+            if (rel != val) ec_resolve_repo_path(rel, path, sizeof(path));
+            else snprintf(path, sizeof(path), "%s", val);
+            ec_video_set_bplus_model(path);
+        } else if (strcmp(key, "backend") == 0) {
+            if (s_enh_cli_bits & EC_CLI_BPLUS_BACKEND || ec_env_set("EC_BPLUS_BACKEND")) return;
+            if (!strcmp(val, "auto") || !strcmp(val, "cuda") || !strcmp(val, "gl")) ec_video_set_bplus_backend(val);
+            else fprintf(stderr, "[EC] settings.ini [ec.bplus] backend invalido: '%s' (auto|cuda|gl)\n", val);
+        } else if (strcmp(key, "dedither") == 0) {
+            if (s_enh_cli_bits & EC_CLI_BPLUS_DEDITHER || ec_env_set("EC_BPLUS_DEDITHER")) return;
+            if (!strcmp(val, "off") || !strcmp(val, "cbod") || !strcmp(val, "both")) ec_video_set_bplus_dedither(val);
+            else fprintf(stderr, "[EC] settings.ini [ec.bplus] dedither invalido: '%s' (off|cbod|both)\n", val);
+        } else if (strcmp(key, "intensity") == 0) {
+            if (s_enh_cli_bits & EC_CLI_BPLUS_INTENSITY || ec_env_set("EC_BPLUS_INTENSITY")) return;
+            if (ec_parse_double_strict(val, &dv) && dv >= 0.0 && dv <= 4.0) ec_video_set_bplus_intensity(dv);
+            else fprintf(stderr, "[EC] settings.ini [ec.bplus] intensity invalido: '%s' (0..4)\n", val);
+        } else if (strcmp(key, "budget_ms") == 0) {
+            if (s_enh_cli_bits & EC_CLI_BPLUS_BUDGET || ec_env_set("EC_BPLUS_BUDGET_MS")) return;
+            if (ec_parse_double_strict(val, &dv) && dv >= 0.0) ec_video_set_bplus_budget_ms(dv);
+            else fprintf(stderr, "[EC] settings.ini [ec.bplus] budget_ms invalido: '%s' (>= 0)\n", val);
+        }
+    } else if (strcmp(section, "hd") == 0) {
+        if (strcmp(key, "manifest") == 0) {
+            if (s_enh_cli_bits & EC_CLI_HD_MANIFEST || ec_env_set("EC_HD_MANIFEST")) return;
+            const char *rel = val;
+            if (!_stricmp(val, "animesharp")) rel = "pipeline/manifest.json";
+            else if (!_stricmp(val, "flux")) rel = "pipeline/manifest_flux.json";
+            if (rel != val) ec_resolve_repo_path(rel, path, sizeof(path));
+            else snprintf(path, sizeof(path), "%s", val);
+            if (ec_video_load_hd_manifest(path) < 0)
+                fprintf(stderr, "[EC] settings.ini [ec.hd] manifest nao carregado: '%s'\n", path);
+        } else if (strcmp(key, "mode") == 0) {
+            if (s_enh_cli_bits & EC_CLI_HD_MODE || ec_env_set("EC_HD_MODE")) return;
+            if (!ec_hd_set_mode_str(val))
+                fprintf(stderr, "[EC] settings.ini [ec.hd] mode invalido: '%s' (off|planes|all)\n", val);
+        }
+    } else if (strcmp(section, "game") == 0) {
+        if (strcmp(key, "unlock_boss") == 0) {
+            if (ec_ini_parse_bool(val, &b)) {
+                if (b) ec_boss_set_enabled(1);   /* CLI/env so ligam: ini = OR */
+            } else {
+                fprintf(stderr, "[EC] settings.ini [ec.game] unlock_boss invalido: '%s' (0|1)\n", val);
+            }
+        }
+    }
+}
+
+/* Optional [ec.audio] / [ec.video] / [ec.bplus] / [ec.hd] / [ec.game] sections in runner settings.ini (CLI flags take precedence). */
 static void ec_load_settings(const char *settings_path)
 {
     if (!settings_path || !*settings_path)
@@ -135,6 +246,7 @@ static void ec_load_settings(const char *settings_path)
 
     int in_audio_section = 0;
     int in_video_section = 0;
+    const char *enh_section = NULL;   /* "bplus" | "hd" | "game" */
     char line_buf[1280];
     while (fgets(line_buf, (int)sizeof(line_buf), fp) != NULL) {
         char *line = ec_ini_trim(line_buf);
@@ -143,9 +255,12 @@ static void ec_load_settings(const char *settings_path)
         if (*line == '[') {
             in_audio_section = (strcmp(line, "[ec.audio]") == 0);
             in_video_section = (strcmp(line, "[ec.video]") == 0);
+            enh_section = !strcmp(line, "[ec.bplus]") ? "bplus"
+                        : !strcmp(line, "[ec.hd]") ? "hd"
+                        : !strcmp(line, "[ec.game]") ? "game" : NULL;
             continue;
         }
-        if (!in_audio_section && !in_video_section)
+        if (!in_audio_section && !in_video_section && !enh_section)
             continue;
         char *eq = strchr(line, '=');
         if (!eq)
@@ -155,6 +270,13 @@ static void ec_load_settings(const char *settings_path)
         char *val = ec_ini_trim(eq + 1);
         if (!*key || !*val)
             continue;
+
+        if (enh_section) {
+            char *ev = ec_ini_clean_value(val);
+            if (*ev)
+                ec_ini_enhance_key(enh_section, key, ev);
+            continue;
+        }
 
         if (in_video_section) {
             /* [ec.video]: shader_preset / shader_params (CLI e env vencem; ver ec_shader_chain.c) */
@@ -197,6 +319,12 @@ static void ec_load_settings(const char *settings_path)
             ec_audio_set_chip_blend((float)dv);
         } else if (strcmp(key, "dsp_reverb") == 0 && !s_audio_reverb_cli && ec_parse_double_strict(val, &dv)) {
             ec_audio_set_dsp_reverb((float)dv);
+        } else if (strcmp(key, "hot_reload") == 0 && !ec_env_set("EC_AUDIO_HOT_RELOAD")) {
+            int hb = 1;
+            if (ec_ini_parse_bool(val, &hb))
+                ec_audio_set_hot_reload(hb);
+            else
+                fprintf(stderr, "[EC-AUDIO] hot_reload invalido: '%s' (0|1)\n", val);
         }
     }
     fclose(fp);
@@ -416,6 +544,14 @@ static int ec_handle_arg(const char *key, const char *val)
 {
     if (!key)
         return 0;
+    if (strcmp(key, "--neural-bplus") == 0) s_enh_cli_bits |= EC_CLI_BPLUS_ENABLED;
+    else if (strcmp(key, "--bplus-model") == 0) s_enh_cli_bits |= EC_CLI_BPLUS_MODEL | EC_CLI_BPLUS_ENABLED;
+    else if (strcmp(key, "--bplus-backend") == 0) s_enh_cli_bits |= EC_CLI_BPLUS_BACKEND;
+    else if (strcmp(key, "--bplus-dedither") == 0) s_enh_cli_bits |= EC_CLI_BPLUS_DEDITHER;
+    else if (strcmp(key, "--bplus-intensity") == 0) s_enh_cli_bits |= EC_CLI_BPLUS_INTENSITY;
+    else if (strcmp(key, "--bplus-budget-ms") == 0) s_enh_cli_bits |= EC_CLI_BPLUS_BUDGET;
+    else if (strcmp(key, "--hd-manifest") == 0) s_enh_cli_bits |= EC_CLI_HD_MANIFEST;
+    else if (strcmp(key, "--hd-mode") == 0) s_enh_cli_bits |= EC_CLI_HD_MODE;
     if (strcmp(key, "--hd-manifest") == 0 && val && *val) {
         (void)ec_video_load_hd_manifest(val);
         return 2;

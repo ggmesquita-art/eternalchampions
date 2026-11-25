@@ -1,4 +1,4 @@
-# Perfil de remasterização em tempo real (editável manualmente ou via mixer_studio.py)
+# Perfil de remasterização por canal (editável manualmente ou via mixer_studio.py)
 [track]
 name = "bgm_09_bank1_09"
 bgm_id = 9
@@ -8,7 +8,7 @@ loop_start = 0
 loop_end = 0
 master_gain_db = 0.0
 target_rms_dbfs = -16.5
-chip_blend = 0.65
+chip_blend = 1.0
 
 [channels.fm0]
 role = "auto"

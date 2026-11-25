@@ -8,7 +8,7 @@ loop_start = 0
 loop_end = 0
 master_gain_db = 0.0
 target_rms_dbfs = -16.5
-chip_blend = 0.0
+chip_blend = 1.0
 
 [channels.fm0]
 role = "auto"
@@ -111,9 +111,9 @@ transpose = 0
 [channels.psg0]
 role = "psg_arp"
 mode = "gm"
-program = 80
+program = 62
 bank = 0
-volume_db = -10.0
+volume_db = -5.0
 pan = -0.45
 mute = false
 solo = false
@@ -125,9 +125,9 @@ transpose = 0
 [channels.psg1]
 role = "psg_arp"
 mode = "gm"
-program = 80
+program = 65
 bank = 0
-volume_db = -10.0
+volume_db = -5.5
 pan = 0.0
 mute = false
 solo = false
@@ -139,9 +139,9 @@ transpose = 0
 [channels.psg2]
 role = "psg_arp"
 mode = "gm"
-program = 80
+program = 67
 bank = 0
-volume_db = -10.0
+volume_db = -4.5
 pan = 0.45
 mute = false
 solo = false

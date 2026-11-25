@@ -35,6 +35,10 @@ int ec_audio_load_profiles_dir(const char *profiles_dir);
  * <profiles_dir>/../voices.toml deixa de ser procurado). Retorna n de vozes ou -1. */
 int ec_audio_load_voices(const char *path);
 
+/* Hot-reload de voices.toml e do perfil da faixa ativa (hybrid/ost; default ligado;
+ * EC_AUDIO_HOT_RELOAD=0 ou [ec.audio] hot_reload = 0 desligam). */
+void ec_audio_set_hot_reload(int enabled);
+
 /* Self-test do hash (vetor ce6df9ba). Retorna 1 se OK. EC_AUDIO_SELFTEST=1 imprime no init. */
 int ec_audio_selftest(void);
 uint32_t ec_audio_fm_patch_hash(int ch);   /* hash do patch atual do canal FM 0..5 (diagnostico) */

@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -283,6 +284,17 @@ typedef struct {
     EcVoice               voices[EC_VOICES_MAX];        /* voices.toml global */
     size_t                voice_count;
     int                   voices_explicit;              /* --audio-voices / settings / env */
+
+    /* Hot-reload (host-only): voices.toml e perfil da faixa ativa */
+    int                   hot_reload;
+    unsigned              hot_counter;
+    char                  voices_path[EC_AUDIO_PATH_MAX];
+    uint64_t              voices_mtime;
+    char                  profile_src[EC_MAX_PROFILES][EC_AUDIO_PATH_MAX];
+    char                  default_src[EC_AUDIO_PATH_MAX];
+    const EcTrackProfile *watch_profile;                /* perfil cujo mtime esta em watch_mtime */
+    uint64_t              watch_mtime;
+    int                   keep_notes_on_apply;          /* apply de perfil sem cortar notas (hot-reload) */
     float                 chan_base_vol[EC_CH_COUNT];   /* volume linear do perfil (0 se silenciado) */
 
     EcTrackProfile        default_profile;
@@ -322,6 +334,7 @@ static EcAudioState s_audio = {
     .bgm_vol           = 1.0f,
     .sfx_vol           = 1.0f,
     .dsp_reverb        = EC_DEFAULT_DSP_REVERB,
+    .hot_reload        = 1,
     .fade_env          = 0.0f,
     .pause_env         = 1.0f,
     .chip_duck         = 1.0f,
@@ -424,6 +437,27 @@ static int ec_ends_with_ci(const char *str, const char *suffix)
         return 0;
     }
     return ec_strcasecmp(str + (slen - suflen), suffix) == 0;
+}
+
+/* mtime do arquivo em unidades opacas (0 se inexistente). */
+static uint64_t ec_file_mtime(const char *path)
+{
+    if (!path || !*path) {
+        return 0u;
+    }
+#ifdef _WIN32
+    WIN32_FILE_ATTRIBUTE_DATA fad;
+    if (!GetFileAttributesExA(path, GetFileExInfoStandard, &fad)) {
+        return 0u;
+    }
+    return ((uint64_t)fad.ftLastWriteTime.dwHighDateTime << 32) | (uint64_t)fad.ftLastWriteTime.dwLowDateTime;
+#else
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        return 0u;
+    }
+    return (uint64_t)st.st_mtime;
+#endif
 }
 
 /* ---- DSP implementation -------------------------------------------------- */
@@ -1175,12 +1209,13 @@ static int ec_parse_profile_toml(const char *path, const char *filename, EcTrack
 
 /* Retorna 1 se o perfil foi armazenado. Somente `default.toml` define o default;
  * perfis de faixa sem bgm_id valido (>= 0) sao ignorados com aviso. */
-static int ec_store_loaded_profile(const EcTrackProfile *prof, const char *filename)
+static int ec_store_loaded_profile(const EcTrackProfile *prof, const char *filename, const char *full_path)
 {
     if (ec_strcasecmp(filename, "default.toml") == 0) {
         s_audio.default_profile = *prof;
         s_audio.default_profile.bgm_id = -1;
         s_audio.default_profile_ready = 1;
+        snprintf(s_audio.default_src, sizeof(s_audio.default_src), "%s", full_path);
         return 1;
     }
     if (prof->bgm_id < 0) {
@@ -1190,10 +1225,12 @@ static int ec_store_loaded_profile(const EcTrackProfile *prof, const char *filen
     for (size_t i = 0; i < s_audio.profile_count; ++i) {
         if (s_audio.profiles[i].bgm_id == prof->bgm_id) {
             s_audio.profiles[i] = *prof;
+            snprintf(s_audio.profile_src[i], sizeof(s_audio.profile_src[i]), "%s", full_path);
             return 1;
         }
     }
     if (s_audio.profile_count < EC_MAX_PROFILES) {
+        snprintf(s_audio.profile_src[s_audio.profile_count], sizeof(s_audio.profile_src[0]), "%s", full_path);
         s_audio.profiles[s_audio.profile_count++] = *prof;
         return 1;
     }
@@ -1291,10 +1328,12 @@ static void ec_apply_active_profile(int resync)
         }
     }
 
-    if (s_audio.tsf) {
-        tsf_note_off_all(s_audio.tsf);
+    if (!s_audio.keep_notes_on_apply) {
+        if (s_audio.tsf) {
+            tsf_note_off_all(s_audio.tsf);
+        }
+        ec_clear_sounding_flags();
     }
-    ec_clear_sounding_flags();
 
     for (int c = 0; c < EC_CH_COUNT; ++c) {
         const EcChanProfile *cp = &prof->channels[c];
@@ -2179,6 +2218,10 @@ void ec_audio_set_chip_mask_hook(void (*hook)(int enabled, unsigned mask))
 
 void ec_audio_init(void)
 {
+    const char *hot_env = getenv("EC_AUDIO_HOT_RELOAD");
+    if (hot_env && *hot_env) {
+        s_audio.hot_reload = (*hot_env != '0') ? 1 : 0;
+    }
     const char *selftest = getenv("EC_AUDIO_SELFTEST");
     if (selftest && *selftest && *selftest != '0') {
         fprintf(stderr, "[EC-AUDIO] selftest hash de voz (ce6df9ba): %s\n",
@@ -2376,6 +2419,8 @@ static int ec_load_voices_file(const char *path)
     if (!fp) {
         return -1;
     }
+    snprintf(s_audio.voices_path, sizeof(s_audio.voices_path), "%s", path);
+    s_audio.voices_mtime = ec_file_mtime(path);
     s_audio.voice_count = 0u;
     EcVoice *cur = NULL;
     int first_line = 1;
@@ -2491,7 +2536,7 @@ int ec_audio_load_profiles_dir(const char *profiles_dir)
         }
         EcTrackProfile prof;
         if (ec_parse_profile_toml(full_path, fd.cFileName, &prof)) {
-            if (ec_store_loaded_profile(&prof, fd.cFileName)) {
+            if (ec_store_loaded_profile(&prof, fd.cFileName, full_path)) {
                 ++loaded_count;
             }
         }
@@ -2518,7 +2563,7 @@ int ec_audio_load_profiles_dir(const char *profiles_dir)
         }
         EcTrackProfile prof;
         if (ec_parse_profile_toml(full_path, ent->d_name, &prof)) {
-            if (ec_store_loaded_profile(&prof, ent->d_name)) {
+            if (ec_store_loaded_profile(&prof, ent->d_name, full_path)) {
                 ++loaded_count;
             }
         }
@@ -2546,6 +2591,75 @@ int ec_audio_load_profiles_dir(const char *profiles_dir)
     }
 
     return loaded_count;
+}
+
+void ec_audio_set_hot_reload(int enabled)
+{
+    s_audio.hot_reload = enabled ? 1 : 0;
+}
+
+/* Verifica a cada ~30 mixes (fora do drain; 1-2 stat) se voices.toml ou o perfil da faixa
+ * ativa mudou. O mapeamento novo vale a partir do proximo key-on: notas soando nao sao
+ * cortadas (o perfil e reaplicado sem note_off_all). */
+static void ec_hot_reload_poll(void)
+{
+    if (!s_audio.hot_reload || !s_audio.tsf ||
+        (s_audio.mode != EC_AUDIO_MODE_HYBRID && s_audio.mode != EC_AUDIO_MODE_OST)) {
+        return;
+    }
+    if (++s_audio.hot_counter < 30u) {
+        return;
+    }
+    s_audio.hot_counter = 0u;
+
+    if (s_audio.voices_path[0]) {
+        uint64_t m = ec_file_mtime(s_audio.voices_path);
+        if (m != 0u && m != s_audio.voices_mtime) {
+            static EcVoice backup[EC_VOICES_MAX];
+            size_t old_count = s_audio.voice_count;
+            memcpy(backup, s_audio.voices, old_count * sizeof(EcVoice));
+            int n = ec_load_voices_file(s_audio.voices_path);
+            if (n <= 0 && old_count > 0u) {
+                /* arquivo meio escrito/vazio: mantem o anterior e tenta de novo na proxima mudanca */
+                memcpy(s_audio.voices, backup, old_count * sizeof(EcVoice));
+                s_audio.voice_count = old_count;
+                s_audio.voices_mtime = m;
+            } else {
+                fprintf(stderr, "[EC-AUDIO] hot-reload: voices.toml (%d vozes)\n", n);
+            }
+        }
+    }
+
+    const EcTrackProfile *act = s_audio.active_profile;
+    if (act) {
+        const char *src = NULL;
+        if (act == &s_audio.default_profile) {
+            src = s_audio.default_src;
+        } else if (act >= s_audio.profiles && act < s_audio.profiles + s_audio.profile_count) {
+            src = s_audio.profile_src[act - s_audio.profiles];
+        }
+        if (src && *src) {
+            uint64_t m = ec_file_mtime(src);
+            if (s_audio.watch_profile != act) {
+                s_audio.watch_profile = act;      /* novo perfil ativo: so memoriza o mtime */
+                s_audio.watch_mtime = m;
+            } else if (m != 0u && m != s_audio.watch_mtime) {
+                s_audio.watch_mtime = m;
+                const char *base = strrchr(src, '/');
+                base = base ? base + 1 : src;
+                EcTrackProfile prof;
+                if (ec_parse_profile_toml(src, base, &prof)) {
+                    EcTrackProfile *slot = (EcTrackProfile *)act;
+                    prof.bgm_id = slot->bgm_id;
+                    *slot = prof;
+                    s_audio.keep_notes_on_apply = 1;
+                    ec_apply_active_profile(0);
+                    s_audio.keep_notes_on_apply = 0;
+                    fprintf(stderr, "[EC-AUDIO] hot-reload: perfil %s (%d vozes)\n", base, prof.voice_count);
+                }
+            }
+        }
+    }
 }
 
 static float ec_set_clamped(const char *name, float v, float lo, float hi)
@@ -2757,6 +2871,7 @@ void ec_audio_mix_callback(int16_t *mix_stereo, size_t frames, double rate)
 
     /* hybrid = substituicao por canal via mascara de audicao do chip (sem blend):
      * o chip restante entra com chip_level (default 1.0) e o SF2 com o makeup atual. */
+    ec_hot_reload_poll();
     const int mask_mode = (s_audio.mode == EC_AUDIO_MODE_HYBRID && s_audio.tsf != NULL);
     ec_apply_chip_mask(mask_mode ? ec_compute_chip_mask() : 0x7FFu);
     float chip_level = 1.0f;
