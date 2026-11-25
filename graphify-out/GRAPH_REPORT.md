@@ -1,18 +1,18 @@
-# Graph Report - eternalchampions  (2026-11-24)
+# Graph Report - eternalchampions  (2026-11-25)
 
 ## Corpus Check
-- 109 files · ~833,876 words
+- 109 files · ~835,003 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 82 file(s) not represented in the graph (top: .asm 48, .ecm 17, .input 7)
 - WARNING: 82 of 198 files seen (41%) have no supported extractor and are missing from this graph entirely. It may look complete while representing only part of the codebase.
 
 ## Summary
-- 2127 nodes · 4136 edges · 160 communities (126 shown, 34 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 176 edges (avg confidence: 0.88)
+- 2129 nodes · 4137 edges · 162 communities (126 shown, 36 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 177 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a883a399`
+- Built from commit: `32dc2c1b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -27,7 +27,7 @@
 - PROGRESS.md — Estado do projeto EternalRecomp
 - remaster_track.py
 - upscaler_lab.py
-- ec_video_scanline_lazy
+- ec_on_post_reset
 - ONNXTensorElementDataType
 - chip_ring_to_midi.py
 - tsf_u16
@@ -62,6 +62,7 @@
 - TASK.md — Fila Executável Ativa (EternalRecomp v2.0)
 - tsf_hydra_imod
 - OrtCUDAProviderOptions
+- PROGRESS.md
 - train_espcn.py
 - export_stems.py
 - onnxruntime_ep_c_api.h
@@ -125,7 +126,7 @@
 - OrtWeightlessSupport
 - OrtProfilingEventCategory
 - ort_release_status
-- ort_dlopen_library
+- EcBplusOrt
 - tsf_channels
 - tsf_stream_memory
 - tsf_voice_lfo
@@ -176,21 +177,21 @@
 10. `ROADMAP.md — EternalRecomp` - 19 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `Etapa G4 — Otimização GPU (OpenGL Compute & CUDA ORT)` --references--> `ec_video_scanline_lazy()`  [INFERRED]
+  task.md → game/ec_video.c
+- `PILAR 2 — Trilha S: Implementação de Suporte a Shaders Modulares` --references--> `ec_video_present_gpu()`  [INFERRED]
+  ROADMAP.md → game/ec_video.c
+- `Etapa S1 — Engine de Cadeia de Shaders Multi-Pass (OpenGL)` --references--> `ec_video_present_gpu()`  [INFERRED]
+  task.md → game/ec_video.c
 - `0. Pré-requisito / Checkpoint Imediato (Higiene de Git)` --references--> `to_wsl_path()`  [INFERRED]
   task.md → harness/ec_harness.py
 - `Etapa G1 — Laboratório Visual de Upscalers Teachers *(Próximo passo imediato — sem alterar código do jogo)*` --references--> `pre_dedither_torch()`  [INFERRED]
   task.md → neural/train_espcn.py
-- `Etapa A3 — Síntese SoundFont em Tempo Real no Runner + DSP Custo-Zero (`Tasks A3-engine` & `A3-integration`)` --references--> `ec_on_post_reset()`  [INFERRED]
-  task.md → game/ec_spec.c
-- `Implementação e verificação (`N1`–`N3` / `P3`, 2026-11-19)` --references--> `ECStudentESPCN4x`  [INFERRED]
-  docs/phase-4.md → neural/train_espcn.py
-- `Execução e estado atual (`M7.1`, 2026-11-19)` --references--> `ECStudentESPCN4x`  [INFERRED]
-  docs/phase-5.md → neural/train_espcn.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (160 total, 34 thin omitted)
+## Communities (162 total, 36 thin omitted)
 
 ### Community 0 - "mixer_studio.py"
 Cohesion: 0.06
@@ -202,19 +203,19 @@ Nodes (19): ec_audio_load_profiles_dir(), ec_ends_with_ci(), ec_find_channel_ind
 
 ### Community 2 - "ec_hd.c"
 Cohesion: 0.10
-Nodes (38): cram_to_qrgb9(), derive_asset_root(), ec_hd_approved_entries(), ec_hd_begin_frame(), ec_hd_get_mode(), ec_hd_is_active(), ec_hd_load_manifest(), ec_hd_record_pixel() (+30 more)
+Nodes (39): cram_to_qrgb9(), derive_asset_root(), ec_hd_approved_entries(), ec_hd_begin_frame(), ec_hd_frame_active(), ec_hd_get_mode(), ec_hd_is_active(), ec_hd_load_manifest() (+31 more)
 
 ### Community 3 - "ec_bplus_gl.c"
 Cohesion: 0.08
 Nodes (40): collect_query(), compile_shader(), dispatch_conv(), ec_bplus_gl_create(), ec_bplus_gl_destroy(), ec_bplus_gl_metrics(), ec_bplus_gl_process(), ec_bplus_gl_readback() (+32 more)
 
 ### Community 4 - "tsf"
-Cohesion: 0.09
-Nodes (52): ec_audio_load_soundfont(), tsf, tsf_active_voice_count(), tsf_bank_get_presetname(), tsf_bank_note_off(), tsf_bank_note_on(), tsf_channel_applypitch(), tsf_channel_get_pan() (+44 more)
+Cohesion: 0.10
+Nodes (47): tsf, tsf_active_voice_count(), tsf_bank_get_presetname(), tsf_bank_note_off(), tsf_channel_applypitch(), tsf_channel_get_pan(), tsf_channel_get_pitchrange(), tsf_channel_get_pitchwheel() (+39 more)
 
 ### Community 5 - "tsf.h"
-Cohesion: 0.09
-Nodes (32): tsf_cents2Hertz(), tsf_channel_get_volume(), tsf_channel_setup_voice(), tsf_decibelsToGain(), tsf_decode_ogg(), tsf_decode_sf3_samples(), tsf_load(), tsf_load_memory() (+24 more)
+Cohesion: 0.10
+Nodes (30): tsf_bank_note_on(), tsf_cents2Hertz(), tsf_channel_get_volume(), tsf_channel_setup_voice(), tsf_decibelsToGain(), tsf_gainToDecibels(), tsf_load_presets(), tsf_note_on() (+22 more)
 
 ### Community 6 - "app.js"
 Cohesion: 0.14
@@ -232,9 +233,9 @@ Nodes (22): _can_use_wsl_fluidsynth(), detect_synth_backend(), format_manifest_t
 Cohesion: 0.19
 Nodes (14): build_boards(), capture_trident(), font(), load_rgb(), main(), make_predither(), now(), run_spandrel() (+6 more)
 
-### Community 10 - "ec_video_scanline_lazy"
-Cohesion: 0.22
-Nodes (14): 1. Princípio: 320 px na lógica, margem estendida só no renderer, 2. Política por Estado (`$FFFFFD64`), 3. Reposicionamento de HUD e Modo C, 4. Flags CLI e Resultados Medidos, 5. GW.3 — Flicker lateral e sprites descartados nas margens (causa-raiz e correção), Widescreen 16:9 / Adaptativo (`M4`–`M6`), ec_compute_viewport_x0(), ec_is_arena_state() (+6 more)
+### Community 10 - "ec_on_post_reset"
+Cohesion: 0.21
+Nodes (12): 9.1 Recompilação estática (`M2`) — `build/native/EternalChampionsRecomp`, ec_audio_get_mode(), ec_audio_init(), ec_audio_reset(), ec_audio_shutdown(), ec_biquad_clear(), ec_dsp_clear_buffers(), ec_synth_reset_chip_state() (+4 more)
 
 ### Community 11 - "ONNXTensorElementDataType"
 Cohesion: 0.06
@@ -245,8 +246,8 @@ Cohesion: 0.11
 Nodes (20): _build_track_chunk(), convert_chip_ring_to_midi(), _DacBurst, _encode_vlq(), main(), _meta_set_tempo(), _meta_track_name(), NoteEvent (+12 more)
 
 ### Community 13 - "tsf_u16"
-Cohesion: 0.07
-Nodes (29): tsf_hydra_ibag, instGenNdx, instModNdx, tsf_hydra_igen, genAmount, genOper, tsf_hydra_inst, instBagNdx (+21 more)
+Cohesion: 0.11
+Nodes (17): tsf_hydra_inst, instBagNdx, instName, tsf_hydra_phdr, bank, genre, library, morphology (+9 more)
 
 ### Community 14 - "onnxruntime_c_api.h"
 Cohesion: 0.06
@@ -273,8 +274,8 @@ Cohesion: 0.07
 Nodes (28): tsf_voice, ampenv, heldSustain, loopEnd, loopStart, tsf_voice_lowpass, a0, a1 (+20 more)
 
 ### Community 20 - "ec_video.c"
-Cohesion: 0.11
-Nodes (27): ec_bplus_is_enabled(), ec_lookup_layer_tile(), ec_mem16(), ec_mem32(), ec_parse_dedither_mode(), ec_plane_edge_comp(), ec_resolve_bplus_backend(), ec_resolve_bplus_budget_ms() (+19 more)
+Cohesion: 0.12
+Nodes (28): ec_bplus_is_enabled(), ec_lookup_layer_tile(), ec_mem16(), ec_mem32(), ec_parse_dedither_mode(), ec_plane_tiles(), ec_ram16(), ec_ram32() (+20 more)
 
 ### Community 21 - "review_viewer.py"
 Cohesion: 0.17
@@ -297,8 +298,8 @@ Cohesion: 0.17
 Nodes (11): benchmark_ort_latency(), canonical_tensor_specs(), compute_array_metrics(), create_ort_session(), export_onnx_model(), export_weight_pack(), main(), remove_stale_onnx() (+3 more)
 
 ### Community 26 - "ec_spec.c"
-Cohesion: 0.10
-Nodes (16): 8. Fase 3: Validação determinística, Fase 3 — Validação Determinística (`M3`), Revisão do critério de aceite e diagnóstico de paridade (2026-11-19), 9.1 Recompilação estática (`M2`) — `build/native/EternalChampionsRecomp`, ec_audio_get_mode(), ec_boss_set_enabled(), ec_call_entry_point(), ec_call_resume() (+8 more)
+Cohesion: 0.13
+Nodes (10): 8. Fase 3: Validação determinística, Fase 3 — Validação Determinística (`M3`), Revisão do critério de aceite e diagnóstico de paridade (2026-11-19), ec_call_resume(), ec_call_vblank(), ec_fill_frame_record(), ec_is_native_entry(), ec_release_z80_bus_if_locked() (+2 more)
 
 ### Community 27 - "HeadlessPlatform"
 Cohesion: 0.10
@@ -309,24 +310,24 @@ Cohesion: 0.14
 Nodes (12): Etapa G3 — Modo C Híbrido (Planos HD limpos + Fallback B+ v3), bleed_rgb_into_transparent(), enforce_silhouette(), http_json(), layer_category(), main(), save_manifest_atomic(), select_entries() (+4 more)
 
 ### Community 29 - "ec_bplus_ort.c"
-Cohesion: 0.16
-Nodes (17): ec_hd_destroy_gpu(), ec_video_present_gpu_destroy(), ec_bplus_ort_destroy(), ec_bplus_ort_metrics(), ec_bplus_ort_process(), ec_bplus_ort_readback(), ec_bplus_ort_set_intensity(), EcBplusOrt (+9 more)
+Cohesion: 0.18
+Nodes (16): ec_bplus_ort_process(), float_to_half(), half_to_float(), ort_dlerror_str(), ort_dlopen_any(), ort_dlopen_library(), ort_download_rgba(), ort_download_rgba16() (+8 more)
 
 ### Community 30 - "ec_boss.c"
-Cohesion: 0.17
-Nodes (25): 11.4 EC jogável e sprites ilimitados, call_68k_pal(), call_68k_sfx(), call_68k_sub(), ec_boss_apply_rom_patches(), ec_boss_instruction_hook(), ec_boss_rb_state_load(), ec_boss_reset() (+17 more)
+Cohesion: 0.18
+Nodes (24): 11.4 EC jogável e sprites ilimitados, call_68k_pal(), call_68k_sfx(), call_68k_sub(), ec_boss_apply_rom_patches(), ec_boss_instruction_hook(), ec_boss_rb_state_load(), ec_boss_vblank() (+16 more)
 
 ### Community 31 - "tsf_midi_synth.c"
-Cohesion: 0.17
-Nodes (13): 3.1 Fluxo de Arquivos e Ferramentas (100% MIDI, Zero WAV em Disco), tsf_close(), tsf_copy(), tsf_load_filename(), tsf_set_max_voices(), ec_auto_preset(), ec_bridge_lock(), ec_bridge_unlock() (+5 more)
+Cohesion: 0.15
+Nodes (15): 3.1 Fluxo de Arquivos e Ferramentas (100% MIDI, Zero WAV em Disco), ec_audio_load_soundfont(), tsf_channel_set_bank_preset(), tsf_close(), tsf_copy(), tsf_set_max_voices(), tsf_set_output(), ec_auto_preset() (+7 more)
 
 ### Community 32 - "bplus_gl_parity.py"
 Cohesion: 0.36
 Nodes (5): main(), make_script(), metrics(), run_capture(), torch_reference()
 
 ### Community 33 - "ec_audio_mix_callback"
-Cohesion: 0.15
-Nodes (17): ec_allpass_tick(), ec_audio_mix_callback(), ec_audio_shutdown(), ec_biquad_clear(), ec_biquad_design_highshelf(), ec_biquad_design_lowshelf(), ec_biquad_design_peaking(), ec_biquad_flush_denormals() (+9 more)
+Cohesion: 0.17
+Nodes (14): ec_allpass_tick(), ec_audio_mix_callback(), ec_biquad_design_highshelf(), ec_biquad_design_lowshelf(), ec_biquad_design_peaking(), ec_biquad_flush_denormals(), ec_biquad_set_identity(), ec_biquad_tick() (+6 more)
 
 ### Community 34 - "sys"
 Cohesion: 0.15
@@ -341,8 +342,8 @@ Cohesion: 0.19
 Nodes (8): _boot_to_main_menu(), _build_char_select_script(), _build_music_test_script(), main(), _run_headless(), _ScriptBuilder, _split_dump_by_windows(), _summarize_midi()
 
 ### Community 37 - "ec_process_fm_event"
-Cohesion: 0.24
-Nodes (15): ec_can_emit_notes(), ec_clamp_i(), ec_process_chip_event(), ec_process_fm_event(), ec_process_psg_event(), ec_psg_calc_raw_note(), ec_psg_handle_noise_vol(), ec_psg_handle_tone_vol() (+7 more)
+Cohesion: 0.18
+Nodes (18): ec_audio_on_chip_write(), ec_can_emit_notes(), ec_clamp_i(), ec_process_chip_event(), ec_process_fm_event(), ec_process_psg_event(), ec_psg_calc_raw_note(), ec_psg_handle_noise_vol() (+10 more)
 
 ### Community 38 - "argparse"
 Cohesion: 0.12
@@ -361,12 +362,12 @@ Cohesion: 0.11
 Nodes (17): OrtErrorCode, ORT_DEVICE_RESET, ORT_ENGINE_ERROR, ORT_EP_FAIL, ORT_FAIL, ORT_INVALID_ARGUMENT, ORT_INVALID_GRAPH, ORT_INVALID_PROTOBUF (+9 more)
 
 ### Community 42 - "TASK.md — Fila Executável Ativa (EternalRecomp v2.0)"
-Cohesion: 0.15
-Nodes (13): 0. Pré-requisito / Checkpoint Imediato (Higiene de Git), 1. Pilar 1 — Aperfeiçoamento da Renderização Gráfica (`Trilha G`), 3. Pilar 3 — Remasterização da Trilha Sonora (`Trilha A`), 4. Trilha F — Finalização, Port Windows e Backlog de Baixa Prioridade, 5. Arquivo Histórico — Marcos Concluídos (M0–M10 + Bugfix/Polish), Etapa A1 — Auditoria FM/PSG, Correção de Blade, Stems & Motor de Remasterização (`Task A1-pipeline`), Etapa A2 — Ferramenta Externa de Mixagem por Instrumento & Catálogo (`Task A2-mixer-tool`), Etapa A3 — Síntese SoundFont em Tempo Real no Runner + DSP Custo-Zero (`Tasks A3-engine` & `A3-integration`) (+5 more)
+Cohesion: 0.12
+Nodes (17): 0. Pré-requisito / Checkpoint Imediato (Higiene de Git), 1. Pilar 1 — Aperfeiçoamento da Renderização Gráfica (`Trilha G`), 2. Pilar 2 — Suporte a Shaders Modulares (`Trilha S`) — *próxima fase, após Pilar 1*, 3. Pilar 3 — Remasterização da Trilha Sonora (`Trilha A`), 4. Trilha F — Finalização, Port Windows e Backlog de Baixa Prioridade, 5. Arquivo Histórico — Marcos Concluídos (M0–M10 + Bugfix/Polish), Etapa A1 — Auditoria FM/PSG, Correção de Blade, Stems & Motor de Remasterização (`Task A1-pipeline`), Etapa A2 — Ferramenta Externa de Mixagem por Instrumento & Catálogo (`Task A2-mixer-tool`) (+9 more)
 
 ### Community 43 - "tsf_hydra_imod"
-Cohesion: 0.12
-Nodes (16): tsf_hydra_genamount, range, shortAmount, wordAmount, tsf_hydra_imod, modAmount, modAmtSrcOper, modDestOper (+8 more)
+Cohesion: 0.07
+Nodes (28): tsf_hydra_genamount, range, shortAmount, wordAmount, tsf_hydra_ibag, instGenNdx, instModNdx, tsf_hydra_igen (+20 more)
 
 ### Community 44 - "OrtCUDAProviderOptions"
 Cohesion: 0.12
@@ -405,12 +406,12 @@ Cohesion: 0.15
 Nodes (13): 16. Marcos e critérios de aceite, 17. Riscos, 18. Questões em aberto, 1.1 Objetivos, 1.2 Não objetivos, 1. Visão geral, 2. Princípios de engenharia, 3. Escopo de uso (+5 more)
 
 ### Community 54 - "ec_hd_composite_gpu"
-Cohesion: 0.19
+Cohesion: 0.21
 Nodes (13): ec_hd_composite_gpu(), ensure_plane_gl_tex(), ensure_sprite_gl_tex(), hd_compile_sh(), hd_gpu_create(), hd_gpu_ensure_size(), hd_link_prog(), hd_load_gl() (+5 more)
 
 ### Community 55 - "Arquitetura de Áudio e Síntese SoundFont em Tempo Real — Eternal Champions"
-Cohesion: 0.15
-Nodes (10): 1.1 Chips de Áudio e Canais Físicos, 1.2 Driver Z80 (`$000A80`), 1.3 Interface 68000 → Z80 (`disasm/code/sound_cmd.asm`), 1. Subsistema de Som Original (Hardware + Driver Z80), 2.1 O Problema na Versão Anterior de `tools/audio/chip_ring_to_midi.py`, 2.2 Correção no Novo Pipeline por Canal, 2. Causa-Raiz do Falso-Positivo de Percussão em `03_syria_blade`, 4.1 Pontos de Integração no Runner (+2 more)
+Cohesion: 0.18
+Nodes (8): 1.1 Chips de Áudio e Canais Físicos, 1.2 Driver Z80 (`$000A80`), 1.3 Interface 68000 → Z80 (`disasm/code/sound_cmd.asm`), 1. Subsistema de Som Original (Hardware + Driver Z80), 2.1 O Problema na Versão Anterior de `tools/audio/chip_ring_to_midi.py`, 2.2 Correção no Novo Pipeline por Canal, 2. Causa-Raiz do Falso-Positivo de Percussão em `03_syria_blade`, Arquitetura de Áudio e Síntese SoundFont em Tempo Real — Eternal Champions
 
 ### Community 56 - "docs/main_loop.md — Esqueleto do laço principal (Fase 1, esboço)"
 Cohesion: 0.15
@@ -430,7 +431,7 @@ Nodes (5): a6(), connect(), fi(), main(), rpc()
 
 ### Community 60 - "ec_apply_active_profile"
 Cohesion: 0.27
-Nodes (15): 4.2 Fluxo de Duas Camadas em `game/ec_audio.{h,c}`, ec_apply_active_profile(), ec_audio_init(), ec_audio_on_bgm_pause(), ec_audio_on_bgm_play(), ec_audio_on_bgm_stop(), ec_audio_on_chip_write(), ec_audio_reset() (+7 more)
+Nodes (12): 4.1 Pontos de Integração no Runner, 4.2 Fluxo de Duas Camadas em `game/ec_audio.{h,c}`, 4. Arquitetura de Runtime em Tempo Real (`game/ec_audio.{h,c}` + `tsf.h`), ec_apply_active_profile(), ec_audio_on_bgm_pause(), ec_audio_on_bgm_play(), ec_audio_on_bgm_stop(), ec_audio_set_mode_str() (+4 more)
 
 ### Community 61 - "time"
 Cohesion: 0.31
@@ -445,15 +446,15 @@ Cohesion: 0.17
 Nodes (12): OrtExternalMemoryDescriptor, handle_type, native_handle, offset_bytes, size_bytes, version, OrtExternalMemoryHandleType, ORT_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_HEAP (+4 more)
 
 ### Community 64 - "ec_render_ws_scanline_impl"
-Cohesion: 0.26
-Nodes (13): ec_hd_frame_active(), ec_on_state_loaded(), ec_draw_sprite_span(), ec_eval_full_sprites_line(), ec_fetch_plane_pixel(), ec_fetch_window_pixel(), ec_plane_tiles(), ec_refresh_frame_hud_sat() (+5 more)
+Cohesion: 0.17
+Nodes (21): 1. Princípio: 320 px na lógica, margem estendida só no renderer, 2. Política por Estado (`$FFFFFD64`), 3. Reposicionamento de HUD e Modo C, 4. Flags CLI e Resultados Medidos, 5. GW.3 — Flicker lateral e sprites descartados nas margens (causa-raiz e correção), Widescreen 16:9 / Adaptativo (`M4`–`M6`), ec_on_state_loaded(), ec_compute_viewport_x0() (+13 more)
 
 ### Community 66 - "read_midi_notes"
 Cohesion: 0.20
 Nodes (6): _decode_vlq(), read_midi_notes(), _handle_wsl_render_stem_json(), _load_libfluidsynth(), main(), _render_events_libfluidsynth()
 
 ### Community 67 - "Resumo do Harness Determinístico & Frame Data (`M3` / `M4`–`M6`)"
-Cohesion: 0.22
+Cohesion: 0.20
 Nodes (9): `01_attract_boot.ecm` (1000 quadros) — `byte-swapped-16bit (desfeito via i^1)`, `02_title_to_fight.ecm` (2900 quadros) — `byte-swapped-16bit (desfeito via i^1)`, 1. Autodeterminismo Nativo e Misses (Suíte Completa), 2. Paridade da Recompilação Estática (`Recomp` × `GENESIS_FORCE_INTERP=1`), 3. Cobertura do Elenco e Arenas + Paridade Native vs GPGX, 4. Progressão de Luta Ativa Observada (`02_title_to_fight.ecm`), 5. Validação Widescreen 16:9 (`game/ec_video.c` — Todas as Arenas), Checkpoints Detalhados — Boot (`01`) e Luta Principal (`02`) (+1 more)
 
 ### Community 68 - "1. Bloqueadores de gameplay"
@@ -465,8 +466,8 @@ Cohesion: 0.16
 Nodes (9): compute_ssim(), compute_ssim_tensor(), eval_v3(), rgb_to_rgba(), run_infer(), sample_v3_batch(), sobel_edges(), train_v3() (+1 more)
 
 ### Community 71 - "ec_handle_arg"
-Cohesion: 0.20
-Nodes (15): ec_audio_set_bgm_vol(), ec_audio_set_chip_blend(), ec_audio_set_dsp_reverb(), ec_audio_set_sfx_vol(), ec_clampf(), ec_ym_tl_to_vel(), ec_handle_arg(), ec_ini_trim() (+7 more)
+Cohesion: 0.22
+Nodes (14): ec_audio_set_bgm_vol(), ec_audio_set_chip_blend(), ec_audio_set_dsp_reverb(), ec_audio_set_sfx_vol(), ec_clampf(), ec_handle_arg(), ec_ini_trim(), ec_load_settings() (+6 more)
 
 ### Community 72 - "OrtOpAttrType"
 Cohesion: 0.20
@@ -481,8 +482,8 @@ Cohesion: 0.22
 Nodes (9): 12. Áudio, 13. Input, 15. Stack e dependências, 7.1 Modelo de execução, 7.2 Interpretador de fallback, 7.3 Tempo e interrupções, 7.4 Overrides manuais, 7. Fase 2: Recompilação estática (+1 more)
 
 ### Community 75 - "6. Fase 1: Disassembly reconstruível"
-Cohesion: 0.29
-Nodes (7): 14. Uso de LLMs, 6.1 Método, 6.2 Ferramentas, 6.3 Convenções, 6.4 Prioridades de mapeamento, 6. Fase 1: Disassembly reconstruível, Fase 1 — Disassembly Reconstruível (`M1`)
+Cohesion: 0.40
+Nodes (5): 6.1 Método, 6.2 Ferramentas, 6.3 Convenções, 6.4 Prioridades de mapeamento, 6. Fase 1: Disassembly reconstruível
 
 ### Community 76 - "tsf_envelope"
 Cohesion: 0.22
@@ -529,8 +530,8 @@ Cohesion: 0.54
 Nodes (6): connect(), dump(), fi(), main(), pause_at(), rpc()
 
 ### Community 87 - "tsf_hydra_shdr"
-Cohesion: 0.12
-Nodes (14): tsf_hydra_shdr, end, endLoop, originalPitch, pitchCorrection, sampleLink, sampleName, sampleRate (+6 more)
+Cohesion: 0.09
+Nodes (20): tsf_decode_ogg(), tsf_decode_sf3_samples(), tsf_hydra_shdr, end, endLoop, originalPitch, pitchCorrection, sampleLink (+12 more)
 
 ### Community 88 - "gen_targets.py"
 Cohesion: 0.43
@@ -581,7 +582,7 @@ Cohesion: 0.60
 Nodes (4): connect(), fi(), main(), rpc()
 
 ### Community 102 - "Eternal Champions — Disasm, Símbolos & Hooks"
-Cohesion: 0.29
+Cohesion: 0.33
 Nodes (6): 0. Grafo primeiro, 1. Nunca leia arquivos grandes inteiros, 2. Onde vive cada informação, 3. Convenção de busca de endereços, 4. Fins de linha, Eternal Champions — Disasm, Símbolos & Hooks
 
 ### Community 103 - "OrtAllocatorType"
@@ -620,9 +621,9 @@ Nodes (5): OrtProfilingEventCategory, OrtProfilingEventCategory_API, OrtProfilin
 Cohesion: 0.22
 Nodes (7): ec_bplus_ort_create(), ort_dlsym_any(), ort_release_status(), ort_status_msg(), OrtApi, ORT_ALL_ARGS_NONNULL, OrtApiBase
 
-### Community 112 - "ort_dlopen_library"
-Cohesion: 0.47
-Nodes (6): ort_dlerror_str(), ort_dlopen_any(), ort_dlopen_library(), ort_preload_cuda_deps(), ort_preload_driver_ptx(), ort_preload_one()
+### Community 112 - "EcBplusOrt"
+Cohesion: 0.28
+Nodes (9): ec_hd_destroy_gpu(), ec_video_present_gpu_destroy(), ec_bplus_ort_destroy(), ec_bplus_ort_metrics(), ec_bplus_ort_readback(), ec_bplus_ort_set_intensity(), EcBplusOrt, ort_compute_percentiles() (+1 more)
 
 ### Community 113 - "tsf_channels"
 Cohesion: 0.50
@@ -699,22 +700,22 @@ Nodes (3): OrtResourceCountKind, OrtResourceCountKind_None, OrtResourceCountKind
 ## Knowledge Gaps
 - **488 isolated node(s):** `OrtArenaAllocator`, `OrtDeviceAllocator`, `OrtInvalidAllocator`, `OrtReadOnlyAllocator`, `OrtCompiledModelCompatibility_EP_NOT_APPLICABLE` (+483 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 979 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **34 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **36 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Fase 4 — Renderer e Upscale Neural (`M4`–`M6`, `N1`–`N3`)` connect `11. Upscale neural em tempo real (modo B+)` to `PROGRESS.md`?**
-  _High betweenness centrality (0.032) - this node is a cross-community bridge._
+- **Why does `tsf_channel` connect `tsf_channel` to `tsf.h`?**
+  _High betweenness centrality (0.023) - this node is a cross-community bridge._
 - **What connects `OrtArenaAllocator`, `OrtDeviceAllocator`, `OrtInvalidAllocator` to the rest of the system?**
   _488 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `mixer_studio.py` be split into smaller, more focused modules?**
   _Cohesion score 0.060674157303370786 - nodes in this community are weakly interconnected._
+- **Why does `ec_on_post_reset()` connect `ec_on_post_reset` to `ec_render_ws_scanline_impl`, `ec_audio.c`, `ec_hd.c`, `TASK.md — Fila Executável Ativa (EternalRecomp v2.0)`, `ec_spec.c`, `ec_apply_active_profile`, `ec_boss.c`, `tsf_midi_synth.c`?**
+  _High betweenness centrality (0.023) - this node is a cross-community bridge._
 - **Should `ec_hd.c` be split into smaller, more focused modules?**
-  _Cohesion score 0.1014799154334038 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09797979797979799 - nodes in this community are weakly interconnected._
 - **Should `ec_bplus_gl.c` be split into smaller, more focused modules?**
-  _Cohesion score 0.08392156862745098 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08326530612244898 - nodes in this community are weakly interconnected._
 - **Should `tsf` be split into smaller, more focused modules?**
-  _Cohesion score 0.08853410740203194 - nodes in this community are weakly interconnected._
-- **Should `tsf.h` be split into smaller, more focused modules?**
-  _Cohesion score 0.09407665505226481 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09574468085106383 - nodes in this community are weakly interconnected._

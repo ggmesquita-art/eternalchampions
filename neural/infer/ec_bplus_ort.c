@@ -31,7 +31,14 @@
 /* ---- dynamic-library loading: dlopen (POSIX) vs LoadLibrary (Win32) ----- */
 
 #ifdef _WIN32
-static void *ort_dlopen_any(const char *path) { return (void *)LoadLibraryA(path); }
+/* Caminho completo: LOAD_WITH_ALTERED_SEARCH_PATH faz as DLLs dependentes
+ * (onnxruntime_providers_*.dll) serem procuradas no diretorio da propria DLL. */
+static void *ort_dlopen_any(const char *path)
+{
+    if (strchr(path, '\\') || strchr(path, '/'))
+        return (void *)LoadLibraryExA(path, NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
+    return (void *)LoadLibraryA(path);
+}
 static void *ort_dlsym_any(void *h, const char *name) { return (void *)GetProcAddress((HMODULE)h, name); }
 static void  ort_dlclose_any(void *h) { FreeLibrary((HMODULE)h); }
 static const char *ort_dlerror_str(void) { return "LoadLibrary/GetProcAddress failed"; }
@@ -181,12 +188,71 @@ static void ort_preload_cuda_deps(const char *ort_lib_path)
 #endif
 }
 
+#ifdef _WIN32
+/* G4.2: ORT vindo de um wheel Python (<site>\onnxruntime\capi\onnxruntime.dll):
+ * o CUDA EP precisa de cudart/cublas/cudnn, que no Windows ficam em
+ * <site>\torch\lib (torch cu13x) ou <site>\nvidia\<pkg>\bin. Prefixa esses
+ * diretorios no PATH do processo antes do LoadLibrary. */
+static void ort_win_prepend_path(const char *dir)
+{
+    DWORD attr = GetFileAttributesA(dir);
+    if (attr == INVALID_FILE_ATTRIBUTES || !(attr & FILE_ATTRIBUTE_DIRECTORY))
+        return;
+    static char buf[32768];
+    char old[30000];
+    DWORD n = GetEnvironmentVariableA("PATH", old, (DWORD)sizeof(old));
+    if (n >= sizeof(old))
+        return;
+    if (n == 0)
+        old[0] = '\0';
+    snprintf(buf, sizeof(buf), "%s;%s", dir, old);
+    SetEnvironmentVariableA("PATH", buf);
+}
+
+static void ort_win_prepare_deps(const char *ort_dll_path)
+{
+    if (!ort_dll_path)
+        return;
+    char site[1024];
+    snprintf(site, sizeof(site), "%s", ort_dll_path);
+    for (char *p = site; *p; ++p)
+        if (*p == '/') *p = '\\';
+    for (int up = 0; up < 3; ++up) { /* capi -> onnxruntime -> <site> */
+        char *s = strrchr(site, '\\');
+        if (!s)
+            return;
+        *s = '\0';
+    }
+    char dir[1400];
+    snprintf(dir, sizeof(dir), "%s\\torch\\lib", site);
+    ort_win_prepend_path(dir);
+    char pat[1400];
+    snprintf(pat, sizeof(pat), "%s\\nvidia\\*", site);
+    WIN32_FIND_DATAA fd;
+    HANDLE hf = FindFirstFileA(pat, &fd);
+    if (hf != INVALID_HANDLE_VALUE) {
+        do {
+            if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && fd.cFileName[0] != '.') {
+                snprintf(dir, sizeof(dir), "%s\\nvidia\\%s\\bin", site, fd.cFileName);
+                ort_win_prepend_path(dir);
+            }
+        } while (FindNextFileA(hf, &fd));
+        FindClose(hf);
+    }
+}
+#endif
+
 /* Resolves libonnxruntime.so: EC_ONNXRUNTIME_LIB > system names > project
- * venv-relative candidates (game may run from repo root or from build dirs). */
+ * venv-relative candidates (game may run from repo root or from build dirs).
+ * Windows: EC_ONNXRUNTIME_LIB > onnxruntime.dll ao lado do exe > nome solto
+ * (evita pegar primeiro o onnxruntime.dll antigo do System32). */
 static void *ort_dlopen_library(void)
 {
     const char *env = getenv("EC_ONNXRUNTIME_LIB");
     if (env && *env) {
+#ifdef _WIN32
+        ort_win_prepare_deps(env);
+#endif
         void *h = ort_dlopen_any(env);
         if (h) {
 #ifndef _WIN32
@@ -199,8 +265,20 @@ static void *ort_dlopen_library(void)
                 env, ort_dlerror_str());
     }
 #ifdef _WIN32
+    {
+        char exe[MAX_PATH];
+        DWORD n = GetModuleFileNameA(NULL, exe, (DWORD)sizeof(exe));
+        char *s = (n > 0 && n < sizeof(exe)) ? strrchr(exe, '\\') : NULL;
+        if (s) {
+            snprintf(s + 1, sizeof(exe) - (size_t)(s + 1 - exe), "onnxruntime.dll");
+            if (GetFileAttributesA(exe) != INVALID_FILE_ATTRIBUTES) {
+                void *h = ort_dlopen_any(exe);
+                if (h)
+                    return h;
+            }
+        }
+    }
     static const char *names[] = {
-        "onnxruntime.dll",
         "onnxruntime.dll",
     };
 #else
@@ -302,10 +380,24 @@ EcBplusOrt *ec_bplus_ort_create(SDL_Renderer *renderer, SDL_Texture *activation,
         goto fail_lib;
     }
     const OrtApiBase *base = get_api_base();
-    ctx->api = base ? base->GetApi(ORT_API_VERSION) : NULL;
-    if (!ctx->api) {
-        fprintf(stderr, "[BPLUS_ORT] ORT API version mismatch\n");
-        goto fail_lib;
+    /* G4.2: negocia a versao da API. O header e API 32, mas so usamos funcoes que
+     * existem desde as primeiras versoes (struct OrtApi e append-only), entao um
+     * runtime mais antigo (ex.: ORT 1.29 do venv -> API 29) e seguro. ORT usa
+     * API == versao minor ("1.29.0" -> 29). Minimo 11 (CUDA EP V1 + CreateSessionFromArray). */
+    {
+        const char *vs = (base && base->GetVersionString) ? base->GetVersionString() : NULL;
+        int maj = 0, min = 0;
+        uint32_t want = ORT_API_VERSION;
+        if (vs && sscanf(vs, "%d.%d", &maj, &min) == 2 && maj == 1 && min > 0 &&
+            (uint32_t)min < want)
+            want = (uint32_t)min;
+        ctx->api = (base && want >= 11u) ? base->GetApi(want) : NULL;
+        if (!ctx->api) {
+            fprintf(stderr, "[BPLUS_ORT] ORT %s sem API compativel (header %d, minimo 11)\n",
+                    vs ? vs : "?", ORT_API_VERSION);
+            goto fail_lib;
+        }
+        fprintf(stderr, "[BPLUS_ORT] ONNX Runtime %s (API %u)\n", vs ? vs : "?", (unsigned)want);
     }
 
     OrtStatus *st = ctx->api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "ec_bplus_ort", &ctx->env);

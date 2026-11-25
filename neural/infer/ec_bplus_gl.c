@@ -142,7 +142,7 @@ struct EcBplusGl {
     GLuint tex_tail;
 
     GLint dd_u_in, dd_u_width, dd_u_height, dd_u_mode;
-    GLint u_width, u_height, u_g_in, u_w_offset, u_b_offset, u_act, u_add_res, u_slope;
+    GLint u_width, u_height, u_g_in, u_g_out, u_w_offset, u_b_offset, u_act, u_add_res, u_slope;
     GLint u_tex_in, u_tex_res;
     GLint up_u_in, up_u_tail, up_u_in_size, up_u_scale, up_u_intensity;
 
@@ -276,8 +276,28 @@ static const char s_dedither_cs[] =
     "    imageStore(u_out, ivec3(x, y, 0), vec4(out_rgb, c4.a));\n"
     "}\n";
 
+/* G4.1 — conv 3x3 com register tiling:
+ *  - cada invocacao calcula PXW pixels (intercalados: lx + 8*p, sem conflito de banco)
+ *    x GOK grupos de 4 canais de saida; cada mat4 de peso lido do SSBO alimenta PXW pixels
+ *    (antes: 1 pixel por leitura de 64 B -> limitado por load);
+ *  - o tile de entrada (10 x (8*PXW+2) vec4) e carregado uma vez por grupo de entrada
+ *    para todos os GOK grupos de saida.
+ *  A ordem das somas por canal (gi -> dy -> dx) e a mesma do kernel original, entao a
+ *  saida e bit a bit identica. */
+#ifndef BPLUS_GOK
+#define BPLUS_GOK 1
+#endif
+#ifndef BPLUS_PXW
+#define BPLUS_PXW 8
+#endif
+#define BPLUS_STR2(x) #x
+#define BPLUS_STR(x) BPLUS_STR2(x)
+
 static const char s_conv3x3_cs[] =
     "#version 430 core\n"
+    "#define GOK " BPLUS_STR(BPLUS_GOK) "\n"
+    "#define PXW " BPLUS_STR(BPLUS_PXW) "\n"
+    "#define TW  (8 * PXW)\n"
     "layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;\n"
     "layout(std430, binding = 0) readonly buffer WeightsBuf { mat4 w_mat[]; };\n"
     "layout(std430, binding = 1) readonly buffer BiasesBuf  { vec4 b_vec[]; };\n"
@@ -287,55 +307,64 @@ static const char s_conv3x3_cs[] =
     "uniform int   u_width;\n"
     "uniform int   u_height;\n"
     "uniform int   u_g_in;\n"
+    "uniform int   u_g_out;\n"
     "uniform int   u_w_offset;\n"
     "uniform int   u_b_offset;\n"
     "uniform int   u_act;\n"
     "uniform int   u_add_res;\n"
     "uniform float u_slope;\n"
-    "shared vec4 s_tile[10][10];\n"
+    "shared vec4 s_tile[10][TW + 2];\n"
     "void main() {\n"
     "    int tid = int(gl_LocalInvocationIndex);\n"
     "    int lx  = int(gl_LocalInvocationID.x);\n"
     "    int ly  = int(gl_LocalInvocationID.y);\n"
-    "    int gx  = int(gl_WorkGroupID.x) * 8 + lx;\n"
+    "    int bx  = int(gl_WorkGroupID.x) * TW;\n"
     "    int gy  = int(gl_WorkGroupID.y) * 8 + ly;\n"
-    "    int go  = int(gl_GlobalInvocationID.z);\n"
-    "    ivec2 tile_base = ivec2(gl_WorkGroupID.xy) * 8 - ivec2(1, 1);\n"
-    "    vec4 acc = b_vec[u_b_offset + go];\n"
+    "    int go0 = int(gl_WorkGroupID.z) * GOK;\n"
+    "    int nk  = min(GOK, u_g_out - go0);\n"
+    "    ivec2 tile_base = ivec2(bx, int(gl_WorkGroupID.y) * 8) - ivec2(1, 1);\n"
+    "    vec4 acc[GOK * PXW];\n"
+    "    for (int k = 0; k < GOK; ++k) {\n"
+    "        vec4 b = (k < nk) ? b_vec[u_b_offset + go0 + k] : vec4(0.0);\n"
+    "        for (int p = 0; p < PXW; ++p) acc[k * PXW + p] = b;\n"
+    "    }\n"
     "    for (int gi = 0; gi < u_g_in; ++gi) {\n"
-    "        {\n"
-    "            int ty = tid / 10;\n"
-    "            int tx = tid - ty * 10;\n"
-    "            ivec2 p = tile_base + ivec2(tx, ty);\n"
-    "            s_tile[ty][tx] = (p.x >= 0 && p.x < u_width && p.y >= 0 && p.y < u_height)\n"
-    "                ? texelFetch(u_in, ivec3(p, gi), 0)\n"
-    "                : vec4(0.0);\n"
-    "        }\n"
-    "        if (tid < 36) {\n"
-    "            int idx2 = tid + 64;\n"
-    "            int ty = idx2 / 10;\n"
-    "            int tx = idx2 - ty * 10;\n"
-    "            ivec2 p = tile_base + ivec2(tx, ty);\n"
-    "            s_tile[ty][tx] = (p.x >= 0 && p.x < u_width && p.y >= 0 && p.y < u_height)\n"
-    "                ? texelFetch(u_in, ivec3(p, gi), 0)\n"
+    "        for (int i = tid; i < 10 * (TW + 2); i += 64) {\n"
+    "            int ty = i / (TW + 2);\n"
+    "            int tx = i - ty * (TW + 2);\n"
+    "            ivec2 q = tile_base + ivec2(tx, ty);\n"
+    "            s_tile[ty][tx] = (q.x >= 0 && q.x < u_width && q.y >= 0 && q.y < u_height)\n"
+    "                ? texelFetch(u_in, ivec3(q, gi), 0)\n"
     "                : vec4(0.0);\n"
     "        }\n"
     "        barrier();\n"
-    "        int wbase = u_w_offset + (go * u_g_in + gi) * 9;\n"
-    "        for (int dy = 0; dy < 3; ++dy) {\n"
-    "            int row = wbase + dy * 3;\n"
-    "            acc += w_mat[row + 0] * s_tile[ly + dy][lx + 0];\n"
-    "            acc += w_mat[row + 1] * s_tile[ly + dy][lx + 1];\n"
-    "            acc += w_mat[row + 2] * s_tile[ly + dy][lx + 2];\n"
+    "        for (int k = 0; k < GOK; ++k) {\n"
+    "            if (k >= nk) break;\n"
+    "            int wbase = u_w_offset + ((go0 + k) * u_g_in + gi) * 9;\n"
+    "            for (int dy = 0; dy < 3; ++dy) {\n"
+    "                for (int dx = 0; dx < 3; ++dx) {\n"
+    "                    mat4 W = w_mat[wbase + dy * 3 + dx];\n"
+    "                    for (int p = 0; p < PXW; ++p)\n"
+    "                        acc[k * PXW + p] += W * s_tile[ly + dy][lx + 8 * p + dx];\n"
+    "                }\n"
+    "            }\n"
     "        }\n"
     "        barrier();\n"
     "    }\n"
-    "    if (gx < u_width && gy < u_height) {\n"
-    "        if (u_add_res != 0)\n"
-    "            acc += texelFetch(u_res, ivec3(gx, gy, go), 0);\n"
-    "        if (u_act != 0)\n"
-    "            acc = max(acc, acc * u_slope);\n"
-    "        imageStore(u_out, ivec3(gx, gy, go), acc);\n"
+    "    if (gy < u_height) {\n"
+    "        for (int k = 0; k < GOK; ++k) {\n"
+    "            if (k >= nk) break;\n"
+    "            for (int p = 0; p < PXW; ++p) {\n"
+    "                int gx = bx + lx + 8 * p;\n"
+    "                if (gx >= u_width) continue;\n"
+    "                vec4 a = acc[k * PXW + p];\n"
+    "                if (u_add_res != 0)\n"
+    "                    a += texelFetch(u_res, ivec3(gx, gy, go0 + k), 0);\n"
+    "                if (u_act != 0)\n"
+    "                    a = max(a, a * u_slope);\n"
+    "                imageStore(u_out, ivec3(gx, gy, go0 + k), a);\n"
+    "            }\n"
+    "        }\n"
     "    }\n"
     "}\n";
 
@@ -830,15 +859,16 @@ static void dispatch_conv(const EcBplusGl *ctx, unsigned layer_idx,
     ctx->gl.Uniform1i(ctx->u_width, (GLint)ctx->in_w);
     ctx->gl.Uniform1i(ctx->u_height, (GLint)ctx->in_h);
     ctx->gl.Uniform1i(ctx->u_g_in, (GLint)L->g_in);
+    ctx->gl.Uniform1i(ctx->u_g_out, (GLint)L->g_out);
     ctx->gl.Uniform1i(ctx->u_w_offset, (GLint)L->w_offset);
     ctx->gl.Uniform1i(ctx->u_b_offset, (GLint)L->b_offset);
     ctx->gl.Uniform1i(ctx->u_act, act);
     ctx->gl.Uniform1i(ctx->u_add_res, add_res);
     ctx->gl.Uniform1f(ctx->u_slope, ctx->model.slope);
 
-    GLuint wg_x = (GLuint)((ctx->in_w + 7u) / 8u);
+    GLuint wg_x = (GLuint)((ctx->in_w + 8u * BPLUS_PXW - 1u) / (8u * BPLUS_PXW));
     GLuint wg_y = (GLuint)((ctx->in_h + 7u) / 8u);
-    ctx->gl.DispatchCompute(wg_x, wg_y, (GLuint)L->g_out);
+    ctx->gl.DispatchCompute(wg_x, wg_y, (GLuint)((L->g_out + BPLUS_GOK - 1u) / BPLUS_GOK));
     ctx->gl.MemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
@@ -935,6 +965,7 @@ EcBplusGl *ec_bplus_gl_create(SDL_Renderer *renderer, SDL_Texture *activation,
         ctx->u_width = ctx->gl.GetUniformLocation(ctx->conv_prog, "u_width");
         ctx->u_height = ctx->gl.GetUniformLocation(ctx->conv_prog, "u_height");
         ctx->u_g_in = ctx->gl.GetUniformLocation(ctx->conv_prog, "u_g_in");
+        ctx->u_g_out = ctx->gl.GetUniformLocation(ctx->conv_prog, "u_g_out");
         ctx->u_w_offset = ctx->gl.GetUniformLocation(ctx->conv_prog, "u_w_offset");
         ctx->u_b_offset = ctx->gl.GetUniformLocation(ctx->conv_prog, "u_b_offset");
         ctx->u_act = ctx->gl.GetUniformLocation(ctx->conv_prog, "u_act");

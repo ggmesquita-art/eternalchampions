@@ -1234,29 +1234,37 @@ static struct SDL_Texture *ec_video_present_gpu(
             float intensity = (float)ec_resolve_bplus_intensity();
             EcBplusDeditherMode dedither = ec_resolve_bplus_dedither();
             int backend = ec_resolve_bplus_backend();
-            int want_cuda = backend == EC_BPLUS_BACKEND_CUDA || backend == EC_BPLUS_BACKEND_AUTO;
-            int want_gl = backend == EC_BPLUS_BACKEND_GL || backend == EC_BPLUS_BACKEND_AUTO;
+            /* G4.2: o caminho ORT/CUDA faz ida-e-volta CPU<->GPU por frame (~15 ms no
+             * v3 fast vs ~1,9 ms do GL otimizado), entao `auto` prefere GL e so cai
+             * no CUDA se o GL 4.3 nao existir. `cuda` explicito continua disponivel. */
+            int ort_ok = (intensity == 1.0f && dedither == EC_BPLUS_DEDITHER_OFF);
+            int want_gl = 0;
 
-            if (want_cuda && intensity == 1.0f && dedither == EC_BPLUS_DEDITHER_OFF) {
-                s_bplus_ort = ec_bplus_ort_create(renderer, activation, opath, budget);
-                if (!s_bplus_ort && backend == EC_BPLUS_BACKEND_CUDA)
-                    fprintf(stderr, "[EC_VIDEO] Mode B+ CUDA unavailable; retaining Modo A/B fallback\n");
-            } else if (want_cuda) {
-                want_gl = 1;
-                if (backend == EC_BPLUS_BACKEND_CUDA) {
+            if (backend == EC_BPLUS_BACKEND_CUDA) {
+                if (ort_ok) {
+                    s_bplus_ort = ec_bplus_ort_create(renderer, activation, opath, budget);
+                    if (!s_bplus_ort)
+                        fprintf(stderr, "[EC_VIDEO] Mode B+ CUDA unavailable; retaining Modo A/B fallback\n");
+                } else {
+                    want_gl = 1;
                     if (dedither != EC_BPLUS_DEDITHER_OFF)
                         fprintf(stderr, "[EC_VIDEO] CUDA backend does not support --bplus-dedither; using GL\n");
                     else
                         fprintf(stderr, "[EC_VIDEO] CUDA backend requires intensity=1.0 (got %.3f); using GL\n",
                                 intensity);
                 }
+            } else {
+                want_gl = 1;
             }
 
-            if (!s_bplus_ort && want_gl) {
+            if (!s_bplus_ort && want_gl)
                 s_bplus_gl = ec_bplus_gl_create(renderer, activation, wpath, budget);
-                if (!s_bplus_gl)
-                    fprintf(stderr, "[EC_VIDEO] Mode B+ unavailable; retaining Modo A/B fallback\n");
+            if (!s_bplus_ort && !s_bplus_gl && backend == EC_BPLUS_BACKEND_AUTO && ort_ok) {
+                fprintf(stderr, "[EC_VIDEO] B+ GL indisponivel; tentando CUDA/ORT\n");
+                s_bplus_ort = ec_bplus_ort_create(renderer, activation, opath, budget);
             }
+            if (!s_bplus_ort && !s_bplus_gl && want_gl)
+                fprintf(stderr, "[EC_VIDEO] Mode B+ unavailable; retaining Modo A/B fallback\n");
 
             if (s_bplus_ort)
                 ec_bplus_ort_set_intensity(s_bplus_ort, intensity);
