@@ -65,3 +65,24 @@ neural/.pydeps/
 
 # Pacote OptiScaler/FidelityFX (DLLs de terceiros, ~282 MB): fica so no disco
 Optiscaler_*/
+
+# --- Triagem 2026-11-25: fora do repositorio, mantidos so no disco ---
+# Configuracao de agentes de IA
+/CLAUDE.md
+/AGENTS.md
+/.claude/
+/.agents/
+# Residuos
+*.bak
+/package.json
+/package-lock.json
+/tools/audio/legacy/
+/tools/scripts/t2_repro/
+/tools/scripts/t4_repro/
+/tools/scripts/cuda-env.sh
+/docs/movelist_investigation.md
+/docs/proposta_bugfix_2026-11-21.md
+# Gerados (regeneraveis)
+screenshots/
+/graphify-out/
+/docs/frame_data/fight_probe_summary.md
