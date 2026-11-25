@@ -1,7 +1,7 @@
 # Graph Report - eternalchampions  (2026-11-25)
 
 ## Corpus Check
-- 117 files · ~854,121 words
+- 117 files · ~854,153 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 131 file(s) not represented in the graph (top: .asm 48, .toml 24, .ecm 17)
 - WARNING: 131 of 255 files seen (51%) have no supported extractor and are missing from this graph entirely. It may look complete while representing only part of the codebase.
@@ -12,7 +12,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a5008aff`
+- Built from commit: `bb29781c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -183,8 +183,6 @@
 10. `OrtTensorRTProviderOptions` - 19 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `A5.4 — Mixer Studio por instrumento` --references--> `read_midi_named_tracks()`  [INFERRED]
-  docs/audio_remaster_architecture.md → tools/audio/mixer_studio.py
 - `Implementação e verificação (`N1`–`N3` / `P3`, 2026-11-19)` --references--> `ECStudentESPCN4x`  [INFERRED]
   docs/phase-4.md → neural/train_espcn.py
 - `Execução e estado atual (`M7.1`, 2026-11-19)` --references--> `ECStudentESPCN4x`  [INFERRED]
@@ -193,6 +191,8 @@
   docs/PROGRESS.md → neural/train_espcn.py
 - `Etapa G1 — Laboratório Visual de Upscalers Teachers *(Próximo passo imediato — sem alterar código do jogo)*` --references--> `pre_dedither_torch()`  [INFERRED]
   task.md → neural/train_espcn.py
+- `Etapa G4 — Otimização GPU (OpenGL Compute & CUDA ORT)` --references--> `ec_video_scanline_lazy()`  [INFERRED]
+  task.md → game/ec_video.c
 
 ## Import Cycles
 - None detected.
@@ -711,17 +711,17 @@ Nodes (3): OrtResourceCountKind, OrtResourceCountKind_None, OrtResourceCountKind
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `OrtTensorRTProviderOptions` connect `OrtTensorRTProviderOptions` to `onnxruntime_c_api.h`?**
-  _High betweenness centrality (0.024) - this node is a cross-community bridge._
+- **Why does `ONNXTensorElementDataType` connect `ONNXTensorElementDataType` to `onnxruntime_c_api.h`?**
+  _High betweenness centrality (0.029) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `MixerApp` (e.g. with `3.4 Mixer Studio (`tools/audio/mixer_studio.py` + `tools/audio/mixer_ui/`)` and `NoteEvent`) actually correct?**
   _`MixerApp` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `OrtArenaAllocator`, `OrtDeviceAllocator`, `OrtInvalidAllocator` to the rest of the system?**
   _488 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `ec_audio.c` be split into smaller, more focused modules?**
   _Cohesion score 0.050970873786407765 - nodes in this community are weakly interconnected._
-- **Why does `MixerApp` connect `MixerApp` to `ApiError`, `mixer_studio.py`, `TsfBridge`, `chip_ring_to_midi.py`, `Path`, `.generate_original`?**
-  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+- **Why does `tsf_region` connect `tsf_region` to `tsf.h`?**
+  _High betweenness centrality (0.021) - this node is a cross-community bridge._
 - **Should `ec_hd.c` be split into smaller, more focused modules?**
   _Cohesion score 0.11666666666666667 - nodes in this community are weakly interconnected._
-- **Why does `DESIGN.md — Eternal Champions: Recompilação Nativa e Remasterização` connect `DESIGN.md — Eternal Champions: Recompilação Nativa e Remasterização` to `PROGRESS.md`?**
-  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+- **Why does `OrtAllocatorType` connect `OrtAllocatorType` to `onnxruntime_c_api.h`?**
+  _High betweenness centrality (0.020) - this node is a cross-community bridge._

@@ -1767,7 +1767,13 @@ static void ec_resync_keyed(void)
         started += s_audio.chip.psg_noise_sounding;
     }
     if (ec_trace_enabled()) {
-        fprintf(stderr, "[EC-AUDIO-TRACE] resync: %d nota(s) re-emitida(s)\n", started);
+        int keyed = 0, known = 0;
+        for (int g = 0; g < 6; ++g) {
+            keyed += s_audio.chip.fm[g].keyed;
+            known += (s_audio.chip.fm[g].known == EC_KN_ALL);
+        }
+        fprintf(stderr, "[EC-AUDIO-TRACE] resync: %d nota(s) re-emitida(s) (fm keyed=%d, fm known=%d)\n",
+                started, keyed, known);
     }
 }
 

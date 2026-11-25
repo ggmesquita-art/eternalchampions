@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "game/ec_audio.c": {
-    "mtime": 1795581493.1585681,
-    "seen": 1795581750.2269828,
-    "ast_hash": "04a43c00afc36834f35eb9a5c4624c6a",
+    "mtime": 1795582021.9022076,
+    "seen": 1795582110.0193336,
+    "ast_hash": "3a837db764c057cb2cdb9590dc54e8ba",
     "semantic_hash": ""
   },
   "game/ec_audio.h": {
