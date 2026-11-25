@@ -130,7 +130,7 @@ A precedência de configuração segue rigorosamente a regra: **Flags de Linha d
 | `--audio-chip-blend` | `<float>` | **Override explícito** (`0.0` a `1.0`) da presença do chip original em `hybrid`/`ost`; vence o `chip_blend` do perfil da faixa, o do `settings.ini` e os defaults do modo. Precedência completa: `--audio-chip-blend` > `chip_blend` do perfil `.toml` da faixa > `chip_blend` de `[ec.audio]` no `settings.ini` (default do usuário) > default do modo (`hybrid` 0.65, `ost` 0.18). Sem efeito em `off`/`dsp`. |
 | `--audio-manifest` | `<arquivo>` | **Obsoleto**: ignorado com aviso (o módulo usa síntese em tempo real: `--audio-sf2` + `--audio-profiles-dir`). |
 | `--audio-dsp-reverb` | `<float>` | Quantidade de reverberação de estúdio Schroeder injetada no barramento mestre (`0.0` a `1.0`). |
-| `--wav` | `<caminho.wav>` | Grava a sessão em WAV estéreo 16-bit na **taxa interna do mixer (223 721 Hz)**, anterior à ponte DRC/reamostragem de saída; reamostre para 44,1/48 kHz antes de usar em players comuns. |
+| `--wav` | `<caminho.wav>` | Grava a sessão em WAV estéreo 16-bit na **taxa interna do mixer (223 721 Hz)** (mesma taxa do `[audio] DRC bridge: 223721 Hz internal`); reamostre para 44,1/48 kHz para players comuns. |
 | `--psg-vol-div` | `<inteiro>` | Divisor de ganho de atenuação do canal PSG (ajuste fino de balanço entre YM2612 e PSG). |
 | `--snd-dump-frame` | `<inteiro>` | Despeja o estado completo dos buffers de som no frame indicado (para diagnóstico determinístico). |
 | `--snd-dump-vint` | `<inteiro>` | Despeja o estado completo do som quando o contador lógico V-Int atingir o valor especificado. |

@@ -293,6 +293,17 @@ static EcAudioState s_audio = {
     .synth_active      = 0
 };
 
+/* EC_AUDIO_TRACE=1: log de eventos de ciclo de vida (play/pause/resync/state load). */
+static int ec_trace_enabled(void)
+{
+    static int cached = -1;
+    if (cached < 0) {
+        const char *e = getenv("EC_AUDIO_TRACE");
+        cached = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return cached;
+}
+
 /* ---- Portable helpers ---------------------------------------------------- */
 
 static int ec_strcasecmp(const char *a, const char *b)
@@ -1737,19 +1748,26 @@ static void ec_resync_keyed(void)
     if (!ec_can_emit_notes(0)) {
         return;
     }
+    int started = 0;
     for (int g = 0; g < 6; ++g) {
         if (s_audio.chip.fm[g].keyed && !s_audio.chip.fm[g].sounding) {
             ec_fm_start_note(g, 0);
+            started += s_audio.chip.fm[g].sounding;
         }
     }
     for (int i = 0; i < 3; ++i) {
         EcPsgToneChan *t = &s_audio.chip.psg_tone[i];
         if (t->vol < 15u && !t->sounding) {
             ec_psg_tone_on(i, t->vol, 0);
+            started += t->sounding;
         }
     }
     if (s_audio.chip.psg_noise_vol < 15u && !s_audio.chip.psg_noise_sounding) {
         ec_psg_noise_on(s_audio.chip.psg_noise_vol, 0);
+        started += s_audio.chip.psg_noise_sounding;
+    }
+    if (ec_trace_enabled()) {
+        fprintf(stderr, "[EC-AUDIO-TRACE] resync: %d nota(s) re-emitida(s)\n", started);
     }
 }
 
@@ -1947,6 +1965,10 @@ void ec_audio_reset(void)
  * e frequencia de cada canal (e novo key-on). */
 void ec_audio_on_state_loaded(void)
 {
+    if (ec_trace_enabled()) {
+        fprintf(stderr, "[EC-AUDIO-TRACE] state loaded (bgm_id=%u has=%d)\n",
+                (unsigned)s_audio.current_bgm_id, s_audio.has_bgm_id);
+    }
     ec_ensure_default_profile();
     ec_synth_reset_chip_state();
     if (s_audio.tsf) {
@@ -2192,6 +2214,9 @@ void ec_audio_set_dsp_reverb(float amount)
 
 void ec_audio_on_bgm_play(uint32_t bgm_id)
 {
+    if (ec_trace_enabled()) {
+        fprintf(stderr, "[EC-AUDIO-TRACE] bgm_play id=%u\n", (unsigned)bgm_id);
+    }
     ec_ensure_default_profile();
     s_audio.current_bgm_id = bgm_id;
     s_audio.has_bgm_id     = 1;
@@ -2210,6 +2235,9 @@ void ec_audio_on_bgm_play(uint32_t bgm_id)
 void ec_audio_on_bgm_pause(int paused)
 {
     int next_paused = paused ? 1 : 0;
+    if (ec_trace_enabled() && next_paused != s_audio.paused) {
+        fprintf(stderr, "[EC-AUDIO-TRACE] pause=%d\n", next_paused);
+    }
     if (next_paused && !s_audio.paused && s_audio.tsf) {
         tsf_note_off_all(s_audio.tsf);
         ec_clear_sounding_flags();
