@@ -31,6 +31,7 @@ struct Opt {
     bool dev = false;              // area "Desenvolvedor" (oculta)
     std::string cli_flag;          // so launcher.args: flag do runner
     int precision = 2;             // casas decimais (Float)
+    std::string empty_start;       // Float com default vazio: valor inicial ao primeiro ajuste
 };
 
 const std::vector<Opt>& schema();

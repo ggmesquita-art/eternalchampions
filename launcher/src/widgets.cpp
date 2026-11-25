@@ -52,13 +52,16 @@ int MenuList::update(App& app, const InputState& in) {
 
 void MenuList::draw(App& app) {
     Theme& th = app.theme;
-    const Font& f = *th.fonts.menu;
-    float tw = f.line_height() * text_scale;
+    const bool pix = th.fonts.pixel != nullptr;       // arte extraida: fonte pixel do jogo, escala inteira, nearest
+    const Font& f = pix ? *th.fonts.pixel : *th.fonts.menu;
+    const float sc = pix ? (float)pixel_scale : text_scale;
+    float tw = f.line_height() * sc;
     int end = std::min((int)items.size(), scroll_ + visible_rows);
     for (int i = scroll_; i < end; ++i) {
         bool foc = (i == focus);
         TextStyle st = th.item_style(foc, items[i].enabled);
-        st.scale = text_scale;
+        if (pix) { st.outline_px = 0; st.shadow_dx = st.shadow_dy = 0; }   // a fonte ja traz a sombra; so tinge (amarelo/cinza)
+        st.scale = sc;
         st.align = align;
         float iy = item_y(i) + (row_h - tw) * 0.5f;
         float w = draw_text(app.render, f, x, iy, items[i].label, st);

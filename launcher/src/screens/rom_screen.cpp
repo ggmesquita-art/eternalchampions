@@ -96,6 +96,7 @@ private:
         if (sha.empty()) { msg_ = "N\xC3\xA3o foi poss\xC3\xADvel ler o arquivo."; ok_ = false; pending_.clear(); rebuild(app); return; }
         if (sha == EC_US_ROM_SHA256) {
             app.set_rom(path, true);
+            app.maybe_extract_art();
             msg_ = "ROM v\xC3\xA1lida (Eternal Champions US) \xE2\x80\x94 gravada em rom-EC.cfg."; ok_ = true; pending_.clear();
             app.toast("ROM configurada.");
         } else {

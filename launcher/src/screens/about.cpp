@@ -39,6 +39,7 @@ public:
             draw_text(r, *th.fonts.help, x, y, l, title ? head : body);
             y += title ? 36 : 29;
         }
+        draw_text(r, *th.fonts.help, x, p.y + p.h - 40, "Tema: " + app.art_status(), TextStyle::solid(Color::hex(0xcfe9e6), 1, th.pal.text_outline));
         draw_help_bar(app, "Esc / B: voltar   Start / F5: JOGAR");
     }
 };

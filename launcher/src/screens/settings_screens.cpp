@@ -46,7 +46,8 @@ std::vector<Page> build_game(App& app) {
 std::vector<Page> build_audio(App& app) {
     Page out{"Saída", {}}, rem{"Remaster", {}}, files{"Arquivos", {}};
     add_opts(app, out, {"audio.volume", "audio.frequency", "audio.bypass_filter"});
-    add_opts(app, rem, {"ec.audio.remaster", "ec.audio.bgm_vol", "ec.audio.sfx_vol", "ec.audio.dsp_reverb", "ec.audio.chip_blend", "ec.audio.hot_reload"});
+    add_opts(app, rem, {"ec.audio.remaster", "ec.audio.bgm_vol", "ec.audio.sfx_vol", "ec.audio.dsp_reverb", "ec.audio.hot_reload"});
+    if (app.cfg.get("ec.audio.remaster") == "ost") add_opts(app, rem, {"args.audio_chip_blend"});
     rem.rows[0].rebuild = false;
     {   // descricao do modo atual
         std::string m = app.cfg.get("ec.audio.remaster");
@@ -127,12 +128,12 @@ std::vector<Page> build_enhance(App& app) {
 
     // --- perfis de qualidade
     std::string active = active_profile_id(app.cfg);
-    prof.rows.push_back(info_row("Aplicam várias opções de uma vez; depois você pode ajustar tudo. O custo é uma estimativa."));
+    prof.rows.push_back(info_row("Aplicam várias opções de uma vez; depois você pode ajustar tudo. Custos medidos numa RTX 5060 Ti (ms por quadro)."));
     for (const Profile& pr : profiles()) {
         Row r;
         r.label = pr.label; r.arrows = false; r.rebuild = true;
         bool on = pr.id == active;
-        r.help = pr.summary + " Custo estimado: " + pr.cost + ".";
+        r.help = pr.summary + " Custo medido numa RTX 5060 Ti: " + pr.cost + " por quadro.";
         r.value = [pr, on](App&) { return pr.cost + (on ? "   ✓ ativo" : ""); };
         if (on) r.tint = Color::hex(0x6fe38a);
         std::string id = pr.id, label = pr.label;

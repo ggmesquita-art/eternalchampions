@@ -24,12 +24,23 @@ bool start_game(App& app, GameProcess& gp, std::string& err) {
     std::wstring cwd = app.root_dir.wstring();   // jogo resolve "assets/..." e "../assets/..." relativo ao cwd
     STARTUPINFOW si{}; si.cb = sizeof si;
     PROCESS_INFORMATION pi{};
+    // stdout/stderr do jogo -> build/logs/game_last.log (para conferir [BPLUS_GL], [SHADER], [EC-AUDIO]...)
+    fs::create_directories(app.logs_dir, ec);
+    SECURITY_ATTRIBUTES sa{sizeof sa, nullptr, TRUE};
+    HANDLE logh = CreateFileW((app.logs_dir / "game_last.log").c_str(), GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (logh != INVALID_HANDLE_VALUE) {
+        si.dwFlags |= STARTF_USESTDHANDLES;
+        si.hStdOutput = si.hStdError = logh;
+        si.hStdInput = nullptr;
+    }
     std::vector<wchar_t> buf(cmd.begin(), cmd.end()); buf.push_back(0);
-    if (!CreateProcessW(app.game_exe.c_str(), buf.data(), nullptr, nullptr, FALSE, 0, nullptr, cwd.c_str(), &si, &pi)) {
+    if (!CreateProcessW(app.game_exe.c_str(), buf.data(), nullptr, nullptr, logh != INVALID_HANDLE_VALUE, CREATE_NO_WINDOW * 0, nullptr, cwd.c_str(), &si, &pi)) {
+        if (logh != INVALID_HANDLE_VALUE) CloseHandle(logh);
         err = "CreateProcess falhou (erro " + std::to_string(GetLastError()) + ")";
         return false;
     }
     app.log("JOGAR cwd=" + path_to_utf8(app.root_dir) + " cmd=" + path_to_utf8(fs::path(cmd)) + " pid=" + std::to_string(pi.dwProcessId));
+    if (logh != INVALID_HANDLE_VALUE) CloseHandle(logh);
     app.load_slot_arg.clear();
     CloseHandle(pi.hThread);
     gp.handle = pi.hProcess;

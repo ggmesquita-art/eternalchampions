@@ -27,3 +27,5 @@ std::unique_ptr<Screen> make_audio_screen();
 std::unique_ptr<Screen> make_game_screen();
 std::unique_ptr<Screen> make_advanced_screen();
 std::unique_ptr<Screen> make_saves_screen();
+std::unique_ptr<Screen> make_controls_screen();
+void apply_controls_preset(App& app, int player, const std::string& id);   // classico|arcade|stick|teclado

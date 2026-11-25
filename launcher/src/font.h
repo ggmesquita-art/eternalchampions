@@ -29,7 +29,8 @@ public:
 
 std::unique_ptr<Font> make_system_font(Render& r, const wchar_t* face, int px, bool bold);
 
-// Stub (L5): carrega atlas PNG + charmap.json {"cell":[w,h],"chars":"..."|"map":{"A":[x,y,w,h,adv]}}.
+// Fonte pixel do jogo (bitmap_font.cpp): atlas PNG + font_menu.json do extrator ({"glyphs":{"A":{x,y,w,h}},"advance":8}); compoe acentos PT-BR.
+// smooth()==false: use scale inteiro, sem contorno (a fonte ja traz sombra).
 std::unique_ptr<Font> load_bitmap_font(Render& r, const std::string& png, const std::string& charmap_json);
 
 enum class Align { Left, Center, Right };

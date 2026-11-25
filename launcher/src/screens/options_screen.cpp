@@ -41,11 +41,14 @@ Row option_row(App& app, const Opt& o) {
     case OType::Int:
     case OType::Float:
         r.value = [po](App& a) {
-            double v = atof(a.cfg.get(*po).c_str());
+            std::string cv = a.cfg.get(*po);
+            if (cv.empty()) return std::string("Padrão");
+            double v = atof(cv.c_str());
             return fmt_num(v, po->type == OType::Int ? 0 : po->precision);
         };
         r.adjust = [po](App& a, int dir) {
-            double v = atof(a.cfg.get(*po).c_str()) + dir * po->step;
+            std::string cv = a.cfg.get(*po);
+            double v = (cv.empty() && !po->empty_start.empty()) ? atof(po->empty_start.c_str()) : atof(cv.c_str()) + dir * po->step;
             v = std::min(po->max, std::max(po->min, v));
             v = std::round(v / po->step) * po->step;
             a.cfg.set(*po, fmt_num(v, po->type == OType::Int ? 0 : std::max(po->precision, 2)));
@@ -201,7 +204,7 @@ public:
             float ty = y + (row_h_ - mf.line_height() * st.scale) * 0.5f;
             float lw = draw_text(rd, mf, rr.x + 34, ty, r.label, st);
             TextStyle bad = TextStyle::solid(Color::hex(0xf9d64a), 1, th.pal.text_outline); bad.scale = 0.78f;
-            if (mod) draw_text(rd, mf, rr.x + 10, ty, "●", bad);
+            if (mod) draw_text(rd, mf, rr.x + 12, ty, "•", bad);
             if (r.restart) draw_text(rd, mf, rr.x + 34 + lw + 10, ty, "↻", bad);
             TextStyle vs = st; vs.align = Align::Right;
             if (en && r.tint.a) { vs.top = vs.bottom = Color{r.tint.r, r.tint.g, r.tint.b, 255}; }

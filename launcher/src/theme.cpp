@@ -1,5 +1,8 @@
 #include "theme.h"
+#include "json.h"
+#include "png_io.h"
 #include <algorithm>
+#include <cstring>
 #include <cmath>
 #include <fstream>
 #include <sstream>
@@ -69,33 +72,86 @@ bool Theme::init(Render& r, const std::string& assets_dir) {
     gen_stone(r);
     gen_yinyang(r);
     gen_halo(r);
-    if (!assets_dir.empty()) load_manifest(r, assets_dir);
+    if (!assets_dir.empty()) load_art(r, assets_dir);
     return stone_ && yy_ && halo_;
 }
 
 void Theme::shutdown() {
-    for (SDL_Texture** t : {&stone_, &yy_, &halo_, &logo_png_, &splash_png_})
+    free_art();
+    for (SDL_Texture** t : {&stone_, &yy_, &halo_})
         if (*t) { SDL_DestroyTexture(*t); *t = nullptr; }
 }
 
-void Theme::load_manifest(Render& r, const std::string& dir) {
-    std::string j = read_text(dir + "/manifest.json");
-    if (j.empty()) return;
-    auto tex = [&](const char* key, int* w = nullptr, int* h = nullptr) -> SDL_Texture* {
-        std::string f = json_str(j, key);
-        return f.empty() ? nullptr : r.load_png_texture(dir + "/" + f, w, h);
+bool Theme::reload_art(Render& r, const std::string& dir) {
+    free_art();
+    if (!dir.empty()) load_art(r, dir);
+    return extracted_art;
+}
+
+void Theme::free_art() {
+    for (SDL_Texture** t : {&logo_png_, &splash_png_, &header_art_, &yy_art_[0], &yy_art_[1], &stone_art_})
+        if (*t) { SDL_DestroyTexture(*t); *t = nullptr; }
+    fonts.pixel.reset();
+    extracted_art = false;
+}
+
+void Theme::load_art(Render& r, const std::string& dir) {
+    JVal m;
+    if (!json_parse_file(dir + "/manifest.json", m) || (int)m.n("schema") != 1) return;
+    const JVal* files = m.get("files");
+    if (!files) return;
+    auto entry = [&](const char* key) -> const JVal* { return files->get(key); };
+    auto png4 = [&](const char* key, std::vector<uint8_t>& px, int& w, int& h) {
+        const JVal* e = entry(key);
+        if (!e) return false;
+        std::string f = e->s("file_4x", e->s("file"));
+        return !f.empty() && png_read_rgba(dir + "/" + f, px, w, h);
     };
-    if (SDL_Texture* t = tex("stone_tile", &stone_w_, &stone_h_)) { SDL_DestroyTexture(stone_); stone_ = t; extracted_art = true; }
-    if (SDL_Texture* t = tex("yinyang")) { SDL_DestroyTexture(yy_); yy_ = t; extracted_art = true; }
-    if (SDL_Texture* t = tex("logo", &logo_w_, &logo_h_)) { logo_png_ = t; extracted_art = true; }
-    if (SDL_Texture* t = tex("splash_bg")) { splash_png_ = t; extracted_art = true; }
-    std::string fp = json_str(j, "font_png"), fc = json_str(j, "font_charmap");
-    if (!fp.empty() && !fc.empty()) {
-        if (auto bf = load_bitmap_font(r, dir + "/" + fp, dir + "/" + fc)) {
-            fonts.menu = std::move(bf);  // L5: fonte pixel substitui a do sistema
-            extracted_art = true;
+    auto tex4 = [&](const char* key, int* w, int* h) -> SDL_Texture* {
+        std::vector<uint8_t> px; int iw = 0, ih = 0;
+        if (!png4(key, px, iw, ih)) return nullptr;
+        if (w) *w = iw;
+        if (h) *h = ih;
+        return r.make_texture(px.data(), iw, ih, true);
+    };
+    // pedra: bloco A | bloco B lado a lado (periodo de 2 blocos, texture_period_x do manifest)
+    {
+        std::vector<uint8_t> a, b; int aw = 0, ah = 0, bw = 0, bh = 0;
+        if (png4("stone_tile", a, aw, ah)) {
+            if (!png4("stone_tile_alt", b, bw, bh) || bw != aw || bh != ah) { b = a; bw = aw; bh = ah; }
+            std::vector<uint8_t> comp((size_t)aw * 2 * ah * 4);
+            for (int y = 0; y < ah; ++y) {
+                memcpy(&comp[(size_t)y * aw * 2 * 4], &a[(size_t)y * aw * 4], (size_t)aw * 4);
+                memcpy(&comp[((size_t)y * aw * 2 + aw) * 4], &b[(size_t)y * aw * 4], (size_t)aw * 4);
+            }
+            stone_art_ = r.make_texture(comp.data(), aw * 2, ah, false);
+            stone_art_w_ = aw * 2; stone_art_h_ = ah;
         }
     }
+    logo_png_ = tex4("logo", &logo_w_, &logo_h_);
+    header_art_ = tex4("header_main_menu", &header_w_, &header_h_);
+    yy_art_[0] = tex4("yinyang_00", nullptr, nullptr);
+    yy_art_[1] = tex4("yinyang_01", nullptr, nullptr);
+    for (SDL_Texture* t : yy_art_) if (t) SDL_SetTextureScaleMode(t, SDL_ScaleModeNearest);
+    {
+        std::vector<uint8_t> px; int w = 0, h = 0;
+        if (png4("title_splash", px, w, h)) {
+            splash_png_ = r.make_texture(px.data(), w, h, true);
+            splash_w_ = w; splash_h_ = h;
+            auto avg = [&](int y0, int y1) {
+                long sr = 0, sg = 0, sb = 0, n = 0;
+                for (int y = y0; y < y1; ++y) for (int x = 0; x < 6; ++x) { const uint8_t* p = &px[((size_t)y * w + x) * 4]; sr += p[0]; sg += p[1]; sb += p[2]; ++n; }
+                return Color{(uint8_t)(sr / n), (uint8_t)(sg / n), (uint8_t)(sb / n), 255};
+            };
+            splash_edge_top_ = avg(0, 40);
+            splash_edge_bot_ = avg(h - 40, h);
+        }
+    }
+    if (const JVal* fm = entry("font_menu")) {
+        std::string f = fm->s("file"), j = fm->s("json");
+        if (!f.empty() && !j.empty()) fonts.pixel = load_bitmap_font(r, dir + "/" + f, dir + "/" + j);
+    }
+    extracted_art = stone_art_ || logo_png_ || header_art_ || yy_art_[0] || splash_png_ || fonts.pixel;
 }
 
 void Theme::gen_stone(Render& r) {
@@ -189,14 +245,14 @@ void Theme::gen_halo(Render& r) {
 }
 
 void Theme::draw_stone_bg(Render& r, float t) {
-    r.tile(stone_, stone_w_, stone_h_, -t * 6.f, -t * 3.f, {0, 0, CANVAS_W, CANVAS_H});
+    if (stone_art_) r.tile(stone_art_, stone_art_w_, stone_art_h_, 0, 0, {0, 0, CANVAS_W, CANVAS_H});
+    else r.tile(stone_, stone_w_, stone_h_, -t * 6.f, -t * 3.f, {0, 0, CANVAS_W, CANVAS_H});
     // vinheta para dar foco ao conteudo
     r.fill_gradient_v({0, 0, CANVAS_W, 90}, Color::hex(0x08182a, 150), Color::hex(0x08182a, 0));
     r.fill_gradient_v({0, CANVAS_H - 110, CANVAS_W, 110}, Color::hex(0x08182a, 0), Color::hex(0x08182a, 170));
 }
 
 void Theme::draw_dusk_bg(Render& r, float t) {
-    if (splash_png_) { r.sprite(splash_png_, nullptr, {0, 0, CANVAS_W, CANVAS_H}); return; }
     r.fill_gradient_v({0, 0, CANVAS_W, CANVAS_H}, pal.dusk_top, pal.dusk_bottom);
     float pulse = 1.f + 0.03f * std::sin(t * 1.2f);
     float hw = 980 * pulse, hh = 760 * pulse;
@@ -205,6 +261,10 @@ void Theme::draw_dusk_bg(Render& r, float t) {
 }
 
 void Theme::draw_yinyang(Render& r, float cx, float cy, float size, double angle, uint8_t alpha) {
+    if (yy_art_[0] && yy_art_[1]) {   // arte do jogo: nao gira; alterna os 2 frames a cada 60 quadros
+        r.sprite(yy_art_[(int)std::floor(time) & 1], nullptr, {std::floor(cx - size / 2), std::floor(cy - size / 2), size, size}, 0, alpha);
+        return;
+    }
     r.sprite(yy_, nullptr, {cx - size / 2, cy - size / 2, size, size}, angle, alpha);
 }
 
@@ -250,4 +310,30 @@ float Theme::draw_logo(Render& r, float cx, float y, float scale) {
     s.scale = scale; s.align = Align::Center;
     draw_text(r, *fonts.logo, cx, y, "ETERNAL CHAMPIONS", s);
     return fonts.logo->line_height() * scale;
+}
+
+void Theme::draw_header_art(Render& r, float cx, float y, float scale) {
+    if (!header_art_) return;
+    float w = header_w_ * scale, h = header_h_ * scale;
+    r.sprite(header_art_, nullptr, {std::floor(cx - w / 2), y, w, h});
+}
+
+void Theme::draw_splash_art(Render& r) {
+    if (!splash_png_) return;
+    // cover 16:9 por altura (a arte e 4:3); nas laterais, o degrade roxo da propria borda da imagem
+    float h = CANVAS_H, w = splash_w_ * h / splash_h_;
+    float x = (CANVAS_W - w) / 2;
+    r.fill_gradient_v({0, 0, CANVAS_W, CANVAS_H}, splash_edge_top_, splash_edge_bot_);
+    r.sprite(splash_png_, nullptr, {x, 0, w, h});
+    const float f = 70;   // feather das bordas da imagem
+    auto strip = [&](float x0, float x1, bool left) {
+        Color t0 = splash_edge_top_, b0 = splash_edge_bot_;
+        Color tt = left ? t0 : t0.with_alpha(0), tb = left ? b0 : b0.with_alpha(0);
+        Color t1 = left ? t0.with_alpha(0) : t0, b1 = left ? b0.with_alpha(0) : b0;
+        SDL_Vertex v[4] = {{{x0, 0}, tt.sdl(), {0, 0}}, {{x1, 0}, t1.sdl(), {0, 0}}, {{x1, (float)CANVAS_H}, b1.sdl(), {0, 0}}, {{x0, (float)CANVAS_H}, tb.sdl(), {0, 0}}};
+        static const int idx[6] = {0, 1, 2, 0, 2, 3};
+        r.geometry(nullptr, v, 4, idx, 6);
+    };
+    strip(x, x + f, true);
+    strip(x + w - f, x + w, false);
 }

@@ -1,7 +1,9 @@
 #include "app.h"
 #include "sha256.h"
 #include <algorithm>
+#include <cstdio>
 #include <fstream>
+#include <shlobj.h>
 #include <windows.h>
 
 namespace fs = std::filesystem;
@@ -31,10 +33,17 @@ bool App::init(bool hidden, int win_w, int win_h) {
     fs::path parent = exe_dir.parent_path();
     root_dir = fs::exists(parent / "assets", ec) ? parent : exe_dir;
     game_exe = exe_dir / "EternalChampionsRecomp.exe";
-    settings_ini = exe_dir / "settings.ini";
+    settings_ini = ini_override.empty() ? exe_dir / "settings.ini" : utf8_to_path(ini_override);
     rom_cfg = exe_dir / "rom-EC.cfg";
     recent_file = exe_dir / "launcher_recent.txt";
     assets_dir = exe_dir / "ui_cache";
+    {   // arte extraida: %APPDATA%\EternalChampionsRecomp\ui (o extrator recebe --out explicito)
+        PWSTR roaming = nullptr;
+        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &roaming)) && roaming) {
+            assets_dir = fs::path(roaming) / "EternalChampionsRecomp" / "ui";
+            CoTaskMemFree(roaming);
+        }
+    }
     logs_dir = exe_dir / "logs";
 
     SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
@@ -44,6 +53,7 @@ bool App::init(bool hidden, int win_w, int win_h) {
     input.init();
     cfg.load(settings_ini);
     load_rom_state();
+    maybe_extract_art();
     return true;
 }
 
@@ -83,6 +93,7 @@ void App::apply_pending() {
 }
 
 void App::update(const InputState& in, float dt) {
+    poll_art(dt);
     if (toast_t_ > 0) toast_t_ -= dt;
     if (fade > 0) fade = std::max(0.f, fade - dt);
     if (!stack_.empty()) stack_.back()->update(*this, in, dt);
@@ -90,6 +101,7 @@ void App::update(const InputState& in, float dt) {
 }
 
 void App::draw() {
+    theme.time = time;
     size_t first = stack_.size();
     while (first > 0) {
         --first;
@@ -104,6 +116,16 @@ void App::draw() {
         render.line_rect(r, Color::hex(0xf9d64a), 2);
         TextStyle st = theme.help_style(); st.align = Align::Center;
         draw_text(render, f, CANVAS_W / 2.f, r.y + 8, toast_msg_, st);
+    }
+    if (art_state == ArtState::Running) {   // indicador discreto de progresso
+        const Font& f = *theme.fonts.help;
+        std::string msg = "Extraindo a arte do jogo da sua ROM…  " + art_progress.substr(0, 70);
+        float w = std::min(1100.f, f.measure(msg) + 80);
+        Rect r{20, CANVAS_H - 84, w, 36};
+        render.fill(r, Color::hex(0x07111f, 215));
+        render.line_rect(r, Color::hex(0x6aa9b0), 1);
+        theme.draw_yinyang(render, r.x + 20, r.y + 18, 24, time * 240.0);
+        draw_text(render, f, r.x + 42, r.y + 7, msg, theme.help_style());
     }
     if (fade > 0) render.fill({0, 0, CANVAS_W, CANVAS_H}, Color::hex(0x000000, (uint8_t)(255 * fade / 0.15f)));
 }
@@ -187,6 +209,5 @@ void App::log(const std::string& line) {
     SYSTEMTIME t; GetLocalTime(&t);
     char ts[40];
     snprintf(ts, sizeof ts, "%04d-%02d-%02d %02d:%02d:%02d ", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
-    f << ts << line << "
-";
+    f << ts << line << "\n";
 }

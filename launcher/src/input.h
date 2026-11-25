@@ -5,6 +5,12 @@
 
 enum Action { A_UP, A_DOWN, A_LEFT, A_RIGHT, A_ACCEPT, A_BACK, A_TABPREV, A_TABNEXT, A_HELP, A_RESET, A_START, A_COUNT };
 
+struct Capture {          // primeira entrada fisica nova neste frame (so quando capture_enabled)
+    int kind = 0;           // 0 nada, 1 tecla, 2 botao do controle, 3 eixo
+    int code = 0;           // scancode / SDL_CONTROLLER_BUTTON_* / SDL_CONTROLLER_AXIS_*
+    int dir = 0;            // eixo: -1/+1
+};
+
 struct InputState {
     bool pressed[A_COUNT] = {};   // disparo neste frame (inclui repeticao ao segurar p/ direcionais e abas)
     bool held[A_COUNT] = {};
@@ -18,6 +24,7 @@ struct InputState {
     bool quit = false;
     bool any_input = false;       // qualquer tecla/botao/clique neste frame
     bool using_pad = false;       // ultimo dispositivo usado foi controle
+    Capture cap;                  // captura de bind
     bool p(Action a) const { return pressed[a]; }
 };
 
@@ -31,6 +38,9 @@ public:
     int pad_count() const { return (int)pads_.size(); }
     const char* pad_name(int i) const;
     void inject(Action a) { inject_[a] = true; }   // uso interno/teste
+    SDL_GameController* pad(int i) const { return i >= 0 && i < (int)pads_.size() ? pads_[i] : nullptr; }
+    int pad_family(int i) const;                    // 0 Xbox/generico, 1 PlayStation, 2 Nintendo
+    bool capture_enabled = false;                   // ligar so durante a captura de bind
 
 private:
     void open_pad(int joy_index);
@@ -41,4 +51,7 @@ private:
     float hold_t_[A_COUNT] = {};
     bool prev_held_[A_COUNT] = {};
     bool last_pad_ = false;
+    unsigned char prev_keys_[SDL_NUM_SCANCODES] = {};
+    unsigned char prev_btn_[8][SDL_CONTROLLER_BUTTON_MAX] = {};
+    signed char prev_axis_[8][SDL_CONTROLLER_AXIS_MAX] = {};
 };

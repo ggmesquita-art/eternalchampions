@@ -5,6 +5,7 @@
 //                                    [--frames N] [--size WxH]
 // (renderiza a tela N frames a 60 fps simulados e grava o canvas 1280x720 em PNG, sem interacao)
 #include "app.h"
+#include "ini.h"
 #include "png_io.h"
 #include "screens/screens.h"
 #include <algorithm>
@@ -18,7 +19,10 @@ struct Args {
     std::string shot, screen = "main";
     int frames = 30, w = 1280, h = 720;
     bool autoplay = false;
-    std::string game_args;
+    std::string game_args, selftest_ini, apply_profile;
+    int tab = 0, focus = 0, state = 0;
+    std::string ini, controls_preset;
+    bool dev = false;
 };
 
 static Args parse_args(int argc, char** argv) {
@@ -28,6 +32,14 @@ static Args parse_args(int argc, char** argv) {
         if (!strcmp(argv[i], "--shot")) a.shot = next();
         else if (!strcmp(argv[i], "--screen")) a.screen = next();
         else if (!strcmp(argv[i], "--autoplay")) a.autoplay = true;
+        else if (!strcmp(argv[i], "--selftest-ini")) a.selftest_ini = next();
+        else if (!strcmp(argv[i], "--apply-profile")) a.apply_profile = next();
+        else if (!strcmp(argv[i], "--tab")) a.tab = atoi(next());
+        else if (!strcmp(argv[i], "--focus")) a.focus = atoi(next());
+        else if (!strcmp(argv[i], "--dev")) a.dev = true;
+        else if (!strcmp(argv[i], "--state")) a.state = atoi(next());
+        else if (!strcmp(argv[i], "--ini")) a.ini = next();
+        else if (!strcmp(argv[i], "--apply-controls-preset")) a.controls_preset = next();
         else if (!strcmp(argv[i], "--game-args")) a.game_args = next();
         else if (!strcmp(argv[i], "--frames")) a.frames = std::max(1, atoi(next()));
         else if (!strcmp(argv[i], "--size")) {
@@ -43,14 +55,25 @@ static std::unique_ptr<Screen> make_named(const std::string& n, App& app) {
     if (n == "about") return make_about_screen();
     if (n == "placeholder") return make_placeholder("V\xC3\x8D""DEO");
     if (n == "rom") return make_rom_screen();
+    if (n == "controls") return make_controls_screen();
+    if (n == "video") return make_video_screen();
+    if (n == "enh") return make_enhance_screen();
+    if (n == "audio") return make_audio_screen();
+    if (n == "game") return make_game_screen();
+    if (n == "saves") return make_saves_screen();
+    if (n == "adv") return make_advanced_screen();
+    if (n == "confirm") return make_confirm("RESTAURAR PADRÕES", "Voltar todas as opções de Vídeo aos valores padrão? Isso não pode ser desfeito.", "Restaurar", nullptr);
     (void)app;
     return make_main_menu();
 }
 
 static int run_shot(App& app, const Args& a) {
     app.shot_mode = true;
+    if (!a.controls_preset.empty()) apply_controls_preset(app, 0, a.controls_preset);   // (use --ini p/ nao tocar no settings.ini real)
     // pilha: para rom/about/placeholder, o menu fica por baixo (como na navegacao real)
-    if (a.screen == "rom" || a.screen == "about" || a.screen == "placeholder") app.push(make_main_menu());
+    app.shot_page = a.tab; app.shot_focus = a.focus; app.shot_state = a.state; app.dev_visible = a.dev;
+    if (a.screen != "splash" && a.screen != "main") app.push(make_main_menu());
+    if (a.screen == "confirm") app.push(make_video_screen());
     app.push(make_named(a.screen, app));
     app.apply_pending();
     InputState idle;
@@ -71,6 +94,11 @@ static int run_shot(App& app, const Args& a) {
 }
 
 static int run_interactive(App& app, const Args& a) {
+    if (!a.apply_profile.empty()) {
+        bool ok = apply_profile(app.cfg, a.apply_profile);
+        app.log(std::string("--apply-profile ") + a.apply_profile + (ok ? " ok" : " DESCONHECIDO"));
+    }
+    if (!a.controls_preset.empty()) { apply_controls_preset(app, 0, a.controls_preset); app.log("--apply-controls-preset " + a.controls_preset); }
     app.autoplay = a.autoplay;
     app.extra_game_args = a.game_args;
     app.push(a.autoplay ? make_main_menu() : make_splash());
@@ -106,8 +134,10 @@ static int run_interactive(App& app, const Args& a) {
 
 int main(int argc, char** argv) {
     Args a = parse_args(argc, argv);
+    if (!a.selftest_ini.empty()) return ini_selftest(a.selftest_ini);
     bool shot = !a.shot.empty();
     App app;
+    app.ini_override = a.ini;
     if (!app.init(shot, shot ? a.w : 1280, shot ? a.h : 720)) {
         fprintf(stderr, "Falha ao iniciar o launcher: %s\n", SDL_GetError());
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Eternal Champions", "Falha ao iniciar o launcher (SDL).", nullptr);

@@ -14,6 +14,18 @@ public:
     void draw(App& app) override {
         Render& r = app.render;
         Theme& th = app.theme;
+        if (th.has_splash_art()) {   // arte do jogo: title_splash em cover 16:9, logo ja faz parte da imagem
+            th.draw_splash_art(r);
+            float blink = 0.5f + 0.5f * std::sin(app.time * 5.f);
+            if (th.fonts.pixel) {
+                TextStyle ps = TextStyle::solid(Color::hex(0xffe63a));
+                ps.scale = 5; ps.align = Align::Center; ps.alpha = (uint8_t)(60 + 195 * blink);
+                draw_text(r, *th.fonts.pixel, CANVAS_W / 2.f, 640, "PRESS START", ps);
+            }
+            TextStyle hs = TextStyle::solid(Color::hex(0xf3ecff), 1, Color::hex(0x2a1f5e));
+            draw_text(r, *th.fonts.help, 14, CANVAS_H - 30, "v" EC_LAUNCHER_VERSION, hs);
+            return;
+        }
         th.draw_dusk_bg(r, app.time);
         // emblema yin-yang grande, translucido, girando devagar atras do logo
         th.draw_yinyang(r, CANVAS_W / 2.f, 330, 520, app.time * 6.0, 46);

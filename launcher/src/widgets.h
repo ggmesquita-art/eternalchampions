@@ -19,6 +19,7 @@ public:
     Align align = Align::Center;
     int visible_rows = 99;       // com mais itens que isso, rola
     float text_scale = 1.f;
+    int pixel_scale = 4;         // escala inteira da fonte pixel do jogo (quando ha arte extraida)
     bool yinyang_cursor = true;
 
     void set_focus(int i);                       // pula itens desabilitados

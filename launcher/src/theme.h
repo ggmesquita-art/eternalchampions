@@ -1,13 +1,9 @@
 // Tema visual (PLAN §3): paleta, fundo de pedra procedural, yin-yang, paineis, splash.
 //
-// Substituicao por arte extraida (L5): Theme::init(assets_dir) procura `assets_dir/manifest.json`
-// com chaves de string -> PNG relativo ao diretorio:
-//   "stone_tile"  : bloco/mosaico de pedra (substitui o procedural; repete em mosaico)
-//   "yinyang"     : yin-yang (quadrado, gira)
-//   "logo"        : logo do jogo (substitui o texto provisorio do splash/menu)
-//   "splash_bg"   : arte de abertura (cobre o canvas 1280x720)
-//   "font_png" + "font_charmap" : fonte pixel (load_bitmap_font) -> substitui Fonts::menu/help
-// Qualquer chave ausente/ilegivel mantem o procedural.
+// Arte extraida da ROM (L5): Theme::init/reload_art leem `assets_dir/manifest.json` (schema 1 do
+// tools/launcher/extract_ui_assets.py): files.<chave>.file_4x (stone_tile, stone_tile_alt, logo,
+// header_main_menu, title_splash, yinyang_00/01) e font_menu {file,json}. Qualquer item ausente/ilegivel
+// mantem o procedural correspondente; has_art() diz se ha arte carregada.
 #pragma once
 #include "font.h"
 #include "render.h"
@@ -31,12 +27,18 @@ struct Fonts {
     std::unique_ptr<Font> title;   // cabecalho ("MAIN MENU")
     std::unique_ptr<Font> menu;    // itens
     std::unique_ptr<Font> help;    // ajuda/rodape
+    std::unique_ptr<Font> pixel;   // fonte pixel do jogo (arte extraida) - null no tema procedural
 };
 
 class Theme {
 public:
     ~Theme() { shutdown(); }
     bool init(Render& r, const std::string& assets_dir);
+    bool reload_art(Render& r, const std::string& assets_dir);   // descarta e recarrega a arte extraida
+    bool has_art() const { return extracted_art; }
+    bool has_header_art() const { return header_art_ != nullptr; }
+    bool has_splash_art() const { return splash_png_ != nullptr; }
+    float time = 0;                      // segundos (animacao do cursor: troca de frame a cada 60 quadros)
     void shutdown();
 
     Palette pal;
@@ -50,6 +52,8 @@ public:
     void draw_yinyang(Render& r, float cx, float cy, float size, double angle_deg, uint8_t alpha = 255);
     void draw_panel(Render& r, const Rect& rc, float darken = 0.6f);  // moldura de pedra escura
     float draw_logo(Render& r, float cx, float y, float scale = 1.f);  // logo provisorio (texto) ou PNG; retorna altura
+    void draw_header_art(Render& r, float cx, float y, float scale);   // "MAIN MENU" original (so com arte)
+    void draw_splash_art(Render& r);                                   // title_splash em cover 16:9 com laterais roxas
     TextStyle gold_style(float scale = 1.f) const;
     TextStyle item_style(bool focused, bool enabled) const;
     TextStyle help_style() const;
@@ -58,11 +62,15 @@ private:
     void gen_stone(Render& r);
     void gen_yinyang(Render& r);
     void gen_halo(Render& r);
-    void load_manifest(Render& r, const std::string& dir);
+    void load_art(Render& r, const std::string& dir);
+    void free_art();
 
     SDL_Texture* stone_ = nullptr; int stone_w_ = 0, stone_h_ = 0;
     SDL_Texture* yy_ = nullptr;
     SDL_Texture* halo_ = nullptr;
     SDL_Texture* logo_png_ = nullptr; int logo_w_ = 0, logo_h_ = 0;
-    SDL_Texture* splash_png_ = nullptr;
+    SDL_Texture* splash_png_ = nullptr; int splash_w_ = 0, splash_h_ = 0; Color splash_edge_top_, splash_edge_bot_;
+    SDL_Texture* header_art_ = nullptr; int header_w_ = 0, header_h_ = 0;
+    SDL_Texture* yy_art_[2] = {nullptr, nullptr};
+    SDL_Texture* stone_art_ = nullptr; int stone_art_w_ = 0, stone_art_h_ = 0;
 };

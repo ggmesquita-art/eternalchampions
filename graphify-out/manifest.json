@@ -750,9 +750,9 @@
     "semantic_hash": ""
   },
   "launcher/src/app.cpp": {
-    "mtime": 1795589137.3397877,
-    "seen": 1795589267.23835,
-    "ast_hash": "4c195bd743d89eb611ad02c9569a966c",
+    "mtime": 1795589334.7848394,
+    "seen": 1795589463.7984207,
+    "ast_hash": "287f03abfddc28b8dd55f8ab340f4942",
     "semantic_hash": ""
   },
   "launcher/src/app.h": {
@@ -762,9 +762,9 @@
     "semantic_hash": ""
   },
   "launcher/src/font.cpp": {
-    "mtime": 1795588543.9740007,
-    "seen": 1795588782.7508342,
-    "ast_hash": "89d978573faf322ed9f87a5d4b44b609",
+    "mtime": 1795589375.2810328,
+    "seen": 1795589463.7984245,
+    "ast_hash": "f32060f1b99a5bc83cfa7fede4ed1b7d",
     "semantic_hash": ""
   },
   "launcher/src/font.h": {
@@ -786,9 +786,9 @@
     "semantic_hash": ""
   },
   "launcher/src/launch.cpp": {
-    "mtime": 1795589148.8553178,
-    "seen": 1795589267.2383661,
-    "ast_hash": "78a733d547a0342ce25f802c22e33447",
+    "mtime": 1795589411.7796733,
+    "seen": 1795589463.7984364,
+    "ast_hash": "ee99458bd212db46e62990f5f9792460",
     "semantic_hash": ""
   },
   "launcher/src/launch.h": {
@@ -798,9 +798,9 @@
     "semantic_hash": ""
   },
   "launcher/src/main.cpp": {
-    "mtime": 1795588753.6355996,
-    "seen": 1795588782.750851,
-    "ast_hash": "572d201a08877a0dbcc7690fe94f2089",
+    "mtime": 1795589304.8628287,
+    "seen": 1795589463.7984402,
+    "ast_hash": "5a100b64540eedc77e9894bb34b80cf7",
     "semantic_hash": ""
   },
   "launcher/src/png_io.cpp": {
@@ -840,9 +840,9 @@
     "semantic_hash": ""
   },
   "launcher/src/screens/main_menu.cpp": {
-    "mtime": 1795588802.7671874,
-    "seen": 1795588822.6006365,
-    "ast_hash": "a25d048dbef8e0b71b95333d1ddf80c9",
+    "mtime": 1795589304.812892,
+    "seen": 1795589463.7984629,
+    "ast_hash": "925a6a6051e8bc8faee23b42f454a720",
     "semantic_hash": ""
   },
   "launcher/src/screens/placeholder.cpp": {
@@ -912,9 +912,9 @@
     "semantic_hash": ""
   },
   "launcher/CMakeLists.txt": {
-    "mtime": 1795588255.9467635,
-    "seen": 1795588782.7512634,
-    "ast_hash": "4b878b82bf975a192324407b2d90c7df",
+    "mtime": 1795589304.810892,
+    "seen": 1795589463.798688,
+    "ast_hash": "3ae2f6c7957a5c99ee96e5cc549deb28",
     "semantic_hash": ""
   },
   "launcher/remaster/tests/ref_catalog.py": {
@@ -966,9 +966,9 @@
     "semantic_hash": ""
   },
   "launcher/src/screens/options_screen.cpp": {
-    "mtime": 1795589230.2916875,
-    "seen": 1795589267.2383938,
-    "ast_hash": "f8e33feecd9d6658dd0d641ac57d880a",
+    "mtime": 1795589375.2810328,
+    "seen": 1795589463.798465,
+    "ast_hash": "5d4926a33587e774f0eb24add8f9540f",
     "semantic_hash": ""
   },
   "launcher/src/screens/options_screen.h": {
@@ -987,6 +987,42 @@
     "mtime": 1795589109.5246644,
     "seen": 1795589267.238411,
     "ast_hash": "886afdea7de2a4824b410023e8b94120",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/catalog.h": {
+    "mtime": 1795589461.5920851,
+    "seen": 1795589463.7984097,
+    "ast_hash": "96736a5f3057b87cf60ead86d7840341",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/voices_header.inc": {
+    "mtime": 1795589422.1506748,
+    "seen": 1795589463.798415,
+    "ast_hash": "e2bb346bf8b3fd9f382163571543d2fe",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/voices_toml.cpp": {
+    "mtime": 1795589422.1516702,
+    "seen": 1795589463.7984169,
+    "ast_hash": "87c8764d9f8ec98a4ffb91e196e4c47c",
+    "semantic_hash": ""
+  },
+  "launcher/remaster/voices_toml.h": {
+    "mtime": 1795589337.8541386,
+    "seen": 1795589463.7984188,
+    "ast_hash": "6aff6374634aa120f060c984b428a74a",
+    "semantic_hash": ""
+  },
+  "launcher/src/screens/saves.cpp": {
+    "mtime": 1795589304.8118935,
+    "seen": 1795589463.7984726,
+    "ast_hash": "2bd84a1ada7becdb57cd2364d2be798e",
+    "semantic_hash": ""
+  },
+  "launcher/src/screens/settings_screens.cpp": {
+    "mtime": 1795589262.2472427,
+    "seen": 1795589463.7984762,
+    "ast_hash": "bc046857f0d32e4c43efe8a6aefa657a",
     "semantic_hash": ""
   },
   "package-lock.json": {

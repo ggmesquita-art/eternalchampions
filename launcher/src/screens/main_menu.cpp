@@ -17,13 +17,13 @@ enum Id { ID_PLAY, ID_ROM, ID_VIDEO, ID_ENH, ID_AUDIO, ID_STUDIO, ID_CONTROLS, I
 
 class MainMenu : public Screen {
 public:
-    void on_enter(App&) override {
+    void on_enter(App& app) override {
         const struct { const char* label; int id; } its[] = {
             {"JOGAR", ID_PLAY}, {"ROM", ID_ROM}, {"VÍDEO", ID_VIDEO}, {"APRIMORAMENTO", ID_ENH},
             {"ÁUDIO", ID_AUDIO}, {"ESTÚDIO DE REMASTER", ID_STUDIO}, {"CONTROLES", ID_CONTROLS},
             {"JOGO", ID_GAME}, {"SAVES", ID_SAVES}, {"AVANÇADO", ID_ADV}, {"SOBRE", ID_ABOUT}, {"SAIR", ID_QUIT}};
         for (auto& i : its) menu_.items.push_back({i.label, true, i.id});
-        menu_.y = 160; menu_.row_h = 35; menu_.x = CANVAS_W / 2.f;
+        menu_.y = app.theme.has_header_art() ? 158.f : 160.f; menu_.row_h = app.theme.has_header_art() ? 34.f : 35.f; menu_.x = CANVAS_W / 2.f;
         menu_.set_focus(0);
     }
     void update(App& app, const InputState& in, float) override {
@@ -34,6 +34,13 @@ public:
         switch (it.id) {
         case ID_PLAY: request_play(app); break;
         case ID_ROM: app.push(make_rom_screen()); break;
+        case ID_VIDEO: app.push(make_video_screen()); break;
+        case ID_ENH: app.push(make_enhance_screen()); break;
+        case ID_AUDIO: app.push(make_audio_screen()); break;
+        case ID_GAME: app.push(make_game_screen()); break;
+        case ID_CONTROLS: app.push(make_controls_screen()); break;
+        case ID_SAVES: app.push(make_saves_screen()); break;
+        case ID_ADV: app.push(make_advanced_screen()); break;
         case ID_ABOUT: app.push(make_about_screen()); break;
         case ID_QUIT: app.quit = true; break;
         default: app.push(make_placeholder(it.label)); break;
@@ -43,8 +50,13 @@ public:
         Render& r = app.render;
         Theme& th = app.theme;
         th.draw_stone_bg(r, app.time);
-        th.draw_logo(r, CANVAS_W / 2.f, 4, 0.72f);
-        draw_header(app, "MAIN MENU", CANVAS_W / 2.f, 76, 0.85f);
+        if (th.has_header_art()) {   // arte do jogo: logo e "MAIN MENU" originais
+            th.draw_logo(r, CANVAS_W / 2.f, 2, 0.5f);
+            th.draw_header_art(r, CANVAS_W / 2.f, 108, 0.8f);
+        } else {
+            th.draw_logo(r, CANVAS_W / 2.f, 4, 0.72f);
+            draw_header(app, "MAIN MENU", CANVAS_W / 2.f, 76, 0.85f);
+        }
         menu_.draw(app);
         // rodape: ROM atual + SHA
         Rect p{250, 590, 780, 80};

@@ -55,6 +55,8 @@ public:
     float time = 0;                      // segundos desde o inicio (em shot: frame/60)
     bool quit = false;
     bool shot_mode = false;
+    int shot_state = 0;                  // --state: 1 = captura de bind aberta, 2 = editor de combo (so em shot)
+    std::string ini_override;            // --ini: usa outro settings.ini (testes/capturas)
     int shot_page = 0, shot_focus = 0;   // --tab / --focus (so no modo de captura)
     bool game_running = false;
     // teste automatizado: --autoplay (JOGAR ao abrir; sai ao fim do jogo gravando launcher_autoplay.txt) e
@@ -84,6 +86,14 @@ public:
     // log do launcher (build/logs/launcher.log), com data/hora
     void log(const std::string& line);
 
+    // ---- extracao da arte da ROM (tools/launcher/extract_ui_assets.py) em segundo plano
+    enum class ArtState { Idle, Running, Done, Failed, NoPython, NoScript };
+    ArtState art_state = ArtState::Idle;
+    std::string art_progress;            // ultima linha do log do extrator
+    bool art_manifest_current() const;   // manifest.json com o SHA da ROM atual e extractor_version conhecido
+    void maybe_extract_art();            // dispara se a ROM e valida e a arte falta/esta velha (nada em shot)
+    std::string art_status() const;      // texto para o SOBRE
+
     // toast
     void toast(const std::string& msg, float secs = 3.f) { toast_msg_ = msg; toast_t_ = secs; }
 
@@ -95,6 +105,8 @@ private:
     std::vector<std::unique_ptr<Screen>> stack_;
     std::vector<Pending> pending_;
     std::string toast_msg_; float toast_t_ = 0;
+    void* art_proc_ = nullptr; float art_poll_t_ = 0;
+    void poll_art(float dt);
     void scan_roms();
     void save_recents();
 };

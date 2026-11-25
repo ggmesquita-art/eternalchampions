@@ -52,7 +52,7 @@ public:
         std::vector<char32_t> cps;
         for (char32_t c = 32; c < 127; ++c) cps.push_back(c);
         for (char32_t c = 160; c < 256; ++c) cps.push_back(c);
-        const char32_t extra[] = {0x2026, 0x2022, 0x25C4, 0x25BA, 0x25CF, 0x2713, 0x2717, 0x21BB, 0x2190, 0x2191, 0x2192, 0x2193, 0x2014, 0x2013, 0x25B2, 0x25BC};
+        const char32_t extra[] = {0x2026, 0x2022, 0x25C4, 0x25BA, 0x25CF, 0x2713, 0x2717, 0x21BB, 0x2190, 0x2191, 0x2192, 0x2193, 0x2014, 0x2013, 0x25B2, 0x25BC, 0x26A0, 0x2248};
         for (char32_t c : extra) cps.push_back(c);
 
         auto mk = [&](const wchar_t* f) {
@@ -129,14 +129,6 @@ std::unique_ptr<Font> make_system_font(Render& r, const wchar_t* face, int px, b
     auto f = std::make_unique<SystemFont>();
     if (!f->build(r, face, px, bold)) return nullptr;
     return f;
-}
-
-// L5: fonte pixel da ROM. Contrato previsto:
-//   png         : atlas RGBA (glifos brancos, alpha = cobertura), texturizado SEM filtro linear
-//   charmap.json: {"line_height":8,"glyphs":{"A":[x,y,w,h,xoff,yoff,adv], ...}} (chaves = caractere UTF-8)
-// Devolve um Font com smooth()==false; draw_text deve receber scale inteiro.
-std::unique_ptr<Font> load_bitmap_font(Render&, const std::string&, const std::string&) {
-    return nullptr;  // stub ate a L5
 }
 
 // ---------------------------------------------------------------------------

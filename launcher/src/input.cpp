@@ -133,4 +133,34 @@ void Input::poll(Render& r, float dt) {
         prev_held_[a] = held[a];
     }
     st_.using_pad = last_pad_;
+
+    // ---- captura de bind: primeira entrada fisica nova (tecla / botao / eixo) ----
+    st_.cap = Capture{};
+    for (int sc = 1; sc < SDL_NUM_SCANCODES; ++sc) {
+        unsigned char now = k[sc];
+        if (capture_enabled && now && !prev_keys_[sc] && !st_.cap.kind) { st_.cap.kind = 1; st_.cap.code = sc; }
+        prev_keys_[sc] = now;
+    }
+    for (size_t i = 0; i < pads_.size() && i < 8; ++i) {
+        for (int b = 0; b < SDL_CONTROLLER_BUTTON_MAX; ++b) {
+            unsigned char now = SDL_GameControllerGetButton(pads_[i], (SDL_GameControllerButton)b) ? 1 : 0;
+            if (capture_enabled && now && !prev_btn_[i][b] && !st_.cap.kind) { st_.cap.kind = 2; st_.cap.code = b; }
+            prev_btn_[i][b] = now;
+        }
+        for (int a = 0; a < SDL_CONTROLLER_AXIS_MAX; ++a) {
+            float v = SDL_GameControllerGetAxis(pads_[i], (SDL_GameControllerAxis)a) / 32767.f;
+            signed char now = v > 0.6f ? 1 : (v < -0.6f ? -1 : 0);
+            if (capture_enabled && now && prev_axis_[i][a] != now && !st_.cap.kind) { st_.cap.kind = 3; st_.cap.code = a; st_.cap.dir = now; }
+            prev_axis_[i][a] = now;
+        }
+    }
+}
+
+int Input::pad_family(int i) const {
+    if (i < 0 || i >= (int)pads_.size()) return 0;
+    switch (SDL_GameControllerGetType(pads_[i])) {
+    case SDL_CONTROLLER_TYPE_PS3: case SDL_CONTROLLER_TYPE_PS4: case SDL_CONTROLLER_TYPE_PS5: return 1;
+    case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_PRO: return 2;
+    default: return 0;
+    }
 }

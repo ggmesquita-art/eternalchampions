@@ -113,8 +113,10 @@ std::vector<Opt> build() {
         o.dep_id = "ec.audio.remaster"; o.dep_val = "!off"; v.push_back(o);
     }
     {
-        Opt o = flt("ec.audio", "chip_blend", "audio", "Mistura do chip", "0.65", 0, 1, 0.05, "Quanto do chip original se mistura ao SoundFont (0 a 1). No modo ost, o perfil de cada faixa define o valor (chip_blend_ost).");
-        o.dep_id = "ec.audio.remaster"; o.dep_val = "!off"; v.push_back(o);
+        Opt o = cli("audio_chip_blend", "--audio-chip-blend", "audio", "Mistura do chip (modo OST)", OType::Float, "", "Quanto do chip original se mistura ao SoundFont no modo OST (0 a 1). Vazio = valor do perfil da faixa (padrão 0,18). Só vale em ost; vai por argumento (--audio-chip-blend).");
+        o.min = 0; o.max = 1; o.step = 0.05; o.precision = 2; o.empty_start = "0.18";
+        o.dep_id = "ec.audio.remaster"; o.dep_val = "ost";
+        v.push_back(o);
     }
     v.push_back(boolean("ec.audio", "hot_reload", "audio", "Recarregar mapeamento ao vivo", true, "Recarrega voices.toml e os perfis quando mudam em disco (útil no Estúdio de Remaster)."));
     {
@@ -217,7 +219,7 @@ std::vector<std::string> Config::build_args() const {
     for (const Opt& o : schema()) {
         if (o.section != "launcher.args") continue;
         std::string v = get(o);
-        if (near_eq(v, o.def)) continue;
+        if (near_eq(v, o.def) || !enabled(o)) continue;
         if (o.type == OType::Bool) { if (v == "1") a.push_back(o.cli_flag); }
         else if (!v.empty()) { a.push_back(o.cli_flag); a.push_back(v); }
     }
@@ -276,13 +278,13 @@ std::vector<Choice> Config::choices(const Opt& o, const App& app) const {
 // ---------------------------------------------------------------------------
 const std::vector<Profile>& profiles() {
     static const std::vector<Profile> p = {
-        {"original", "Original", "Sem aprimoramentos: o jogo como no Mega Drive.", "≈ 0 ms/quadro",
+        {"original", "Original", "Sem aprimoramentos: o jogo como no Mega Drive.", "≈ 0 ms",
          {{"ec.bplus.enabled", "0"}, {"ec.video.shader_preset", "off"}, {"ec.hd.mode", "off"}, {"ec.audio.remaster", "off"}}},
-        {"remaster_leve", "Remaster Leve", "B+ v3 fast, shader de nitidez e áudio híbrido.", "≈ 5–9 ms/quadro (est.)",
+        {"remaster_leve", "Remaster Leve", "B+ v3 fast (1,9 ms em 4:3 / 2,9 ms em widescreen) + shader remaster-crisp (≤ 0,1 ms) + áudio híbrido.", "≈ 2–3 ms",
          {{"ec.bplus.enabled", "1"}, {"ec.bplus.model", "v3_fast"}, {"ec.bplus.dedither", "both"}, {"ec.video.shader_preset", "remaster-crisp"}, {"ec.hd.mode", "off"}, {"ec.audio.remaster", "hybrid"}}},
-        {"remaster_maximo", "Remaster Máximo", "B+ v3 HQ, Modo C (planos), shader HQ e áudio híbrido.", "≈ 12–18 ms/quadro (est.)",
+        {"remaster_maximo", "Remaster Máximo", "B+ v3 HQ (4,0 ms em 4:3 / 6,3 ms em widescreen) + Modo C (desprezível) + shader remaster-hq (≤ 0,1 ms) + áudio híbrido.", "≈ 4–7 ms",
          {{"ec.bplus.enabled", "1"}, {"ec.bplus.model", "v3_hq"}, {"ec.bplus.dedither", "both"}, {"ec.video.shader_preset", "remaster-hq"}, {"ec.hd.manifest", "animesharp"}, {"ec.hd.mode", "planes"}, {"ec.audio.remaster", "hybrid"}}},
-        {"sem_neural", "Sem neural (GPU fraca)", "Sem B+; só o shader scalefx leve e áudio DSP.", "≈ 1–2 ms/quadro (est.)",
+        {"sem_neural", "Sem neural (GPU fraca)", "Sem B+: só o shader lite-scalefx (≈ 0,1–0,2 ms) e áudio DSP.", "≈ 0,2 ms",
          {{"ec.bplus.enabled", "0"}, {"ec.video.shader_preset", "lite-scalefx"}, {"ec.hd.mode", "off"}, {"ec.audio.remaster", "dsp"}}},
     };
     return p;
