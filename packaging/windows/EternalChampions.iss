@@ -76,6 +76,14 @@ Filename: "{app}\EternalChampions.exe"; WorkingDir: "{app}"; Description: "{cm:L
 ; a copia da ROM e o apontador para ela; settings.ini e saves ficam (dados do usuario)
 Type: files; Name: "{app}\roms\eternal_champions_us.gen"
 Type: files; Name: "{app}\rom-EC.cfg"
+; logs e arquivos de diagnostico gerados pelo runner ao rodar
+Type: filesandordirs; Name: "{app}\logs"
+Type: files; Name: "{app}\dispatch_misses.toml"
+Type: files; Name: "{app}\floor_coverage.toml"
+Type: files; Name: "{app}\floor_unsafe.toml"
+Type: files; Name: "{app}\interior_label_misses.toml"
+Type: files; Name: "{app}\launcher_autoplay.txt"
+Type: dirifempty; Name: "{app}"
 
 [Code]
 var
