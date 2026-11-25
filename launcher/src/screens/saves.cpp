@@ -2,6 +2,7 @@
 // .thumb = "GTHUMB1\0" (8 bytes) + 128*90 pixels uint32 (0xAARRGGBB); .bin = savestate do slot.
 #include "../launch.h"
 #include "../platform.h"
+#include "../sha256.h"
 #include "../widgets.h"
 #include "screens.h"
 #include <cstdio>
@@ -150,6 +151,36 @@ private:
         menu_open_ = true;
     }
 
+    // Savestate valido: cabecalho "ECRB2sav" do runner, mesmo tamanho dos saves existentes e nao e a ROM
+    std::string validate_import(App& app, const std::string& path) {
+        std::error_code ec;
+        fs::path fp = utf8_to_path(path);
+        if (!fs::is_regular_file(fp, ec)) return "arquivo ilegível";
+        uintmax_t sz = fs::file_size(fp, ec);
+        std::ifstream f(fp, std::ios::binary);
+        char magic[8] = {};
+        f.read(magic, 8);
+        if (!f || memcmp(magic, "ECRB2sav", 8) != 0) return "não é um savestate do jogo (cabeçalho ECRB2sav ausente)";
+        uintmax_t want = 0;
+        for (int i = 1; i <= 9 && !want; ++i) if (fs::is_regular_file(bin(app, i), ec)) want = fs::file_size(bin(app, i), ec);
+        if (want && sz != want) return "tamanho diferente dos savestates existentes (" + std::to_string(sz) + " x " + std::to_string(want) + " bytes)";
+        std::string sha = sha256_file_hex(fp);
+        if (sha == EC_US_ROM_SHA256 || (!app.rom_sha.empty() && sha == app.rom_sha)) return "o arquivo é a ROM, não um savestate";
+        return "";
+    }
+    void do_import(App& app, int slot, const std::string& path) {
+        std::error_code ec;
+        if (fs::is_regular_file(bin(app, slot), ec)) {
+            fs::path bk = bin(app, slot); bk += L".bak";
+            fs::copy_file(bin(app, slot), bk, fs::copy_options::overwrite_existing, ec);
+            if (ec) { app.toast("Falha ao criar o .bak do slot atual; importação cancelada."); return; }
+        }
+        fs::copy_file(utf8_to_path(path), bin(app, slot), fs::copy_options::overwrite_existing, ec);
+        fs::remove(thumb(app, slot), ec);   // miniatura antiga nao vale para o novo estado
+        app.toast(ec ? "Falha ao importar." : "Importado para o slot " + std::to_string(slot) + ".");
+        refresh(app);
+    }
+
     void update_menu(App& app, const InputState& in) {
         if (in.p(A_BACK) || in.mouse_right_click) { menu_open_ = false; return; }
         int a = menu_.update(app, in);
@@ -175,11 +206,12 @@ private:
             menu_open_ = false;
             std::string p = pick_open_file(app, L"Importar savestate", L"Savestate (*.bin)\0*.bin\0Todos (*.*)\0*.*\0", app.exe_dir);
             if (!p.empty()) {
-                std::error_code ec;
-                fs::copy_file(utf8_to_path(p), bin(app, slot), fs::copy_options::overwrite_existing, ec);
-                fs::remove(thumb(app, slot), ec);   // miniatura antiga nao vale para o novo estado
-                app.toast(ec ? "Falha ao importar." : "Importado para o slot " + std::to_string(slot) + ".");
-                refresh(app);
+                std::string why = validate_import(app, p);
+                if (!why.empty()) { app.toast("Importação recusada: " + why, 5.f); break; }
+                if (slots_[sel_].exists)
+                    app.push(make_confirm("SUBSTITUIR SLOT " + std::to_string(slot), "O slot " + std::to_string(slot) + " já tem um savestate. Substituir? O atual vira native_save_" + std::to_string(slot) + ".bin.bak.", "Substituir",
+                                          [slot, p, this](App& ap) { do_import(ap, slot, p); }));
+                else do_import(app, slot, p);
             }
             break;
         }

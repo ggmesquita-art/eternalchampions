@@ -39,7 +39,7 @@ Com uma ROM válida e sem arte atual, o launcher roda em segundo plano `tools\la
 
 | Arquivo / pasta | Conteúdo |
 |---|---|
-| `build\settings.ini` | O mesmo `settings.ini` do jogo (ver §6). O launcher preserva comentários, ordem e chaves que não conhece; valores iguais ao padrão são removidos do arquivo. Também grava `[launcher] skip_launcher = 1`. |
+| `build\settings.ini` | O mesmo `settings.ini` do jogo (ver §6). O launcher preserva comentários, ordem, BOM UTF-8 e chaves que não conhece; valores iguais ao padrão são removidos do arquivo; valores com ` ;`, ` #` ou espaços nas pontas são gravados entre aspas. Gravação atômica por `settings.ini.launcher.tmp` (o runner usa `settings.ini.tmp`). Se o runner regravar o arquivo enquanto o launcher está aberto, o launcher recarrega e reaplica **só** as chaves que ele mudou. Na primeira gravação da sessão ele guarda `settings.ini.bak` (estado anterior). Falha de gravação aparece como aviso na tela. Também grava `[launcher] skip_launcher = 1` (se não conseguir, JOGAR segue com `--no-launcher`). |
 | `build\rom-EC.cfg` | ROM padrão (caminho absoluto). |
 | `build\launcher_recent.txt` | ROMs recentes. |
 | `build\logs\launcher.log` | Log do launcher (ROM, perfis aplicados, comando de JOGAR). |
@@ -71,7 +71,7 @@ Nas telas de opções cada linha mostra a ajuda na parte de baixo, "•" marca v
 | Taxa de apresentação (off / 120 / 144 / do monitor) | `[video] presentation_rate` (0 / 120 / 144 / -1) |
 | Widescreen e proporção (fit, 16:9, 21:9, 32:9) | `[mods.widescreen] enabled`, `aspect` |
 | Widescreen por argumento (vence o ini; `stage` e `W:H` livre só editando o ini) | `[launcher.args] widescreen` → `--widescreen` |
-| Desentrelaçamento (auto / bob / weave) | `[launcher.args] interlace` → `--interlace-display` |
+| Exibição entrelaçada (padrão do jogo / TV / Raw) | `[launcher.args] interlace` → `--interlace-display tv|raw` (o runner só aceita `tv` e `raw`; `auto`, `bob` e `weave` não existem). Valor inválido no ini aparece como "Padrão". |
 
 ### 3.2 Aprimoramento
 
@@ -89,7 +89,7 @@ Cinco abas.
 - **B+ neural:** `[ec.bplus] enabled`, `model` (lista só os pesos presentes em `assets\models`: v3 fast, v3 HQ, v3 HQ JaNai, v2 Flux, v1 ESPCN), `backend` (auto / cuda / gl), `dedither` (off / cbod / both), `intensity` (0–4), `budget_ms` (0–33; 0 = sem limite). Avisos na própria tela: modelos v2/v3 pedem `both`; o backend CUDA não suporta de-dither nem intensidade diferente de 1,0.
 - **Modo C:** `[ec.hd] manifest` (Nenhum / AnimeSharp se existir `pipeline\manifest.json` / Flux se existir `pipeline\manifest_flux.json`) e `mode` (off / planes / all).
 - **Shader:** `[ec.video] shader_preset` (off + os `.glslp` de `assets\shaders\presets`, ou "Escolher .glslp…" para um preset do RetroArch) e um slider por `#pragma parameter` do preset, gravados em `[ec.video] shader_params` (`NOME=valor,...`). Trocar de preset limpa os parâmetros.
-- **Pré-visualizar:** "Gerar pré-visualização" roda o jogo por alguns segundos (≈ 10–25 s) até a **tela de abertura**, com as opções atuais, e mostra lado a lado o quadro nativo 320×224 e o resultado (rótulo: shader, B+ ou shader + B+). O resultado fica em cache enquanto as opções (e a ROM) não mudarem; se mudarem, o painel avisa "desatualizada". Precisa de ROM válida e de uma janela OpenGL (o jogo abre uma janela rápida). A captura usa `EC_SHADER_CAPTURE` e `EC_BPLUS_CAPTURE` (ver [`CONFIGURATION_AND_CLI.md`](CONFIGURATION_AND_CLI.md) §2.3).
+- **Pré-visualizar:** "Gerar pré-visualização" roda o jogo por alguns segundos (≈ 10–25 s; **timeout de 90 s**, e a linha **Cancelar pré-visualização** encerra o jogo antes disso) até a **tela de abertura**, com as opções atuais, e mostra lado a lado o quadro nativo 320×224 e o resultado (rótulo: shader, B+ ou shader + B+). O resultado fica em cache (só vale com `_orig.png`, `_enh.png` e `_kind.txt` completos; as capturas são gravadas em `.tmp` e renomeadas) enquanto as opções, a ROM, o exe do jogo, os pesos do modelo, o `.glslp` e seus shaders não mudarem; se mudarem, o painel avisa "desatualizada". Precisa de ROM válida e de uma janela OpenGL (o jogo abre uma janela rápida). A captura usa `EC_SHADER_CAPTURE` e `EC_BPLUS_CAPTURE` (ver [`CONFIGURATION_AND_CLI.md`](CONFIGURATION_AND_CLI.md) §2.3).
 
 ### 3.3 Áudio
 
@@ -127,18 +127,18 @@ Ver §4.
 Grade 3×3 dos slots 1–9 com miniatura, data/hora e tamanho de `native_save_N.bin`. Enter abre as ações do slot:
 
 - **Jogar a partir deste slot:** inicia o jogo com `--load-slot N` (uso único).
-- **Exportar… / Importar…** um savestate `.bin` (importar apaga a miniatura antiga do slot).
+- **Exportar… / Importar…** um savestate `.bin`. A importação valida o arquivo (cabeçalho `ECRB2sav`, mesmo tamanho dos saves existentes e que não seja a ROM), pede confirmação se o slot já estiver ocupado e move o save atual para `native_save_N.bin.bak`; a miniatura antiga é apagada.
 - **Apagar** (com confirmação).
 
 ### 3.8 Avançado
 
-- **Execução:** cadência de quadros (`--pacing`: padrão / sync / uncapped / fiber / accurate) e FPS alvo (`--target-fps`: padrão, 30, 50, 75, 90, 120), ambos em `[launcher.args]`; widescreen legado do VDP (`[video] widescreen`, `widescreen_cells`).
+- **Execução:** cadência de quadros (`--pacing`: padrão / fiber / accurate; o runner só aceita `fiber` e `accurate`, o padrão compilado é `accurate`) e FPS alvo (`--target-fps`: padrão, 30, 50, 75, 90, 120), ambos em `[launcher.args]`; widescreen legado do VDP (`[video] widescreen`, `widescreen_cells`).
 - **Desenvolvedor** (oculto até ligar "Mostrar opções de desenvolvedor"): porta de debug TCP (`--port`), descartar evidências (`--fresh-evidence`), log de yields (`--yield-log`) e gravar áudio (`--wav <arquivo>`).
 - **Arquivos e padrões:** abrir `settings.ini`, abrir a pasta de logs e "Restaurar" por aba (Vídeo, Aprimoramento, Áudio, Jogo, Avançado) ou **TUDO**, sempre com confirmação. Controles e chaves desconhecidas do ini não são tocados.
 
 ### 3.9 Sobre
 
-Versão do launcher, aviso de que a ROM não é distribuída, licenças de terceiros (SDL2, libpng/zlib, TinySoundFont, shaders libretro) e o estado do tema (arte extraída ou procedural, §2.2).
+Versão do launcher (`1.0.0`) e do jogo (`git describe` gerado a cada build; "desconhecida" sem git), aviso de que a ROM não é distribuída, licenças de terceiros (SDL2, libpng/zlib, TinySoundFont, shaders libretro) e o estado do tema (arte extraída ou procedural, §2.2).
 
 ---
 
@@ -206,7 +206,7 @@ Edita o mapeamento dos **52 instrumentos FM** do jogo (e dos canais PSG/ruído/D
 1. **Primeira vez:** exige ROM válida e o SoundFont (ver §3.3). Sem os dumps em cache, a tela oferece "extrair agora": o launcher roda o jogo headless nas 17 músicas, ≈ 40 s cada, **≈ 12 min no total**, em segundo plano, com barra de progresso e cancelamento (Esc). Os dados vão para `%APPDATA%\EternalChampionsRecomp\remaster_cache`.
 2. **Editar:** a lista mostra os instrumentos da música atual (LB/RB troca de música) e os canais; o painel à direita edita nome, modo (GM / percussão / chip original / off), programa GM, banco, transposição, volume (dB), nota de bateria, solo e mudo, mostra o patch FM (algoritmo/feedback) e a sugestão automática. **Escopo:** "Global" (vale para todas as músicas que usam o instrumento; a tela avisa em quantas) ou "Só nesta música" (override no perfil da faixa). **BIBLIOTECA** lista todos os instrumentos do jogo, com "Ouvir em contexto".
 3. **Ouvir:** a prévia **B (remaster)** é sintetizada em tempo real com TinySoundFont e o SoundFont TimGM6mb (ou o configurado). A **A (original)** é capturada uma vez por música: o jogo roda headless com `--audio-remaster off --wav <tmp>` e o áudio fica só em RAM (≈ 1 min, em segundo plano). A/B toca do mesmo ponto e a troca é instantânea (crossfade de 20 ms).
-4. **Salvar:** grava `voices.toml` e o perfil da faixa de forma atômica, preservando comentários, ordem e `[voices.<hash>.meta]`, e mantém um `.bak` do arquivo anterior. **Desfazer/Refazer** valem na sessão; "Restaurar do disco" reverte o instrumento. Sair com alterações pede confirmação.
+4. **Salvar:** grava `voices.toml` e o perfil da faixa de forma atômica, preservando comentários, ordem e `[voices.<hash>.meta]`. O `.bak` guarda o estado de **antes da sessão** (criado só no primeiro salvamento de cada arquivo). Trocar de música (LB/RB) salva antes o perfil pendente; se `<slug>.toml` não existe, ele é criado na primeira edição "só nesta música" a partir de `default.toml` (que nunca é alterado). O Estúdio usa `ec.audio.voices` e `ec.audio.profiles_dir` do ini quando definidos (mesma regra do jogo). Extrair dumps, capturar o original e testar no jogo exigem ROM válida. **Desfazer/Refazer** valem na sessão; "Restaurar do disco" reverte o instrumento. Sair com alterações pede confirmação.
 5. **TESTAR NO JOGO:** salva e abre o jogo no Music Test, na música atual, com `--audio-remaster hybrid --audio-voices ... --audio-profiles-dir ...`. Com `[ec.audio] hot_reload = 1`, edições seguintes são ouvidas sem reiniciar.
 
 ### 5.2 Atalhos
@@ -262,14 +262,15 @@ Servem para automação e capturas; não aparecem na interface. Lista conforme `
 | `--tab <N>` / `--focus <N>` | Aba e linha focada nas telas de opções, Controles e Estúdio (só em `--shot`). |
 | `--state <N>` | Estado da captura: em Controles, 1 = captura de bind aberta e 2 = editor de combo; no Estúdio, estados de teste (editor, patch FM, captura do original, extração, barra). |
 | `--dev` | Mostra as opções de desenvolvedor do Avançado. |
-| `--ini <arquivo>` | Usa outro `settings.ini` (não toca o real). Use junto com as flags de aplicar. |
+| `--ini <arquivo>` | Usa outro `settings.ini` (não toca o real). |
+| `--real-ini` | Opt-in explícito: deixa `--apply-profile` / `--apply-controls-preset` / `--run-preview` gravarem no `settings.ini` **real**. Sem `--ini` nem `--real-ini`, essas flags operam numa cópia temporária que é apagada ao sair. |
 | `--apply-profile <id>` | Aplica um perfil de Aprimoramento: `original`, `remaster_leve`, `remaster_maximo`, `sem_neural`. |
 | `--apply-controls-preset <id>` | Aplica um preset de controles ao P1: `classico`, `arcade`, `stick`, `teclado`. |
 | `--run-preview` | (com `--shot`) roda de verdade a pré-visualização do Aprimoramento e espera; imprime `preview: OK/FALHOU`. |
 | `--autoplay` | Pula a abertura e clica em JOGAR ao abrir; ao fim da partida grava `launcher_autoplay.txt` (`exit_code=N`) ao lado do exe e sai. |
 | `--game-args "<args>"` | Argumentos extras repassados ao jogo (ex.: `--max-frames 120`). |
-| `--selftest-ini <settings.ini>` | Testa o leitor/gravador do ini (carregar→salvar sem mudanças = idêntico, edição preserva o resto) em uma cópia `.selftest`; imprime PASS/FAIL e `RESULT OK/FAIL`. |
-| `--selftest-studio` | Teste do núcleo do Estúdio sem janela (dumps + voices.toml + SoundFont, prévia com energia, A/B, salvar numa cópia com `.bak`, `voices.toml` real intacto). Usa `--root`, `--dumps`, `--out`. |
+| `--selftest-ini <settings.ini>` | Testa o leitor/gravador do ini (carregar→salvar sem mudanças = idêntico, edição preserva o resto, aspas, BOM, mudança concorrente do runner, `.bak` só na primeira gravação, lote) em uma cópia `.selftest`; imprime PASS/FAIL e `RESULT OK/FAIL`. |
+| `--selftest-studio` | Teste do núcleo do Estúdio sem janela (dumps + voices.toml + SoundFont, prévia com energia, A/B, salvar numa cópia com `.bak`, `voices.toml` real intacto). Inclui clamp de áudio (`volume_db` absurdo), troca de música com perfil pendente e perfil novo a partir de `default.toml`. Usa `--root`, `--dumps`, `--out` (diretório **novo ou vazio**; nunca é apagado). |
 | `--root <pasta>` / `--dumps <pasta>` / `--voices <arquivo>` / `--out <pasta>` | Raiz do projeto, dumps prontos, cópia do `voices.toml` e pasta de saída para os testes e capturas do Estúdio. |
 
 Exemplos:
@@ -288,7 +289,5 @@ build\EternalChampions.exe --autoplay --game-args "--max-frames 120"
 - **QA em andamento (fase L7):** revisão independente, teste em 1080p/1440p/4K e checklist de acessibilidade ainda não concluídos.
 - A navegação **por controle físico** (Xbox, PlayStation etc.) não foi testada de ponta a ponta; o caminho por teclado e mouse é o mais exercitado.
 - O preset **Stick de luta** é aproximado (mapeia os botões do SDL, não o layout físico de cada stick); os rótulos de **Nintendo** também são aproximados.
-- O botão "Abrir o Estúdio de Remaster" da aba ÁUDIO › Arquivos ainda abre uma tela de "em construção"; use **ESTÚDIO DE REMASTER** no menu principal.
 - A pré-visualização do Aprimoramento mostra só a tela de abertura, não uma luta.
 - O Estúdio não reproduz chip/EQ na prévia e captura ≈ 40 s por música (§5.3).
-- A versão exibida (`0.1.0 (L1)`) ainda não foi atualizada.

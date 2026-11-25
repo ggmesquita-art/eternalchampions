@@ -1,5 +1,11 @@
 #include "screens.h"
 #include "../widgets.h"
+#if __has_include("launcher_version.h")
+#include "launcher_version.h"
+#endif
+#ifndef EC_GAME_VERSION
+#define EC_GAME_VERSION "desconhecida"
+#endif
 
 namespace {
 class About : public Screen {
@@ -21,7 +27,7 @@ public:
         draw_text(r, *th.fonts.menu, x, y, "Eternal Champions Recomp \xE2\x80\x94 Launcher", head);
         y += 42;
         const char* lines[] = {
-            "Vers\xC3\xA3o " EC_LAUNCHER_VERSION,
+            "Launcher " EC_LAUNCHER_VERSION "  \xC2\xB7  jogo " EC_GAME_VERSION,
             "Port nativo recompilado de Eternal Champions (Mega Drive). Este projeto n\xC3\xA3o distribui a ROM:",
             "voc\xC3\xAA fornece a sua (vers\xC3\xA3o US, validada por SHA-256).",
             "",

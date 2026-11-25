@@ -83,7 +83,8 @@ void App::shutdown() {
     theme.fonts = Fonts{};
     render.shutdown();
     SDL_Quit();
-    if (job_) { CloseHandle((HANDLE)job_); job_ = nullptr; }   // fecha o job: mata qualquer filho remanescente
+    // job_ NAO e fechado aqui: com KILL_ON_JOB_CLOSE isso mataria o proprio launcher (membro do job) antes de main() terminar;
+    // o SO fecha o handle na saida do processo e encerra qualquer filho remanescente.
 }
 
 // ---- pilha de telas ---------------------------------------------------------

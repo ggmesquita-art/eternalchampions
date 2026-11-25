@@ -14,7 +14,7 @@
 | L5 — Arte extraída | feita |
 | L6 — Pré-visualização | feita |
 | L6b — Estúdio de Remaster | feita |
-| L7 — QA e docs | **pendente**: `docs/LAUNCHER.md` escrito; revisão independente, teste em 1080p/1440p/4K e checklist de acessibilidade em andamento |
+| L7 — QA e docs | **concluída** (código, revisão e docs): `docs/LAUNCHER.md`; 14 achados da revisão independente corrigidos; autotestes e harness OK. QA manual aberta: 1080p/1440p/4K com controles físicos e checklist de acessibilidade |
 
 ---
 

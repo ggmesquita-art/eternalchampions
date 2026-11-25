@@ -16,6 +16,7 @@
 #include <cstring>
 #include <filesystem>
 #include <string>
+#include <windows.h>
 
 struct Args {
     std::string shot, screen = "main";
@@ -24,7 +25,7 @@ struct Args {
     std::string game_args, selftest_ini, apply_profile;
     int tab = 0, focus = 0, state = 0;
     std::string ini, controls_preset, dumps, voices, root, out;
-    bool selftest_studio = false, run_preview = false;
+    bool selftest_studio = false, run_preview = false, real_ini = false;
     bool dev = false;
 };
 
@@ -41,6 +42,7 @@ static Args parse_args(int argc, char** argv) {
         else if (!strcmp(argv[i], "--focus")) a.focus = atoi(next());
         else if (!strcmp(argv[i], "--dev")) a.dev = true;
         else if (!strcmp(argv[i], "--run-preview")) a.run_preview = true;
+        else if (!strcmp(argv[i], "--real-ini")) a.real_ini = true;   // opt-in explicito: flags de teste gravam no settings.ini REAL
         else if (!strcmp(argv[i], "--selftest-studio")) a.selftest_studio = true;
         else if (!strcmp(argv[i], "--dumps")) a.dumps = next();
         else if (!strcmp(argv[i], "--voices")) a.voices = next();
@@ -187,6 +189,19 @@ int main(int argc, char** argv) {
     bool shot = !a.shot.empty();
     App app;
     app.ini_override = a.ini;
+    app.shot_mode = shot;   // antes do init: a extracao da arte nao dispara em capturas
+    // flags de teste que gravam no ini (--apply-profile / --apply-controls-preset / --run-preview): sempre numa COPIA
+    // temporaria do settings.ini, nunca no real (a menos que se passe --ini <arq> ou --real-ini explicitamente)
+    std::filesystem::path temp_ini;
+    if ((!a.apply_profile.empty() || !a.controls_preset.empty() || a.run_preview) && a.ini.empty() && !a.real_ini) {
+        wchar_t exe[MAX_PATH * 2];
+        DWORD n = GetModuleFileNameW(nullptr, exe, (DWORD)(sizeof exe / sizeof exe[0]));
+        std::error_code ec;
+        std::filesystem::path real = std::filesystem::path(std::wstring(exe, n)).parent_path() / "settings.ini";
+        temp_ini = std::filesystem::temp_directory_path(ec) / ("ec_launcher_test_" + std::to_string((unsigned long long)GetTickCount64()) + ".ini");
+        if (std::filesystem::exists(real, ec)) std::filesystem::copy_file(real, temp_ini, std::filesystem::copy_options::overwrite_existing, ec);
+        app.ini_override = path_to_utf8(temp_ini);
+    }
     app.studio_dumps = a.dumps; app.studio_voices = a.voices;
     if (!app.init(shot, shot ? a.w : 1280, shot ? a.h : 720)) {
         fprintf(stderr, "Falha ao iniciar o launcher: %s\n", SDL_GetError());
@@ -195,5 +210,10 @@ int main(int argc, char** argv) {
     }
     int rc = shot ? run_shot(app, a) : run_interactive(app, a);
     app.shutdown();
+    if (!temp_ini.empty()) {   // copia de teste: nada fica para tras
+        std::error_code ec;
+        std::filesystem::remove(temp_ini, ec);
+        std::filesystem::remove(temp_ini.string() + ".bak", ec);
+    }
     return rc;
 }

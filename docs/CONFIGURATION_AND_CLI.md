@@ -83,8 +83,8 @@ A precedência de configuração segue rigorosamente a regra: **Flags de Linha d
 | Flag | Argumentos | Descrição |
 |---|---|---|
 | `--widescreen` | `<off \| fit \| stage \| W:H>` | Configura a apresentação widescreen. Ex.: `--widescreen 16:9`, `--widescreen 21:9`, `--widescreen 32:9`, `--widescreen fit` (adaptativo à janela) ou `--widescreen off` (proporção clássica 4:3). |
-| `--interlace-display` | `<auto \| bob \| weave>` | Define o método de desentrelacamento em modos de vídeo entrelaçados do VDP: `auto` seleciona o melhor método, `bob` prioriza atualização rápida e `weave` prioriza detalhe estático. |
-| `--pacing` | `<sync \| uncapped \| fiber \| accurate>` | Controla o limitador de cadência de quadros do host: `sync` sincroniza na taxa alvo (60 Hz NTSC), `uncapped` desliga espera, `accurate` usa temporizador de alta precisão. |
+| `--interlace-display` | `<tv \| raw>` | Como o runner mostra quadros entrelaçados do VDP. `tv` (padrão; aliases `original`, `squash`) comprime os campos como numa TV, mantendo a altura original; `raw` (aliases `full`, `expanded`) mostra o quadro expandido completo. Qualquer outro valor imprime `unknown interlace_display=... (use tv\|raw)` e usa `tv`. |
+| `--pacing` | `<fiber \| accurate>` | Modo de cadência do host (o runner só aceita estes dois; outro valor imprime `[pacing] unknown mode ... using compiled default`). `fiber` (FIBER_FULL): a fibra do jogo roda até o VBlank a cada quadro do host em velocidade total (quadros pesados podem disparar o VBlank mais de uma vez); `accurate` (CYCLE_ACCURATE, padrão compilado): a fibra é limitada ao orçamento de ciclos de um quadro NTSC (127.856), com exatamente um VBlank por quadro do host. |
 | `--target-fps` | `<float>` | Força uma taxa de quadros alvo arbitrária (ex.: `--target-fps 59.94` ou `--target-fps 120.0`). |
 
 ### 3.3 Upscale Neural B+ e Modo C (Substituição HD)

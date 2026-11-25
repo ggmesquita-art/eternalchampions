@@ -1,0 +1,23 @@
+# Gera launcher_version.h com a versao do jogo (git describe) a cada build; fallback "desconhecida" sem git/repo.
+# Uso: cmake -DSRC=<raiz do repo> -DOUT=<launcher_version.h> -P gen_version.cmake
+find_program(EC_GIT git HINTS "C:/Program Files/Git/cmd" "C:/Program Files (x86)/Git/cmd")
+set(V "")
+if(EC_GIT)
+    execute_process(COMMAND "${EC_GIT}" -C "${SRC}" describe --tags --always --dirty
+        OUTPUT_VARIABLE V OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET RESULT_VARIABLE R)
+    if(NOT R EQUAL 0)
+        set(V "")
+    endif()
+endif()
+if(V STREQUAL "")
+    set(V "desconhecida")
+endif()
+set(NEW "#pragma once\n#define EC_GAME_VERSION \"${V}\"\n")
+if(EXISTS "${OUT}")
+    file(READ "${OUT}" OLD)
+else()
+    set(OLD "")
+endif()
+if(NOT OLD STREQUAL NEW)
+    file(WRITE "${OUT}" "${NEW}")
+endif()

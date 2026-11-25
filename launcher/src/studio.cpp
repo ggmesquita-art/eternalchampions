@@ -588,6 +588,27 @@ int studio_selftest(const std::string& root_s, const std::string& dumps_s, const
         pf.load((out / "profiles" / (std::string(bi->slug) + ".toml")).u8string(), &err);
         const ecr::VoiceOverride* ov = pf.find_override(first);
         check(ov && std::fabs(ov->edit.volume_db + 6.0) < 0.01, "perfil da faixa (copia) com [voices.<hash>] relido");
+
+        // trocar de musica salva o perfil pendente; perfil inexistente nasce de default.toml SEM tocar nele
+        {
+            const ecr::BgmInfo* b4 = ecr::bgm_by_id(4);   // 02_salem_xavier
+            fs::path np = out / "profiles" / (std::string(b4->slug) + ".toml");
+            fs::remove(np, ec);
+            const uint64_t def_before = file_sig(out / "profiles" / "default.toml");
+            check(st.select_song(4), "select_song(4) com perfil inexistente (default.toml como molde)");
+            std::string first4;
+            for (auto& m : st.maps()) if (m.is_voice) { first4 = m.key; break; }
+            ecr::VoiceEdit e4 = st.effective_edit(first4); e4.volume_db = -3.0;
+            st.edit_voice(first4, e4, VoiceScope::Song);
+            check(!fs::exists(np, ec) && st.dirty(), "edicao por musica pendente; <slug>.toml ainda nao gravado");
+            check(st.select_song(8), "trocar de musica com perfil sujo");
+            ecr::ProfileFile np4;
+            std::string e5;
+            bool rd = np4.load(np.u8string(), &e5);
+            const ecr::VoiceOverride* o4 = rd ? np4.find_override(first4) : nullptr;
+            check(rd && np4.track().bgm_id == 4 && o4 && std::fabs(o4->edit.volume_db + 3.0) < 0.01, "<slug>.toml criado na troca, com bgm_id=4 e o override");
+            check(file_sig(out / "profiles" / "default.toml") == def_before, "default.toml NAO foi alterado");
+        }
     }
     // o arquivo real nao foi tocado
     check(file_sig(real_voices) == sig_before, "voices.toml REAL intacto (assinatura igual)");

@@ -45,7 +45,14 @@ add_executable(EternalChampions WIN32
     src/screens/studio_screen.cpp
     src/screens/fm_view.cpp
 )
-target_include_directories(EternalChampions PRIVATE src)
+# versao do jogo (git describe) gerada a cada build em launcher_gen/launcher_version.h
+set(EC_VER_DIR ${CMAKE_BINARY_DIR}/launcher_gen)
+add_custom_target(launcher_version
+    COMMAND ${CMAKE_COMMAND} -DSRC=${CMAKE_CURRENT_SOURCE_DIR}/.. -DOUT=${EC_VER_DIR}/launcher_version.h -P ${CMAKE_CURRENT_SOURCE_DIR}/gen_version.cmake
+    BYPRODUCTS ${EC_VER_DIR}/launcher_version.h
+    COMMENT "launcher_version.h")
+add_dependencies(EternalChampions launcher_version)
+target_include_directories(EternalChampions PRIVATE src ${EC_VER_DIR})
 target_compile_features(EternalChampions PRIVATE cxx_std_17)
 target_compile_definitions(EternalChampions PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 if(MSVC)

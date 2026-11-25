@@ -143,15 +143,21 @@ PCfg load_pcfg(App& a, int p) {
     return c;
 }
 
-void put(App& a, int p, const std::string& key, const std::string& val) { a.cfg.ini().set(sec(p), key, val); a.cfg.ini().save(); }
-void del(App& a, int p, const std::string& key) { a.cfg.ini().remove(sec(p), key); a.cfg.ini().save(); }
+// escrita: remove tambem as variantes de caixa (autofire.x x autofire.X: o runner le sem distinguir caixa em autofire)
+void put(App& a, int p, const std::string& key, const std::string& val) { a.cfg.ini().remove_variants(sec(p), key); a.cfg.ini().set(sec(p), key, val); a.cfg.save(); }
+void del(App& a, int p, const std::string& key) { a.cfg.ini().remove(sec(p), key); a.cfg.ini().remove_variants(sec(p), key); a.cfg.save(); }
+struct Batch {   // varias alteracoes, um unico save() (falha vira toast)
+    App& a;
+    explicit Batch(App& app) : a(app) { a.cfg.begin_batch(); }
+    ~Batch() { a.cfg.end_batch(); }
+};
 void put_key(App& a, int p, int b, int sc) { put(a, p, std::string("key.") + kBtn[b], std::to_string(sc)); }
 void put_pad(App& a, int p, int b, const Bind& bd) { put(a, p, std::string("pad.") + kBtn[b], fmt_bind(bd)); }
 void put_combo(App& a, int p, int k, const Combo& c) {
     if (!c.dest) del(a, p, "combo." + std::to_string(k + 1)); else put(a, p, "combo." + std::to_string(k + 1), fmt_combo(c));
 }
 bool hotkeys_on(App& a) { std::string v; return !a.cfg.ini().get("input", "pad_hotkeys", v) || atoi(v.c_str()) != 0; }
-void set_hotkeys(App& a, bool on) { a.cfg.ini().set("input", "pad_hotkeys", on ? "1" : "0"); a.cfg.ini().save(); }
+void set_hotkeys(App& a, bool on) { a.cfg.ini().set("input", "pad_hotkeys", on ? "1" : "0"); a.cfg.save(); }
 
 // ------------------------------------------------------------------ nomes
 const char* kXboxBtn[] = {"A", "B", "X", "Y", "Back", "Guide", "Start", "L3", "R3", "LB", "RB", "D-pad ↑", "D-pad ↓", "D-pad ←", "D-pad →"};
@@ -213,6 +219,7 @@ bool uses_hotkey_buttons(const PCfg& c) {
 }
 
 void apply_preset_cfg(App& a, int p, const std::string& id) {
+    Batch batch(a);   // um unico save() para o preset inteiro
     PCfg c = defaults(p == 0 || p == 1 ? 0 : p);
     PCfg base = defaults(p);
     c.device = base.device;

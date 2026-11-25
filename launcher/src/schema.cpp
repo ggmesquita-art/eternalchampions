@@ -140,7 +140,7 @@ std::vector<Opt> build() {
     v.push_back(boolean("mods.diagnostics", "enabled", "game", "Diagnóstico de replay", true, "Grava dados de diagnóstico para reproduzir e analisar partidas."));
 
     // ================= AVANÇADO =================
-    v.push_back(cli("pacing", "--pacing", "adv", "Cadência de quadros", OType::Enum, "", "Cadência do host. fiber: o jogo roda numa fibra com o quadro completo por vez; accurate: sincroniza por ciclos exatos do 68000. Padrão: o compilado no jogo (accurate)."));
+    v.push_back(cli("pacing", "--pacing", "adv", "Cadência de quadros", OType::Enum, "", "Cadência do host. fiber: o jogo roda a toda velocidade até o VBlank a cada quadro do host (quadros pesados podem disparar mais de um VBlank); accurate: limita ao orçamento de ciclos de um quadro NTSC (exatamente um VBlank por quadro). Padrão: accurate."));
     v.back().choices = {{"", "Padrão do jogo"}, {"fiber", "fiber"}, {"accurate", "accurate (ciclos exatos)"}};
     v.push_back(cli("target_fps", "--target-fps", "adv", "FPS alvo", OType::Enum, "0", "Sobrescreve a taxa de quadros alvo (acelera ou desacelera o jogo)."));
     v.back().choices = {{"0", "Padrão (60)"}, {"30", "30"}, {"50", "50"}, {"75", "75"}, {"90", "90"}, {"120", "120"}};

@@ -39,7 +39,7 @@ private:
     std::string msg_;
     float elapsed_ = 0;
     std::thread th_;
-    std::atomic<bool> done_{false}, cancel_{false};
+    std::atomic<bool> done_{false}, cancel_{false}, timed_out_{false};
     std::atomic<int> rc_{0};
     std::string pending_key_, shown_key_, enh_kind_;
     SDL_Texture* orig_ = nullptr;

@@ -72,8 +72,8 @@ std::vector<Page> build_audio(App& app) {
         r.activate = [](App&) {};
         files.rows.push_back(r);
         files.rows.push_back(header_row("Estúdio de Remaster"));
-        files.rows.push_back(action_row("Abrir o Estúdio de Remaster", "Mapeia os instrumentos FM do jogo para o SoundFont, com prévia e A/B. Em construção.",
-                                        [](App& a) { a.push(make_placeholder("ESTÚDIO DE REMASTER")); }));
+        files.rows.push_back(action_row("Abrir o Estúdio de Remaster", "Mapeia os instrumentos FM do jogo para o SoundFont, com prévia, A/B com o original e Testar no jogo.",
+                                        [](App& a) { a.push(make_studio_screen()); }));
     }
     return {out, rem, files};
 }
@@ -235,6 +235,12 @@ std::vector<Page> build_enhance(App& app) {
         Row st; st.label = "Estado"; st.arrows = false; st.value = [](App& a) { return a.preview.message().empty() ? std::string("—") : a.preview.message(); };
         st.activate = [](App&) {};
         pv.rows.push_back(st);
+        {   // Cancelar enquanto roda (o jogo e encerrado); timeout automatico de 90 s
+            Row cn = action_row("Cancelar pré-visualização", "Encerra o jogo da pré-visualização. Ela também cancela sozinha após 90 s.", [](App& a) { a.preview.cancel(); });
+            cn.enabled = [](App& a) { return a.preview.state() == PreviewJob::State::Running; };
+            cn.value = [](App& a) { return a.preview.state() == PreviewJob::State::Running ? std::string("Enter") : std::string("—"); };
+            pv.rows.push_back(cn);
+        }
         pv.extra = [](App& a, const Rect& r) {
             Render& rd = a.render; Theme& th = a.theme;
             PreviewJob& pj = a.preview;

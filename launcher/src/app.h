@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-#define EC_LAUNCHER_VERSION "0.1.0 (L1)"
+#define EC_LAUNCHER_VERSION "1.0.0"
 
 class App;
 
@@ -109,6 +109,7 @@ private:
     std::vector<Pending> pending_;
     std::string toast_msg_; float toast_t_ = 0;
     void* art_proc_ = nullptr; float art_poll_t_ = 0;
+    void* job_ = nullptr;
     void poll_art(float dt);
     void scan_roms();
     void save_recents();
