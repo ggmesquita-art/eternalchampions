@@ -870,6 +870,18 @@ bool ProfileFile::save(std::string* err) {
     return true;
 }
 
+bool ProfileFile::retarget(const std::string& new_path, const std::string& name, int bgm_id) {
+    int si = p_->doc.find_sec("track");
+    if (si < 0) return false;
+    bool ok = p_->doc.set_kv(si, "name", toml_quote(name));
+    ok &= p_->doc.set_kv(si, "bgm_id", std::to_string(bgm_id));
+    p_->path = new_path;
+    p_->bak_done = false;
+    p_->dirty = true;
+    p_->rebuild();
+    return ok;
+}
+
 bool ProfileFile::dirty() const { return p_->dirty; }
 const std::string& ProfileFile::path() const { return p_->path; }
 std::string ProfileFile::serialize() const { return p_->doc.text(); }

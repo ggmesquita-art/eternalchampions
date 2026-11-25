@@ -1,5 +1,6 @@
 #include "studio.h"
 #include <SDL.h>
+#include <windows.h>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -35,7 +36,7 @@ void Studio::refresh() {
         th_load_ = std::thread([this] { load_songs_thread(); });
         return;
     }
-    if (p_.run.rom.empty() || !fs::is_regular_file(fs::u8path(p_.run.rom), ec)) { stage_ = Stage::NoRom; return; }
+    if (p_.run.rom.empty() || !fs::is_regular_file(fs::u8path(p_.run.rom), ec) || !p_.rom_valid) { stage_ = Stage::NoRom; return; }   // extrair exige ROM valida (SHA US)
     if (!sf2_ok_) { stage_ = Stage::NoSf2; return; }
     stage_ = Stage::NeedDumps;
 }
@@ -131,20 +132,34 @@ bool Studio::select_song(int bgm_id) {
     const ecr::SongNotes* sg = nullptr;
     for (auto& s : songs_) if (s.bgm_id == bgm_id) sg = &s;
     if (!sg) return false;
+    op_error_.clear();
+    // edicoes pendentes do perfil da musica atual: salva antes de trocar (nada se perde ao usar LB/RB)
+    if (profile_ok_ && profile_.dirty()) {
+        std::string e;
+        if (!profile_.save(&e)) { op_error_ = "Nao foi possivel salvar o perfil antes de trocar de musica: " + e; return false; }
+    }
     const bool was_playing = playing_;
     play(false);
     bgm_ = bgm_id;
-    // perfil da faixa (para overrides e canais PSG/DAC); se faltar, perfil vazio default
+    // perfil da faixa (overrides e canais PSG/DAC). Se <slug>.toml nao existe, default.toml serve de MOLDE somente-leitura:
+    // o arquivo da faixa so e criado na primeira edicao por musica (nunca se grava em default.toml)
     std::error_code ec;
     fs::path pp = p_.profiles_dir / (sg->slug + ".toml");
-    if (!fs::exists(pp, ec)) pp = p_.profiles_dir / "default.toml";
+    profile_pending_new_ = false;
+    if (!fs::exists(pp, ec)) { profile_target_ = pp; pp = p_.profiles_dir / "default.toml"; profile_pending_new_ = true; }
     profile_ = ecr::ProfileFile();
     std::string err;
     profile_ok_ = profile_.load(pp.u8string(), &err);
     synth_.set_song(*sg, ecr::build_channel_maps(*sg, voices_, profile_));
     undo_.clear(); redo_.clear();
     // original capturado e de outra musica? descarta
-    if (orig_bgm_ != bgm_id) { orig_ready_ = false; ab_original_ = false; }
+    {   // original ja capturado para esta musica? (A/B sem recapturar)
+        std::shared_ptr<const ecr::OriginalAudio> o;
+        { std::lock_guard<std::mutex> l(mu_); auto it = originals_.find(bgm_id); if (it != originals_.end()) o = it->second; }
+        std::atomic_store(&orig_cur_, o);
+        orig_ready_ = (o != nullptr);
+        if (!o) ab_original_ = false;
+    }
     if (was_playing) play(true);
     return true;
 }
@@ -185,7 +200,16 @@ void Studio::apply_voice_to_synth(const std::string& hash) {
     synth_.update_map(m);
 }
 
+void Studio::ensure_profile_file() {
+    if (!profile_pending_new_) return;
+    const ecr::SongNotes* sg = song();
+    if (!sg) return;
+    profile_.retarget(profile_target_.u8string(), sg->slug, sg->bgm_id);
+    profile_pending_new_ = false;
+}
+
 void Studio::edit_voice(const std::string& hash, const ecr::VoiceEdit& e, VoiceScope scope) {
+    if (scope == VoiceScope::Song) ensure_profile_file();
     UndoItem u;
     u.is_override = scope == VoiceScope::Song;
     u.hash = hash;
@@ -224,7 +248,7 @@ void Studio::apply_undo_item(const UndoItem& u, bool undo) {
     const ecr::VoiceEdit& o = undo ? u.before_override : u.after_override;
     voices_.set_edit(u.hash, g);
     if (profile_ok_) {
-        if (had) profile_.set_override(u.hash, o); else profile_.remove_override(u.hash);
+        if (had) { ensure_profile_file(); profile_.set_override(u.hash, o); } else profile_.remove_override(u.hash);
     }
     apply_voice_to_synth(u.hash);
 }
@@ -243,6 +267,7 @@ void Studio::redo() {
 }
 
 void Studio::edit_channel(const ecr::ProfileChannel& c) {
+    ensure_profile_file();
     if (profile_ok_) profile_.set_channel(c);
     ecr::ChannelMap m = map_of(c.name);
     if (m.key.empty()) return;
@@ -310,9 +335,7 @@ void Studio::play(bool on) {
 }
 
 void Studio::seek_seconds(double s) {
-    if (dev_id_) SDL_LockAudioDevice(dev_id_);
-    synth_.seek_frames((int64_t)(std::max(0.0, s) * ecr::kPreviewRate));
-    if (dev_id_) SDL_UnlockAudioDevice(dev_id_);
+    synth_.seek_frames((int64_t)(std::max(0.0, s) * ecr::kPreviewRate));   // o PreviewSynth tem mutex proprio
 }
 double Studio::position_s() const { return (double)synth_.position_frames() / ecr::kPreviewRate; }
 
@@ -322,9 +345,9 @@ void Studio::audio_callback(float* out, int frames) {
     const int64_t pos0 = synth_.position_frames();
     const int64_t total = std::max<int64_t>(1, synth_.total_frames());
     synth_.render_block(scratch_.data(), frames);     // avanca a posicao e alimenta os VUs mesmo em A
+    const std::shared_ptr<const ecr::OriginalAudio> oa = std::atomic_load(&orig_cur_);   // troca atomica: sem travar o audio
     const float* orig = nullptr; int64_t ofr = 0;
-    if (orig_ready_ && !orig_audio_.stereo.empty()) { orig = orig_audio_.stereo.data(); ofr = (int64_t)orig_audio_.stereo.size() / 2; }
-    else if (!inj_.empty()) { orig = inj_.data(); ofr = (int64_t)inj_.size() / 2; }
+    if (oa && !oa->stereo.empty()) { orig = oa->stereo.data(); ofr = (int64_t)oa->stereo.size() / 2; }
     const float target = (ab_original_ && orig) ? 1.f : 0.f;
     const float step = 1.f / (0.020f * ecr::kPreviewRate);   // crossfade de 20 ms
     for (int i = 0; i < frames; ++i) {
@@ -334,15 +357,30 @@ void Studio::audio_callback(float* out, int frames) {
             int64_t p = pos0 + i; if (p >= total) p %= total;
             if (p < ofr) { a0 = orig[2 * p]; a1 = orig[2 * p + 1]; }
         }
-        out[2 * i] = scratch_[2 * i] * (1.f - ab_mix_) + a0 * ab_mix_;
-        out[2 * i + 1] = scratch_[2 * i + 1] * (1.f - ab_mix_) + a1 * ab_mix_;
+        float l = scratch_[2 * i] * (1.f - ab_mix_) + a0 * ab_mix_;
+        float r = scratch_[2 * i + 1] * (1.f - ab_mix_) + a1 * ab_mix_;
+        if (!std::isfinite(l)) l = 0.f;   // nunca entrega NaN/Inf nem estouro ao dispositivo
+        if (!std::isfinite(r)) r = 0.f;
+        out[2 * i] = std::max(-1.f, std::min(1.f, l));
+        out[2 * i + 1] = std::max(-1.f, std::min(1.f, r));
     }
 }
 
-void Studio::inject_original(std::vector<float> stereo) { inj_ = std::move(stereo); }
+void Studio::inject_original(std::vector<float> stereo) {
+    auto o = std::make_shared<ecr::OriginalAudio>();
+    o->stereo = std::move(stereo);
+    std::atomic_store(&orig_cur_, std::shared_ptr<const ecr::OriginalAudio>(o));
+}
+
+std::string Studio::rom_problem() const {
+    if (p_.run.rom.empty()) return "Nenhuma ROM configurada.";
+    if (!p_.rom_valid) return "A ROM configurada nao confere com o SHA-256 da versao US (escolha a ROM correta no menu ROM).";
+    return "";
+}
 
 void Studio::start_capture_original() {
     if (orig_job().running || bgm_ < 0) return;
+    if (std::string rp = rom_problem(); !rp.empty()) { op_error_ = rp; return; }   // capturar o original exige ROM valida
     if (th_orig_.joinable()) th_orig_.join();
     const int id = bgm_;
     orig_ready_ = false; ab_original_ = false;
@@ -362,11 +400,9 @@ void Studio::start_capture_original() {
             if (ok) orig_.frac = 1;
         }
         if (ok) {
-            if (dev_id_) SDL_LockAudioDevice(dev_id_);
-            orig_audio_ = std::move(out);
-            orig_bgm_ = id;
-            orig_ready_ = (bgm_ == id);
-            if (dev_id_) SDL_UnlockAudioDevice(dev_id_);
+            auto sp = std::make_shared<const ecr::OriginalAudio>(std::move(out));
+            { std::lock_guard<std::mutex> l(mu_); originals_[id] = sp; }
+            if (bgm_.load() == id) { std::atomic_store(&orig_cur_, sp); orig_ready_ = true; }
         }
         orig_done_ = true;
     });
@@ -378,6 +414,7 @@ void Studio::start_capture_original() {
 bool Studio::test_in_game(std::string* err) {
     if (game_running()) { if (err) *err = "o jogo ja esta aberto"; return false; }
     if (bgm_ < 0) return false;
+    if (std::string rp = rom_problem(); !rp.empty()) { if (err) *err = rp; return false; }   // testar no jogo exige ROM valida
     if (!save(err)) return false;   // o jogo le os arquivos salvos (e recarrega ao vivo, hot_reload)
     std::error_code ec;
     fs::path tmp = fs::temp_directory_path(ec) / "ec_studio_test";
@@ -440,9 +477,13 @@ int studio_selftest(const std::string& root_s, const std::string& dumps_s, const
     int fails = 0;
     auto check = [&](bool ok, const std::string& what) { report += std::string(ok ? "PASS " : "FAIL ") + what + "\n"; if (!ok) ++fails; };
     fs::path root = root_s.empty() ? fs::current_path() : fs::u8path(root_s);
-    fs::path out = out_s.empty() ? fs::temp_directory_path() / "ec_studio_selftest" : fs::u8path(out_s);
+    const bool own_out = out_s.empty();   // diretorio criado por nos (so este e apagado no fim)
+    fs::path out = own_out ? fs::temp_directory_path() / ("ec_studio_selftest_" + std::to_string((unsigned long long)GetTickCount64())) : fs::u8path(out_s);
     std::error_code ec;
-    fs::remove_all(out, ec);
+    if (!own_out && fs::exists(out, ec) && !fs::is_empty(out, ec)) {   // nunca remove_all num --out arbitrario
+        fprintf(stderr, "--out deve ser um diretorio novo ou vazio: %s\n", out.string().c_str());
+        return 2;
+    }
     fs::create_directories(out / "profiles", ec);
     const fs::path real_voices = root / "assets" / "audio_remaster" / "voices.toml";
     const fs::path real_prof = root / "assets" / "audio_remaster" / "profiles";
@@ -489,6 +530,22 @@ int studio_selftest(const std::string& root_s, const std::string& dumps_s, const
         snprintf(b, sizeof b, "solo na voz %s: %.1f dBFS (< pleno %.1f)", first.c_str(), r3, r1);
         check(r3 < r1, b);
         st.set_solo(first, false);
+
+        // volume_db absurdo (400) -> saida finita e dentro de [-1, 1]
+        {
+            ecr::VoiceEdit big = st.effective_edit(first);
+            big.volume_db = 400.0;
+            big.transpose = 500;
+            st.edit_voice(first, big, VoiceScope::Global);
+            st.seek_seconds(0);
+            auto cl = render_seconds(st, 1.0);
+            bool finite = true; float mx = 0;
+            for (float x : cl) { if (!std::isfinite(x)) finite = false; mx = std::max(mx, std::fabs(x)); }
+            snprintf(b, sizeof b, "volume_db=400: saida finita e |x| <= 1 (pico %.3f)", mx);
+            check(finite && mx <= 1.0f, b);
+            // o ganho efetivo foi limitado a +24 dB: comparavel ao teto, nao 400 dB
+            st.undo();
+        }
 
         // A/B com um "original" sintetico (seno 440 Hz, -20 dBFS)
         {
@@ -537,5 +594,6 @@ int studio_selftest(const std::string& root_s, const std::string& dumps_s, const
     report += fails ? "RESULT FAIL\n" : "RESULT OK\n";
     fputs(report.c_str(), stdout);
     std::ofstream(out / "selftest_studio.txt", std::ios::binary) << report;
+    if (own_out) { st.close_audio_device(); std::error_code e2; fs::remove_all(out, e2); }   // so o que criamos
     return fails ? 1 : 0;
 }

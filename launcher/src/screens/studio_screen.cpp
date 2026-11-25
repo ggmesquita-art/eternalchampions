@@ -14,8 +14,14 @@ namespace fs = std::filesystem;
 StudioPaths make_studio_paths(App& app) {
     StudioPaths p;
     p.root = app.root_dir;
-    p.voices = app.studio_voices.empty() ? app.root_dir / "assets" / "audio_remaster" / "voices.toml" : utf8_to_path(app.studio_voices);
-    p.profiles_dir = app.root_dir / "assets" / "audio_remaster" / "profiles";
+    // mesma regra do jogo (ec_spec.c/ec_audio.c): ec.audio.profiles_dir e ec.audio.voices do ini, quando definidos;
+    // senao assets/audio_remaster/profiles e <profiles_dir>/../voices.toml
+    auto resolve = [&](const std::string& s) { fs::path q = utf8_to_path(s); return q.is_absolute() ? q : app.root_dir / q; };
+    std::string pd = app.cfg.get("ec.audio.profiles_dir"), vv = app.cfg.get("ec.audio.voices");
+    p.profiles_dir = pd.empty() ? app.root_dir / "assets" / "audio_remaster" / "profiles" : resolve(pd);
+    p.voices = !app.studio_voices.empty() ? utf8_to_path(app.studio_voices)
+             : (vv.empty() ? p.profiles_dir.parent_path() / "voices.toml" : resolve(vv));
+    p.rom_valid = app.rom_valid;
     std::string sf = app.cfg.get("ec.audio.sf2");
     fs::path sp = sf.empty() ? fs::path("assets/soundfonts/TimGM6mb.sf2") : utf8_to_path(sf);   // mesmo default do mixer_studio.py
     p.sf2 = sp.is_absolute() ? sp : app.root_dir / sp;
@@ -79,6 +85,11 @@ public:
         t_ += dt;
         if (msg_t_ > 0) msg_t_ -= dt;
         st_->poll();
+        {   // o jogo aberto por "Testar no jogo" pode regravar o settings.ini: recarrega quando ele fecha
+            bool gr = st_->game_running();
+            if (game_was_ && !gr && !app.cfg.ini().dirty()) app.cfg.load(app.settings_ini);
+            game_was_ = gr;
+        }
         const Studio::Stage stg = st_->stage();
         if (stg != Studio::Stage::Ready) { update_prestage(app, in); return; }
         rebuild_list();
@@ -213,8 +224,8 @@ private:
         const StudioPaths& sp = st_->paths();
         switch (stg) {
         case Studio::Stage::NoRom:
-            draw_text(rd, *th.fonts.menu, cx, y, "Configure a ROM primeiro", it); y += 60;
-            para("O Estúdio precisa rodar o jogo uma vez (headless) para extrair as notas das 17 músicas. Escolha uma ROM válida no menu ROM e volte aqui.");
+            draw_text(rd, *th.fonts.menu, cx, y, "Configure uma ROM válida primeiro", it); y += 60;
+            para("O Estúdio precisa rodar o jogo uma vez (headless) para extrair as notas das 17 músicas, e isso exige a ROM com o SHA-256 da versão US. Escolha-a no menu ROM e volte aqui. " + st_->rom_problem());
             break;
         case Studio::Stage::NoSf2:
             draw_text(rd, *th.fonts.menu, cx, y, "SoundFont não encontrado", it); y += 60;
@@ -263,7 +274,7 @@ private:
     }
     void change_song(int d) {
         int n = ecr::bgm_count(), i = (song_index() + d + n) % n;
-        st_->select_song(ecr::bgm_table()[i].id);
+        if (!st_->select_song(ecr::bgm_table()[i].id)) { say(st_->op_error()); return; }
         list_focus_ = 0; list_scroll_ = 0; edit_focus_ = 0;
         rebuild_list();
         if (!list_.empty() && list_[0].kind == 2) list_focus_ = 1;
@@ -316,7 +327,7 @@ private:
         if (!st_->original_ready()) {
             if (st_->orig_job().running) { say("Capturando o original… aguarde."); return; }
             st_->start_capture_original();
-            say("Capturando o áudio original (≈ 70 s, em segundo plano)…");
+            say(st_->op_error().empty() ? "Capturando o áudio original (≈ 70 s, em segundo plano)…" : st_->op_error());
             return;
         }
         st_->set_ab_original(!st_->ab_original());
@@ -507,7 +518,7 @@ private:
         const ecr::BgmInfo* b = ecr::bgm_by_slug(ve->meta.songs.front());
         if (!b) return;
         library_ = false;
-        st_->select_song(b->id);
+        if (!st_->select_song(b->id)) { say(st_->op_error()); return; }
         rebuild_list();
         for (size_t i = 0; i < list_.size(); ++i) if (list_[i].key == key) list_focus_ = (int)i;
         for (auto& m : st_->maps()) if (m.is_voice) st_->set_solo(m.key, m.key == key);
@@ -745,7 +756,7 @@ private:
     std::vector<ERow> edit_;
     Zone zone_ = Z_LIST;
     int bar_focus_ = 0, list_focus_ = 0, list_scroll_ = 0, edit_focus_ = 0, edit_scroll_ = 0;
-    bool library_ = false, patch_view_ = false, loop_ = false, show_help_ = false, text_edit_ = false, fake_extract_ = false;
+    bool library_ = false, patch_view_ = false, loop_ = false, show_help_ = false, text_edit_ = false, fake_extract_ = false, game_was_ = false;
     std::string text_buf_, msg_;
     float t_ = 0, msg_t_ = 0;
 };

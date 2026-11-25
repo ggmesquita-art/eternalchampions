@@ -1,5 +1,6 @@
 // Extracao da arte da ROM em segundo plano (tools/launcher/extract_ui_assets.py) e recarga do tema.
 #include "app.h"
+#include "dumps.h"
 #include "json.h"
 #include <cstdio>
 #include <fstream>
@@ -43,12 +44,11 @@ void App::maybe_extract_art() {
                        L"\" --exe \"" + game_exe.wstring() + L"\" --out \"" + assets_dir.wstring() + L"\"";
     SECURITY_ATTRIBUTES sa{sizeof sa, nullptr, TRUE};
     HANDLE logh = CreateFileW((logs_dir / "extract_ui.log").c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    STARTUPINFOW si{}; si.cb = sizeof si;
-    if (logh != INVALID_HANDLE_VALUE) { si.dwFlags |= STARTF_USESTDHANDLES; si.hStdOutput = si.hStdError = logh; }
     PROCESS_INFORMATION pi{};
     std::vector<wchar_t> buf(cmd.begin(), cmd.end()); buf.push_back(0);
     std::wstring cwd = root_dir.wstring();
-    BOOL ok = CreateProcessW(nullptr, buf.data(), nullptr, nullptr, logh != INVALID_HANDLE_VALUE, CREATE_NO_WINDOW, nullptr, cwd.c_str(), &si, &pi);
+    unsigned long le = 0;
+    bool ok = ecr::spawn_process_w(nullptr, buf.data(), cwd.c_str(), nullptr, CREATE_NO_WINDOW, logh, &pi, &le);
     if (logh != INVALID_HANDLE_VALUE) CloseHandle(logh);
     if (!ok) { art_state = ArtState::Failed; log("extrator de arte: CreateProcess falhou"); return; }
     CloseHandle(pi.hThread);

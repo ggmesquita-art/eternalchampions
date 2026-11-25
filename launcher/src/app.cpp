@@ -46,6 +46,15 @@ bool App::init(bool hidden, int win_w, int win_h) {
     }
     logs_dir = exe_dir / "logs";
 
+    {   // Job Object KILL_ON_JOB_CLOSE: todo filho (jogo, extrator, previa, dumps, captura) morre junto com o launcher
+        HANDLE job = CreateJobObjectW(nullptr, nullptr);
+        if (job) {
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION li{};
+            li.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            if (SetInformationJobObject(job, JobObjectExtendedLimitInformation, &li, sizeof li) && AssignProcessToJobObject(job, GetCurrentProcess())) job_ = job;
+            else CloseHandle(job);
+        }
+    }
     SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) != 0) return false;
     if (!render.init(win_w, win_h, hidden, "Eternal Champions")) return false;
@@ -62,11 +71,19 @@ void App::shutdown() {
     pending_.clear();
     preview.cancel();
     preview.free_textures();
+    if (art_proc_) {   // extrator ainda rodando: encerra e espera (sem orfaos)
+        TerminateProcess((HANDLE)art_proc_, 1);
+        WaitForSingleObject((HANDLE)art_proc_, 3000);
+        CloseHandle((HANDLE)art_proc_);
+        art_proc_ = nullptr;
+        art_state = ArtState::Failed;
+    }
     input.shutdown();
     theme.shutdown();
     theme.fonts = Fonts{};
     render.shutdown();
     SDL_Quit();
+    if (job_) { CloseHandle((HANDLE)job_); job_ = nullptr; }   // fecha o job: mata qualquer filho remanescente
 }
 
 // ---- pilha de telas ---------------------------------------------------------
@@ -95,6 +112,10 @@ void App::apply_pending() {
 }
 
 void App::update(const InputState& in, float dt) {
+    {
+        std::string e;
+        if (cfg.take_error(e)) toast("Falha ao gravar o settings.ini: " + e, 5.f);
+    }
     poll_art(dt);
     preview.poll(*this, dt);
     if (toast_t_ > 0) toast_t_ -= dt;

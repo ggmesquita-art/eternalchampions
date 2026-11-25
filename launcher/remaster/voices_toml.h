@@ -131,6 +131,9 @@ public:
     const ProfileTrack& track() const;
     const std::vector<ProfileChannel>& channels() const;             // ordem do arquivo
     const ProfileChannel* find_channel(const std::string& name) const;
+    // Passa a gravar em `new_path` (arquivo novo) e fixa [track] name/bgm_id: usado para criar <slug>.toml a partir de
+    // default.toml na primeira edicao por musica (o jogo ignora perfis sem bgm_id valido). Marca como alterado.
+    bool retarget(const std::string& new_path, const std::string& name, int bgm_id);
     bool set_channel(const ProfileChannel& c);                       // so campos alterados
 
     const std::vector<VoiceOverride>& overrides() const;

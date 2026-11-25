@@ -40,25 +40,30 @@ const Opt* schema_find(const std::string& id);
 class Config {
 public:
     bool load(const std::filesystem::path& settings_ini);
-    bool save() { return ini_.save(); }
+    bool save() { bool ok = ini_.save(); if (!ok) error_ = ini_.error(); return ok; }
+    // Falha de gravacao pendente (a UI mostra um toast). Devolve true uma vez por falha.
+    void begin_batch() { ini_.begin_batch(); }
+    bool end_batch() { bool ok = ini_.end_batch(); if (!ok) error_ = ini_.error(); return ok; }
+    bool take_error(std::string& msg) { if (error_.empty()) return false; msg = error_; error_.clear(); return true; }
     Ini& ini() { return ini_; }
 
     std::string get(const Opt& o) const;                    // valor efetivo (ini ou default)
     std::string get(const std::string& id) const;
     bool is_modified(const Opt& o) const;                   // valor efetivo != default
-    void set(const Opt& o, const std::string& v);           // == default => remove a chave do ini (volta ao default do jogo)
-    void set(const std::string& id, const std::string& v);
-    void reset(const Opt& o) { set(o, o.def); }
+    bool set(const Opt& o, const std::string& v);           // == default => remove a chave do ini (volta ao default do jogo); false = falha ao gravar
+    bool set(const std::string& id, const std::string& v);
+    bool reset(const Opt& o) { return set(o, o.def); }
     bool enabled(const Opt& o) const;                       // dependencias
     // dinamico: lista de escolhas efetiva (inclui valor atual desconhecido, p.ex. caminho custom)
     std::vector<Choice> choices(const Opt& o, const App& app) const;
     // argv extra a partir de [launcher.args] (so valores != default)
     std::vector<std::string> build_args() const;
     // [launcher] skip_launcher = 1
-    void ensure_skip_launcher();
+    bool ensure_skip_launcher();
 
 private:
     Ini ini_;
+    std::string error_;
 };
 
 // ---- Perfis de qualidade (§4.4)

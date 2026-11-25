@@ -54,8 +54,8 @@ std::vector<Opt> build() {
         Opt o = choice("mods.widescreen", "aspect", "video", "Proporção widescreen", "fit", {{"fit", "Ajustar à janela"}, {"16:9", "16:9"}, {"21:9", "21:9"}, {"32:9", "32:9"}}, "Proporção usada pelo widescreen.");
         o.dep_id = "mods.widescreen.enabled"; o.dep_val = "1"; v.push_back(o);
     }
-    v.push_back(cli("interlace", "--interlace-display", "video", "Desentrelaçamento", OType::Enum, "auto", "Modo de exibição das telas entrelaçadas (modo de 2 jogadores): automático, bob ou weave."));
-    v.back().choices = {{"auto", "Automático"}, {"bob", "Bob"}, {"weave", "Weave"}};
+    v.push_back(cli("interlace", "--interlace-display", "video", "Exibição entrelaçada", OType::Enum, "", "Como o runner mostra quadros entrelaçados do VDP. TV (padrão do runner): comprime os campos como numa TV, mantendo a altura original. Raw: mostra o quadro expandido completo."));
+    v.back().choices = {{"", "Padrão do jogo (TV)"}, {"tv", "TV (original)"}, {"raw", "Raw (expandido)"}};
     v.push_back(cli("widescreen", "--widescreen", "video", "Widescreen por argumento", OType::Enum, "", "Força o widescreen pela linha de comando (vence o ini). \"stage\" ajusta à fase; W:H livre só editando [launcher.args]."));
     v.back().choices = {{"", "Usar o ini"}, {"off", "off"}, {"fit", "fit"}, {"stage", "stage"}, {"16:9", "16:9"}, {"21:9", "21:9"}, {"32:9", "32:9"}};
 
@@ -140,8 +140,8 @@ std::vector<Opt> build() {
     v.push_back(boolean("mods.diagnostics", "enabled", "game", "Diagnóstico de replay", true, "Grava dados de diagnóstico para reproduzir e analisar partidas."));
 
     // ================= AVANÇADO =================
-    v.push_back(cli("pacing", "--pacing", "adv", "Cadência de quadros", OType::Enum, "", "Modo de sincronização: sync, uncapped, fiber ou accurate. Padrão: o compilado no jogo."));
-    v.back().choices = {{"", "Padrão do jogo"}, {"sync", "sync"}, {"uncapped", "uncapped (sem limite)"}, {"fiber", "fiber"}, {"accurate", "accurate (ciclos exatos)"}};
+    v.push_back(cli("pacing", "--pacing", "adv", "Cadência de quadros", OType::Enum, "", "Cadência do host. fiber: o jogo roda numa fibra com o quadro completo por vez; accurate: sincroniza por ciclos exatos do 68000. Padrão: o compilado no jogo (accurate)."));
+    v.back().choices = {{"", "Padrão do jogo"}, {"fiber", "fiber"}, {"accurate", "accurate (ciclos exatos)"}};
     v.push_back(cli("target_fps", "--target-fps", "adv", "FPS alvo", OType::Enum, "0", "Sobrescreve a taxa de quadros alvo (acelera ou desacelera o jogo)."));
     v.back().choices = {{"0", "Padrão (60)"}, {"30", "30"}, {"50", "50"}, {"75", "75"}, {"90", "90"}, {"120", "120"}};
     v.push_back(boolean("video", "widescreen", "adv", "Widescreen legado do VDP", false, "Opção antiga do VDP; prefira o widescreen da aba Vídeo."));
@@ -190,6 +190,11 @@ std::string Config::get(const Opt& o) const {
     std::string v;
     if (!ini_.get(o.section, o.key, v) || (v.empty() && o.type != OType::Path && o.type != OType::Enum)) return o.def;
     if (o.type == OType::Bool) return norm_bool(v);
+    if (o.type == OType::Enum && o.section == "launcher.args" && !o.choices.empty()) {   // valor invalido no ini -> "Padrao"
+        bool ok = false;
+        for (auto& c : o.choices) ok |= (c.value == v);
+        if (!ok) return o.def;
+    }
     return v;
 }
 std::string Config::get(const std::string& id) const {
@@ -198,13 +203,14 @@ std::string Config::get(const std::string& id) const {
 }
 bool Config::is_modified(const Opt& o) const { return !near_eq(get(o), o.def); }
 
-void Config::set(const Opt& o, const std::string& v) {
+bool Config::set(const Opt& o, const std::string& v) {
     if (near_eq(v, o.def)) { ini_.remove(o.section, o.key); }
     else ini_.set(o.section, o.key, v);
-    ini_.save();
+    return save();
 }
-void Config::set(const std::string& id, const std::string& v) {
-    if (const Opt* o = schema_find(id)) set(*o, v);
+bool Config::set(const std::string& id, const std::string& v) {
+    if (const Opt* o = schema_find(id)) return set(*o, v);
+    return false;
 }
 
 bool Config::enabled(const Opt& o) const {
@@ -226,11 +232,11 @@ std::vector<std::string> Config::build_args() const {
     return a;
 }
 
-void Config::ensure_skip_launcher() {
+bool Config::ensure_skip_launcher() {
     std::string v;
-    if (ini_.get("launcher", "skip_launcher", v) && v == "1") return;
+    if (ini_.get("launcher", "skip_launcher", v) && v == "1") return true;
     ini_.set("launcher", "skip_launcher", "1");
-    ini_.save();
+    return save();
 }
 
 // ---------------------------------------------------------------------------

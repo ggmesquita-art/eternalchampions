@@ -27,6 +27,7 @@ struct StudioPaths {
     std::filesystem::path sf2;           // SoundFont absoluto
     std::filesystem::path cache_dir;     // bgm_NN.appdump.txt (derivados da ROM, fora do git)
     ecr::GameRun run;                    // exe/rom/work_dir do jogo headless
+    bool rom_valid = false;              // ROM com o SHA-256 da versao US (exigida p/ extrair, capturar o original e testar no jogo)
 };
 
 enum class VoiceScope { Global, Song };
@@ -61,8 +62,10 @@ public:
 
     // ---- dados
     const std::vector<ecr::SongNotes>& songs() const { return songs_; }
-    bool select_song(int bgm_id);                    // carrega perfil, monta mapas, set_song
-    int current_bgm() const { return bgm_; }
+    bool select_song(int bgm_id);                    // salva o perfil pendente, carrega o da faixa, monta mapas, set_song
+    const std::string& op_error() const { return op_error_; }   // ultimo erro de select_song/save/captura (para a UI)
+    std::string rom_problem() const;                 // "" se a ROM serve; senao o motivo
+    int current_bgm() const { return bgm_.load(); }
     const ecr::SongNotes* song() const;
     ecr::VoicesFile& voices() { return voices_; }
     ecr::ProfileFile& profile() { return profile_; }
@@ -103,7 +106,7 @@ public:
     // A/B: true = original (se ja capturado)
     void set_ab_original(bool o) { ab_original_ = o; }
     bool ab_original() const { return ab_original_; }
-    bool original_ready() const { return orig_ready_; }
+    bool original_ready() const { return orig_ready_.load(); }
     void start_capture_original();
     // Mesmo caminho do dispositivo SDL (e do selftest): preenche `frames` quadros estereo float.
     void audio_callback(float* stereo, int frames);
@@ -134,7 +137,11 @@ private:
     std::string error_;
 
     std::vector<ecr::SongNotes> songs_;
-    int bgm_ = -1;
+    std::atomic<int> bgm_{-1};
+    std::string op_error_;
+    bool profile_pending_new_ = false;   // perfil da faixa ainda nao existe: usando default.toml como molde
+    std::filesystem::path profile_target_;
+    void ensure_profile_file();
     ecr::VoicesFile voices_;
     ecr::ProfileFile profile_;
     bool profile_ok_ = false;
@@ -150,18 +157,18 @@ private:
     std::thread th_dump_, th_load_, th_orig_;
     std::atomic<bool> cancel_{false}, dump_done_{false}, load_done_{false}, orig_done_{false};
     std::vector<ecr::SongNotes> loaded_;
-    ecr::OriginalAudio orig_audio_;
     std::atomic<bool> orig_ready_{false};
-    int orig_bgm_ = -1;
+    // originais capturados por musica (A/B sem recapturar); o callback le por shared_ptr atomico (sem depender do dispositivo)
+    std::map<int, std::shared_ptr<const ecr::OriginalAudio>> originals_;
+    std::shared_ptr<const ecr::OriginalAudio> orig_cur_;
 
     // audio
     bool headless_ = false;
-    unsigned dev_id_ = 0;
+    unsigned dev_id_ = 0;               // so a thread principal abre/fecha/le
     std::atomic<bool> playing_{false};
     std::atomic<bool> ab_original_{false};
     float ab_mix_ = 0;
     std::vector<float> scratch_;
-    std::vector<float> inj_;       // original injetado (teste)
 
     std::shared_ptr<std::atomic<bool>> game_flag_ = std::make_shared<std::atomic<bool>>(false);
     std::thread th_game_;
