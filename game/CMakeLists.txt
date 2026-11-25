@@ -74,3 +74,9 @@ if(WIN32)
 endif()
 
 genesisrecomp_runner_target(EternalChampionsRecomp)
+
+# Launcher (EternalChampions.exe): frontend proprio, SDL2 + libpng, sem tocar no jogo.
+option(EC_BUILD_LAUNCHER "Compila o EternalChampions.exe (launcher)" ON)
+if(EC_BUILD_LAUNCHER AND WIN32)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../launcher ${CMAKE_BINARY_DIR}/launcher_build)
+endif()
