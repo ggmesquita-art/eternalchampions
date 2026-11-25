@@ -110,6 +110,7 @@ typedef struct {
     uint32_t a1;                    /* ($CD1E + slot*8) */
     uint16_t a0;                    /* ($CD1E + slot*8 + 4) */
     uint16_t d5;                    /* ($2,a0) >> 5 */
+    uint16_t addr;                  /* endereco da camada na WRAM (alvo de ($4E,obj)) */
     uint8_t  slot_ok;               /* slot < 128 */
 } EcLayerSnap;
 
@@ -138,6 +139,7 @@ static void ec_take_layer_snapshot(void)
     uint16_t a4 = ec_ram16(0xD84Eu);
     for (int step = 0; step < EC_SNAP_LAYERS && a4 != 0u; ++step, a4 = ec_ram16(a4)) {
         EcLayerSnap *L = &s_snap_layers[s_snap_nlayers++];
+        L->addr = a4;
         for (unsigned i = 0; i < EC_SNAP_LAYER_SZ; ++i)
             L->raw[i] = g_ram[((unsigned)a4 + i) & 0xFFFFu];
         uint16_t slot = ec_snap_w(L, 0x2Cu);
@@ -376,11 +378,65 @@ static void ec_refresh_frame_hud_sat(const GVDP *v)
     }
 }
 
+static int64_t ec_floor_div64(int64_t a, int64_t b)
+{
+    int64_t q = a / b;
+    if ((a % b != 0) && ((a < 0) != (b < 0)))
+        --q;
+    return q;
+}
+
+/*
+ * Compensacao de borda de UMA camada: quanto o conteudo dela deve ser deslocado (para a
+ * esquerda, em px) para que, com x0 ancorado na borda (dx = x0 - left), ela fique parada
+ * como se a camera estivesse em cam_v = cam - dx.
+ *
+ * O jogo escreve H-scroll = -(cam + eE), com eE em 16.16 em ($0E,a4). No modo $0C,
+ * eE = cam * fac / 4096 (fac = ($28,a4)) e a parte inteira e o floor do 16.16. Calcular
+ * comp = floor(eE(cam_v)) - floor(eE(cam)) usa o MESMO arredondamento do jogo: a soma
+ * fica constante quadro a quadro (sem o tremor de 1 px que round(-fac*dx/4096) causava,
+ * pois o round da compensacao e o floor do jogo divergiam alternadamente).
+ * Modos $00/$08/$10 andam a 1x a camera (eE nao depende dela; $10 so deriva) -> 0.
+ */
+static int ec_layer_edge_comp(const EcLayerSnap *L, int dx, int hs)
+{
+    if (dx == 0)
+        return 0;
+    switch (L->raw[0x26u]) {
+    case 0x04:
+        return -dx;
+    case 0x14:
+        return dx;
+    case 0x0C: {
+        int64_t fac = (int64_t)(int16_t)ec_snap_w(L, 0x28u);
+        int64_t e   = (int64_t)(int32_t)ec_snap_l(L, 0x0Eu);
+        int64_t ev  = e - (int64_t)dx * fac * 16;
+        int ideal_v = (int)ec_floor_div64(ev, 65536);  /* deslocamento da camada em cam_v */
+        if (hs < 0)
+            return ideal_v - (int)ec_floor_div64(e, 65536);
+        /*
+         * Com o H-scroll real da linha: o deslocamento que o jogo de fato aplicou e
+         * -hs - cam (cam da camada = -($1A,a4)). Algumas camadas nao seguem floor(eE)
+         * exato (o Santuario grava o eE do quadro anterior quantizado em 2 px), entao
+         * medir o valor real e o que mantem a camada parada sem tremor.
+         */
+        int cam    = -(int)(int16_t)ec_snap_w(L, 0x1Au);
+        int base   = (int)(ec_snap_w(L, 0x04u) & 0x1FFu); /* hs = $1A - eE - ($4 & $1FF) */
+        int actual = -hs - cam - base;
+        int c      = ideal_v - actual;
+        c = ((c + 512) & 0x3FF) - 512;               /* H-scroll e modulo 1024 */
+        return c;
+    }
+    default:
+        return 0;
+    }
+}
+
 /*
  * Compensa o parallax nos planos A/B quando x0 ancora a cena nas bordas widescreen
  * (dx = x0 - left != 0). Avalia a última camada ativa em $FFFFD84E que escreve H-scroll.
  */
-static int ec_plane_edge_comp(uint16_t pl, int line, int dx)
+static int ec_plane_edge_comp(uint16_t pl, int line, int dx, int hs)
 {
     if (dx == 0)
         return 0;
@@ -403,32 +459,22 @@ static int ec_plane_edge_comp(uint16_t pl, int line, int dx)
             comp = 0;
             continue;
         }
-
-        uint8_t hmode = L->raw[0x26u];
-        switch (hmode) {
-        case 0x00:
-        case 0x08:
-        case 0x10:
-            comp = 0;
-            break;
-        case 0x04:
-            comp = -dx;
-            break;
-        case 0x14:
-            comp = dx;
-            break;
-        case 0x0C: {
-            int fac = (int)(int16_t)ec_snap_w(L, 0x28u);
-            int num = -fac * dx;
-            comp = (num >= 0) ? ((num + 2048) / 4096) : ((num - 2048) / 4096);
-            break;
-        }
-        default:
-            comp = 0;
-            break;
-        }
+        comp = ec_layer_edge_comp(L, dx, hs);
     }
     return comp;
+}
+
+/* Compensacao de borda da camada no endereco `addr` (objetos ($18)=8 presos a ela). */
+static int ec_layer_addr_edge_comp(uint16_t addr, int dx)
+{
+    if (dx == 0 || addr == 0u)
+        return 0;
+    for (int li = 0; li < s_snap_nlayers; ++li) {
+        const EcLayerSnap *L = &s_snap_layers[li];
+        if (L->addr == addr)
+            return (ec_snap_l(L, 0x36u) != 0u) ? 0 : ec_layer_edge_comp(L, dx, -1);
+    }
+    return 0;
 }
 
 /*
@@ -438,13 +484,14 @@ static int ec_plane_edge_comp(uint16_t pl, int line, int dx)
  * em s_extra_pend durante a logica do quadro f; na linha 0 do quadro seguinte (quando a
  * SAT correspondente passa a ser exibida) a lista vira s_extra_act. Nao escreve no jogo.
  */
-#define EC_EXTRA_MAX 48
+#define EC_EXTRA_MAX 128
 typedef struct {
     int16_t  x;     /* x + 128 (como gravado na SAT) */
     int16_t  y;     /* y + 128 */
     uint16_t szw;   /* palavra size/link de origem (byte alto = size) */
     uint16_t attr;
     uint16_t ord;   /* d4: indice da SAT onde entraria (ordem de prioridade) */
+    uint16_t layer; /* ($4E,a0) se o objeto e ($18)=8 (preso a uma camada), senao 0 */
 } EcExtraSpr;
 
 static EcExtraSpr s_extra_pend[EC_EXTRA_MAX];
@@ -452,12 +499,92 @@ static int        s_extra_pend_n = 0;
 static EcExtraSpr s_extra_act[EC_EXTRA_MAX];
 static int        s_extra_act_n = 0;
 
+/*
+ * Objetos ($18)=8 (decoracoes presas a uma camada de parallax: meio do tronco do Trident,
+ * cabecas dos leoes do RAX, poste do Larcen...) somam a cada quadro o delta ($16) da camada
+ * ($4E,a0) a sua posicao (Sub_E684 $E69E..$E6CA), ou seja, andam na velocidade da camada.
+ * Com x0 ancorado na borda a camada recebe ec_layer_edge_comp, entao os sub-sprites desses
+ * objetos precisam do mesmo deslocamento, senao descolam do cenario.
+ * Hook passivo em $E6CE (a0 = objeto, d4 = proximo indice da SAT): registra a camada do
+ * objeto que comeca naquele indice; na linha 0 do quadro seguinte (quando essa SAT e
+ * exibida) vira s_sat_layer_act, propagada para os indices seguintes.
+ */
+static uint16_t s_sat_layer_pend[80];
+static uint8_t  s_sat_layer_pend_set[80];
+static uint16_t s_sat_layer_act[80];
+static uint16_t s_sat_objid_pend[80];   /* ($40,a0) do objeto dono de cada entrada da SAT */
+static uint16_t s_sat_objid_act[80];
+static int16_t  s_sat_xadj[80];      /* comp por indice da SAT no quadro corrente */
+
 void ec_video_reset_ws_state(void)
 {
     s_extra_pend_n = 0;
     s_extra_act_n  = 0;
     s_snap_valid   = 0;
     s_snap_fd64    = 0xFFFFu;
+    memset(s_sat_layer_pend, 0, sizeof(s_sat_layer_pend));
+    memset(s_sat_layer_pend_set, 0, sizeof(s_sat_layer_pend_set));
+    memset(s_sat_layer_act, 0, sizeof(s_sat_layer_act));
+    memset(s_sat_objid_pend, 0, sizeof(s_sat_objid_pend));
+    memset(s_sat_objid_act, 0, sizeof(s_sat_objid_act));
+    memset(s_sat_xadj, 0, sizeof(s_sat_xadj));
+}
+
+/*
+ * Objetos escondidos pelo corte horizontal do proprio jogo (loc_DF18: bit 7 de ($21,a0)
+ * quando o x de tela sai de [-64,384)). No 4:3 isso nunca aparece, mas no 16:9 parte do
+ * objeto cai na margem (ex.: cabeca dos leoes do RAX, cujo corpo e cenario e continua
+ * visivel). Reproduz o calculo de posicao de Sub_E684 ($E722..$E76A) e registra os
+ * sub-sprites como extras (desenhados so nas margens). So objetos cujo unico motivo de
+ * estar oculto e o X: fl20 & $8080 == $0080, Y dentro da faixa do corte e x fora dela.
+ */
+static void ec_collect_xculled_object(uint16_t a0)
+{
+    if (a0 == 0u)
+        return;
+    /* Tipo 6 = HUD; tipo 0 recebe o bit 7 todo quadro em Sub_E884 ($E8A8), oculto de
+     * proposito e nao pelo corte de X. */
+    uint16_t t18 = ec_ram16((unsigned)a0 + 0x18u);
+    if (t18 == 6u || t18 == 0u)
+        return;
+    uint16_t fl = ec_ram16((unsigned)a0 + 0x20u);
+    if ((fl & 0x8080u) != 0x0080u)
+        return;
+    /* Mesmos filtros de quadro alternado de Sub_E684 ($E6E8..$E720). */
+    if (g_ram[0xFD71u] & 1u) {
+        if (fl & 0x1000u)
+            return;
+    } else if (fl & 0x2000u) {
+        return;
+    }
+    if (ec_ram16(0xDF6Cu) != 0u && (fl & 0x0800u) &&
+        ((ec_ram16((unsigned)a0 + 0x3Eu) ^ ec_ram16(0xFD70u)) & 1u))
+        return;
+
+    int16_t sx = (int16_t)(ec_ram16((unsigned)a0 + 0x4Au) - ec_ram16(0xCD14u));
+    int16_t sy = (int16_t)(ec_ram16((unsigned)a0 + 0x4Cu) - ec_ram16(0xCD12u));
+    if ((uint16_t)(sx + 0x40) <= 0x1C0u)
+        return;                                   /* nao foi cortado por X */
+    if ((uint16_t)(sy + 0x40) > 0x160u)
+        return;                                   /* cortado (tambem) por Y */
+    if (sx < -192 || sx > 512)
+        return;                                   /* longe demais para alcancar a margem */
+
+    uint16_t d6  = (uint16_t)(sx + 0x80);
+    uint16_t d7  = (uint16_t)(sy + 0x80);
+    uint16_t a1  = ec_ram16((unsigned)a0 + 0x0Cu);
+    unsigned cnt = ec_ram16((unsigned)a0 + 0x0Eu);
+    uint16_t layer = (ec_ram16((unsigned)a0 + 0x18u) == 8u) ? ec_ram16((unsigned)a0 + 0x4Eu) : 0u;
+    for (unsigned i = 0; i < cnt && i < 16u && a1 != 0u && s_extra_pend_n < EC_EXTRA_MAX; ++i) {
+        EcExtraSpr *e = &s_extra_pend[s_extra_pend_n++];
+        e->x     = (int16_t)(uint16_t)(ec_ram16((unsigned)a1 + 0u) + d6);
+        e->y     = (int16_t)(uint16_t)(ec_ram16((unsigned)a1 + 2u) + d7);
+        e->szw   = ec_ram16((unsigned)a1 + 4u);
+        e->attr  = ec_ram16((unsigned)a1 + 6u);
+        e->ord   = (uint16_t)g_cpu.D[4];
+        e->layer = layer;
+        a1 = ec_ram16((unsigned)a1 + 8u);
+    }
 }
 
 void ec_video_on_sprite_hook(uint32_t pc)
@@ -466,6 +593,37 @@ void ec_video_on_sprite_hook(uint32_t pc)
         return;
     if (pc == 0x00E684u) {
         s_extra_pend_n = 0;
+        memset(s_sat_layer_pend_set, 0, sizeof(s_sat_layer_pend_set));
+        return;
+    }
+    if (pc == 0x00E6CEu) {
+        uint16_t a0 = (uint16_t)g_cpu.A[0];
+        /* d4 e o campo link da entrada gravada; a propria entrada e a de indice d4 - 1
+         * (o pool do HUD ocupa SAT[0..($DF7A)-2] e d4 parte de ($DF7A)). */
+        uint16_t idx = (uint16_t)((uint16_t)g_cpu.D[4] - 1u);
+        /* Marca explicitamente as ($E,a0) entradas do objeto e zera a seguinte: o proximo
+         * objeto (ou o que for escrito depois de Sub_E684, ex.: terminador) nao herda a
+         * camada. Objeto pulado/descartado: o seguinte comeca no mesmo indice e sobrescreve. */
+        if (idx < 80u) {
+            uint16_t layer = (a0 != 0u && ec_ram16((unsigned)a0 + 0x18u) == 8u)
+                                 ? ec_ram16((unsigned)a0 + 0x4Eu) : 0u;
+            unsigned cnt = (a0 != 0u) ? ec_ram16((unsigned)a0 + 0x0Eu) : 0u;
+            uint16_t oid = (a0 != 0u) ? ec_ram16((unsigned)a0 + 0x40u) : 0u;
+            unsigned end = idx + cnt;
+            if (end > 80u)
+                end = 80u;
+            for (unsigned i = idx; i < end; ++i) {
+                s_sat_layer_pend[i]     = layer;
+                s_sat_objid_pend[i]     = oid;
+                s_sat_layer_pend_set[i] = 1;
+            }
+            if (end < 80u) {
+                s_sat_layer_pend[end]     = 0u;
+                s_sat_objid_pend[end]     = 0u;
+                s_sat_layer_pend_set[end] = 1;
+            }
+        }
+        ec_collect_xculled_object(a0);
         return;
     }
     if (pc != 0x00E7B0u || s_extra_pend_n >= EC_EXTRA_MAX)
@@ -488,6 +646,7 @@ void ec_video_on_sprite_hook(uint32_t pc)
     e->szw  = ec_ram16((unsigned)a1 + 0u);
     e->attr = ec_ram16((unsigned)a1 + 2u);
     e->ord  = (uint16_t)g_cpu.D[4];
+    e->layer = (ec_ram16((unsigned)a0 + 0x18u) == 8u) ? ec_ram16((unsigned)a0 + 0x4Eu) : 0u;
 }
 
 /* Desenha um sprite na linha. margin_only: so pixels fora de [x0, x0+native_w). */
@@ -587,7 +746,8 @@ static void ec_eval_full_sprites_line(const GVDP *v, int line, int left, int x0,
         for (; ex < s_extra_act_n && s_extra_act[ex].ord <= (uint16_t)link; ++ex) {
             const EcExtraSpr *x = &s_extra_act[ex];
             ec_draw_sprite_span(v, line, (int)(x->y & 0x3FF) - (im2 ? 256 : 128),
-                                (int)x->x - 128, x0, (uint8_t)(x->szw >> 8), x->attr, 0xFF,
+                                (int)x->x - 128, x0 - ec_layer_addr_edge_comp(x->layer, x0 - left),
+                                (uint8_t)(x->szw >> 8), x->attr, 0xFF,
                                 width, im2, sh_mode, 1, x0, native_w, drawn, ms);
         }
 
@@ -605,9 +765,10 @@ static void ec_eval_full_sprites_line(const GVDP *v, int line, int left, int x0,
                 any_nonzero_x = 1;
             }
 
-            /* Sub_E684 grava (screen_x + 128) com sinal 16-bit na SAT; HUD usa âncora fixa `left`. */
+            /* Sub_E684 grava (screen_x + 128) com sinal 16-bit na SAT; HUD usa âncora fixa `left`;
+             * objetos presos a camada recebem a compensacao de borda da camada. */
             int sx0    = (int)(int16_t)w3 - 128;
-            int base_x = s_sat_is_hud[link] ? left : x0;
+            int base_x = s_sat_is_hud[link] ? left : (x0 - (int)s_sat_xadj[link]);
             ec_draw_sprite_span(v, line, y, sx0, base_x, sz, attr, link, width, im2, sh_mode,
                                 0, x0, native_w, drawn, ms);
         }
@@ -620,7 +781,8 @@ static void ec_eval_full_sprites_line(const GVDP *v, int line, int left, int x0,
     for (; ex < s_extra_act_n; ++ex) {
         const EcExtraSpr *x = &s_extra_act[ex];
         ec_draw_sprite_span(v, line, (int)(x->y & 0x3FF) - (im2 ? 256 : 128),
-                            (int)x->x - 128, x0, (uint8_t)(x->szw >> 8), x->attr, 0xFF,
+                            (int)x->x - 128, x0 - ec_layer_addr_edge_comp(x->layer, x0 - left),
+                            (uint8_t)(x->szw >> 8), x->attr, 0xFF,
                             width, im2, sh_mode, 1, x0, native_w, drawn, ms);
     }
 }
@@ -686,9 +848,9 @@ static void ec_render_ws_scanline_impl(const GVDP *v, int out_line, int bg_line,
     int hidx       = (hmode == 0) ? 0 : (hmode == 2) ? (rline & ~7) : rline;
     int hs_a       = (int)(ec_vram16(v, (uint16_t)(hbase + hidx * 4 + 0)) & 0x3FFu);
     int hs_b       = (int)(ec_vram16(v, (uint16_t)(hbase + hidx * 4 + 2)) & 0x3FFu);
-    int comp_a     = ec_plane_edge_comp(0u, bg_line, x0 - left);
+    int comp_a     = ec_plane_edge_comp(0u, bg_line, x0 - left, hs_a);
     int hs_a_adj   = (hs_a - comp_a) & 0x3FF;
-    int comp_b     = ec_plane_edge_comp(2u, bg_line, x0 - left);
+    int comp_b     = ec_plane_edge_comp(2u, bg_line, x0 - left, hs_b);
     int hs_b_adj   = (hs_b - comp_b) & 0x3FF;
 
     int vs_mask     = im2 ? 0x7FF : 0x3FF;
@@ -737,6 +899,18 @@ static void ec_render_ws_scanline_impl(const GVDP *v, int out_line, int bg_line,
         int s_hi = ms ? (ms->hi[ox] != 0) : 0;
         int s_sh = ms ? (ms->sh[ox] != 0) : 0;
         int s_hl = ms ? (ms->hl[ox] != 0) : 0;
+
+        /*
+         * Trident (Estado 24): o meio do tronco da arvore e um sprite de prioridade alta
+         * (objeto $22) e no original fica na frente da nevoa, que esta pintada no plano B
+         * em pontilhado (indices 20/21/22/23/25 da linha 1; o ceu e 17..19). A pedido do
+         * usuario a nevoa passa na frente dele: onde o plano B tem um ponto de nevoa, ele
+         * vence o tronco, mantendo o efeito translucido. So apresentacao (widescreen).
+         */
+        if (s_op && s_snap_fd64 == 24u && op_b && ms && ms->link[ox] < 80u &&
+            s_sat_objid_act[ms->link[ox]] == 0x0022u &&
+            (idx_b == 20u || idx_b == 21u || idx_b == 22u || idx_b == 23u || idx_b == 25u))
+            s_op = 0;
 
         uint8_t cidx = backdrop;
         int win_layer = EC_HD_LAYER_NONE;
@@ -932,9 +1106,37 @@ static void ec_video_scanline_lazy(const GVDP *vdp, int line, int native_w,
             if (fd64 == s_snap_fd64) {
                 memcpy(s_extra_act, s_extra_pend, (size_t)s_extra_pend_n * sizeof(EcExtraSpr));
                 s_extra_act_n = s_extra_pend_n;
+                uint16_t cur = 0u, curid = 0u;
+                for (int i = 0; i < 80; ++i) {
+                    if (s_sat_layer_pend_set[i]) {
+                        cur   = s_sat_layer_pend[i];
+                        curid = s_sat_objid_pend[i];
+                    }
+                    s_sat_layer_act[i] = cur;
+                    s_sat_objid_act[i] = curid;
+                }
             } else {
                 /* Entrada/troca de arena: a lista pendente pode ser de outro estado. */
                 s_extra_act_n = 0;
+                memset(s_sat_layer_act, 0, sizeof(s_sat_layer_act));
+                memset(s_sat_objid_act, 0, sizeof(s_sat_objid_act));
+            }
+            {
+                int dx = s_snap_x0 - left;
+                for (int i = 0; i < 80; ++i)
+                    s_sat_xadj[i] = (int16_t)ec_layer_addr_edge_comp(s_sat_layer_act[i], dx);
+                static int s_ws_debug = -1;
+                if (s_ws_debug < 0) {
+                    const char *e = getenv("EC_WS_DEBUG");
+                    s_ws_debug = (e && *e && *e != '0') ? 1 : 0;
+                }
+                if (s_ws_debug) {
+                    fprintf(stderr, "[WSDBG] x0=%d dx=%d", s_snap_x0, dx);
+                    for (int i = 0; i < 80; ++i)
+                        if (s_sat_layer_act[i])
+                            fprintf(stderr, " %d:%04X/%d", i, s_sat_layer_act[i], s_sat_xadj[i]);
+                    fprintf(stderr, "\n");
+                }
             }
             s_snap_fd64  = fd64;
             s_snap_valid = 1;
@@ -951,7 +1153,7 @@ static void ec_video_scanline_lazy(const GVDP *vdp, int line, int native_w,
             ec_refresh_frame_hud_sat(vdp);
         int x0 = s_snap_x0;
         if (line == 0 && ec_hd_is_active())
-            ec_hd_begin_frame(vdp, ec_ram16(0xFD64u), width, 224, left, x0, s_sat_is_hud);
+            ec_hd_begin_frame(vdp, ec_ram16(0xFD64u), width, 224, left, x0, s_sat_is_hud, s_sat_xadj);
         int force_display = (line >= 216 && s_frame_had_display && s_snap_force_ok) ? 1 : 0;
         EcMarginSprites ms;
         ec_eval_full_sprites_line(vdp, line, left, x0, native_w, width, force_display, &ms);

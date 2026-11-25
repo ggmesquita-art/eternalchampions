@@ -50,6 +50,12 @@ As variáveis de ambiente permitem configurar drivers de baixo nível da bibliot
 | Variável | Valores | Descrição |
 |---|---|---|
 | `EC_UNLOCK_BOSS` | `1` ou `0` | Desbloqueia permanentemente o *Eternal Champion* na tela de seleção de personagens e modos de jogo. |
+| `EC_HOLO_OK_TEST` | `<n>` | Diagnóstico (com `--unlock-boss`): arma o overkill do raio da armadilha no Holo-Trainer `n` quadros após entrar na arena, inclusive no modo treino, com o P2 como vítima. Só para ver o efeito. |
+| `EC_HOLO_OK_SFX` | `<id hex>` | Som tocado quando o raio do overkill do Holo-Trainer dispara (padrão: nenhum). |
+| `EC_HOLO_OK_LOG` | `1` | Registra em stderr as tentativas de armar o overkill do Holo-Trainer (posição da vítima, VRAM, grupo da armadilha). |
+| `EC_HOLO_OK_DRONE` | `1` | Com `EC_HOLO_OK_TEST`, usa o drone flutuante em vez da armadilha do trilho (comparação). |
+| `EC_FORM_TEST` | `<forma>@<quadro>[,...]` | Diagnóstico (com `--unlock-boss`): pede trocas de forma do Eternal Champion do P1 nos quadros dados (0 Base, 1 Dragão, 2 Fênix, 3 Tubarão, 4 Tigre), sem precisar de controle de 6 botões. |
+| `EC_FORM_LOG` | `1` | Registra em stderr os pedidos e aplicações de troca de forma do Eternal Champion. |
 | `EC_HD_MANIFEST` | `<caminho/manifest.toml>` | Caminho para o manifesto de substituição de assets em alta definição (Modo C). |
 | `EC_AUDIO_REMASTER` | `off`, `dsp`, `hybrid`, `ost` | Define o modo inicial do motor de remasterização de áudio: `off` (áudio original puro), `dsp` (apenas efeitos DSP), `hybrid` (síntese SoundFont + chip original), `ost` (síntese SoundFont isolada). |
 | `EC_AUDIO_SF2` | `<caminho.sf2>` | Caminho do arquivo SoundFont 2 para síntese instrumental em tempo real (padrão: `assets/soundfonts/TimGM6mb.sf2`). |
@@ -401,6 +407,7 @@ Durante a execução da partida, as seguintes teclas de atalho estão ativas em 
 | **`F10`** | **Cold Reset** | Reinicia completamente a máquina virtual e o cartucho (a memória SRAM de bateria é preservada). |
 | **`F11`** / **`Alt+Enter`** | **Alternar Tela Cheia** | Alterna entre o modo janela e o modo tela cheia configurado no `settings.ini`. |
 | **`F12`** | **Captura de Tela (PNG)** | Tira um print de alta qualidade e salva em `screenshots/screenshot_YYYYMMDD_HHMMSS.png`. |
+| **`MODE` + `X` / `Y` / `B` / `A`** (controle de 6 botões) | **Forma do Eternal Champion** | Com `--unlock-boss`, durante a luta e com o EC em neutro: `X` = Tubarão, `Y` = Dragão, `B` = Tigre, `A` = Fênix; o botão da forma atual volta à forma neutra (Base). Exige `pad_type = 1` no jogador (no Xbox, MODE = Back, X = botão Y). O `A`/`B` também contam como golpe. |
 | **`Shift + F12`** / **`Ctrl + F12`** | **Dump de Áudio Dev** | Despeja imediatamente os buffers de rastreamento dos chips para `chip_ring.txt` e `snd_ring.txt`. |
 | **`Backspace`** | **Botão Mode** | Botão *Mode* do controle de 6 botões (bind padrão `key.mode = 42`); não rebobina (rebobinar é `F8`). |
 | **`Esc`** | **Sair / Menu** | Fecha o jogo (com `--no-launcher`/sem launcher); no build com runtime UI abre o menu de pausa. |

@@ -531,8 +531,9 @@ static int ec_instruction_hook(uint32_t pc)
         ec_audio_on_bgm_stop(1);
         return 0;
     case 0x00E684u:
+    case 0x00E6CEu:
     case 0x00E7B0u:
-        ec_video_on_sprite_hook(pc); /* passivo: so coleta sub-sprites descartados */
+        ec_video_on_sprite_hook(pc); /* passivo: sub-sprites descartados e objetos presos a camada */
         return 0;
     default:
         break;

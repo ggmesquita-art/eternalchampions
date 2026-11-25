@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "game/ec_boss.c": {
-    "mtime": 1795329394.5110412,
-    "seen": 1795464764.6282527,
-    "ast_hash": "e134b9559cbbf3adb8c5aa296b370c85",
+    "mtime": 1795621857.0804589,
+    "seen": 1795622496.8974197,
+    "ast_hash": "d9c337275f5f2a58874b4cfd39846739",
     "semantic_hash": ""
   },
   "game/ec_boss.h": {
@@ -30,27 +30,27 @@
     "semantic_hash": ""
   },
   "game/ec_hd.c": {
-    "mtime": 1795572684.468975,
-    "seen": 1795573469.5534072,
-    "ast_hash": "8126fc37cc0df62649b87f9619bc6145",
+    "mtime": 1795619597.804281,
+    "seen": 1795622496.897428,
+    "ast_hash": "e6d57e6dd1fcce0f8786b406f2cc38a3",
     "semantic_hash": ""
   },
   "game/ec_hd.h": {
-    "mtime": 1795570050.696232,
-    "seen": 1795573469.5534098,
-    "ast_hash": "396aff74de9833a952af7e58ab4aea92",
+    "mtime": 1795619597.805279,
+    "seen": 1795622496.8974302,
+    "ast_hash": "589690956295df6e756d7df600c74e13",
     "semantic_hash": ""
   },
   "game/ec_spec.c": {
-    "mtime": 1795586618.3713076,
-    "seen": 1795586895.253663,
-    "ast_hash": "ea275a093ffa0119fa132ad43ba287e4",
+    "mtime": 1795619597.8062816,
+    "seen": 1795622496.8974366,
+    "ast_hash": "3f967aad4cde866d28920055288fb78d",
     "semantic_hash": ""
   },
   "game/ec_video.c": {
-    "mtime": 1795578253.301291,
-    "seen": 1795578341.5465176,
-    "ast_hash": "08444a9ee155ed253741dedb598648a4",
+    "mtime": 1795621845.7685928,
+    "seen": 1795622496.8974388,
+    "ast_hash": "a8459158e69de1798341026dea3ce943",
     "semantic_hash": ""
   },
   "game/ec_video.h": {
@@ -492,9 +492,9 @@
     "semantic_hash": ""
   },
   "docs/frame_data/fight_probe_summary.md": {
-    "mtime": 1795593235.4417877,
-    "seen": 1795614642.6170013,
-    "ast_hash": "5091a62b1b0f21c0eff331fd1436756a",
+    "mtime": 1795622481.274949,
+    "seen": 1795622496.897839,
+    "ast_hash": "9b4f8e12f98e250400fb8ff85af34dec",
     "semantic_hash": ""
   },
   "docs/main_loop.md": {
@@ -558,9 +558,9 @@
     "semantic_hash": ""
   },
   "docs/widescreen.md": {
-    "mtime": 1795490498.5953572,
-    "seen": 1795491252.5543795,
-    "ast_hash": "586385fba468d693c40dd6e935c38b5c",
+    "mtime": 1795621408.9300194,
+    "seen": 1795622496.8978622,
+    "ast_hash": "3c65e8c068332f443acb16fd68b11c49",
     "semantic_hash": ""
   },
   "game/CMakeLists.txt": {
@@ -576,9 +576,9 @@
     "semantic_hash": ""
   },
   "task.md": {
-    "mtime": 1795593250.119867,
-    "seen": 1795614642.6170356,
-    "ast_hash": "9db92649dcd5018f4f4d0cfdbb87ab1f",
+    "mtime": 1795617550.5864582,
+    "seen": 1795617560.1950324,
+    "ast_hash": "479a88eb387e71e6550352f03fe6c9b4",
     "semantic_hash": ""
   },
   "tools/audio/mixer_ui/index.html": {
@@ -1209,6 +1209,12 @@
     "mtime": 1754320750.5604103,
     "seen": 1795614642.6169786,
     "ast_hash": "d2e72fdd699f54451849ce0e6b3ca765",
+    "semantic_hash": ""
+  },
+  "docs/FRAMEGEN_ROADMAP.md": {
+    "mtime": 1795617537.9515536,
+    "seen": 1795617560.1949868,
+    "ast_hash": "33ba78a5c7370c8917bf6bc39e37303a",
     "semantic_hash": ""
   },
   "package-lock.json": {

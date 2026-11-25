@@ -19,7 +19,7 @@ mode = "gm"       # gm | percussion | chip | off
 program = 62
 bank = 0
 transpose = 0
-volume_db = 3.0
+volume_db = 0.0
 drum_note = 0
 [voices.0047b5c7.meta]
 alg = 5
@@ -44,7 +44,7 @@ suggestion = "brass"
 [voices.01a7cbf3]
 name = ""
 mode = "gm"       # gm | percussion | chip | off
-program = 73
+program = 82
 bank = 0
 transpose = 0
 volume_db = 0.0
@@ -184,10 +184,10 @@ suggestion = "plucked"
 [voices.1e04081c]
 name = ""
 mode = "gm"       # gm | percussion | chip | off
-program = 63
+program = 29
 bank = 0
 transpose = 0
-volume_db = -4.0
+volume_db = -3.0
 drum_note = 0
 [voices.1e04081c.meta]
 alg = 5
@@ -324,7 +324,7 @@ suggestion = "plucked"
 [voices.30df7c20]
 name = ""
 mode = "gm"       # gm | percussion | chip | off
-program = 1
+program = 4
 bank = 0
 transpose = 0
 volume_db = 0.0
@@ -383,7 +383,7 @@ mode = "gm"       # gm | percussion | chip | off
 program = 12
 bank = 0
 transpose = 0
-volume_db = -2.0
+volume_db = -4.0
 drum_note = 0
 [voices.36a64f56.meta]
 alg = 3
@@ -691,7 +691,7 @@ mode = "gm"       # gm | percussion | chip | off
 program = 12
 bank = 0
 transpose = 0
-volume_db = 0.0
+volume_db = -3.0
 drum_note = 0
 [voices.7c0a2e87.meta]
 alg = 4
@@ -744,7 +744,7 @@ suggestion = "plucked"
 [voices.8ba7fc08]
 name = ""
 mode = "gm"       # gm | percussion | chip | off
-program = 68
+program = 13
 bank = 0
 transpose = 0
 volume_db = 0.0
@@ -800,7 +800,7 @@ suggestion = "percussion"
 [voices.9bed907f]
 name = ""
 mode = "gm"       # gm | percussion | chip | off
-program = 29
+program = 36
 bank = 0
 transpose = 0
 volume_db = 0.0
@@ -884,10 +884,10 @@ suggestion = "brass"
 [voices.a4ab7d98]
 name = ""
 mode = "gm"       # gm | percussion | chip | off
-program = 62
+program = 67
 bank = 0
 transpose = 0
-volume_db = 0.0
+volume_db = 2.0
 drum_note = 0
 [voices.a4ab7d98.meta]
 alg = 5
@@ -912,7 +912,7 @@ suggestion = "lead"
 [voices.b071434f]
 name = ""
 mode = "gm"       # gm | percussion | chip | off
-program = 4
+program = 84
 bank = 0
 transpose = 0
 volume_db = 0.0
@@ -1108,7 +1108,7 @@ suggestion = "lead"
 [voices.cfe48baf]
 name = ""
 mode = "gm"       # gm | percussion | chip | off
-program = 72
+program = 99
 bank = 0
 transpose = 0
 volume_db = 0.0
@@ -1248,7 +1248,7 @@ suggestion = "plucked"
 [voices.de574d95]
 name = ""
 mode = "gm"       # gm | percussion | chip | off
-program = 39
+program = 45
 bank = 0
 transpose = 0
 volume_db = 0.0

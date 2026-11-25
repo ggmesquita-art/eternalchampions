@@ -83,3 +83,19 @@ A caçada descrita abaixo terminou com sucesso. Resumo do estado final
 - `docs/main_loop.md`; labels em `disasm/symbols/labels.toml`; RAM em
   `disasm/symbols/ram_map.toml` (614 entradas; $FFFFAA52 = slot P2, $FFFFAB86
   = Fighter_P1 stride 0x134).
+
+## Overkill do Holo-Trainer — raio da armadilha do trilho (2026-11-25, `--unlock-boss`)
+
+O Holo-Trainer (Estado `14`) não está na tabela de overkills por arena (`$26A36`: bytes `13 15..1B 14 FF`, sem espaço para mais uma entrada), então o overkill é armado pelo mesmo hook do vitral do Santuário (`$026A16`, em `game/ec_boss.c`) quando `is_vs_offlabel_holo()`.
+
+- **Gatilho:** as mesmas condições do jogo para qualquer overkill (golpe que nocauteia, round decisivo, golpe forte `($128) >= $0B`, atacante com vida) com a vítima no **centro** da arena (`x` entre 400 e 560, `HOLO_ZONE_MIN/MAX`).
+- **Vítima parada:** usa `$9C7C = 2`, o caminho do overkill da arena do RAX (`$5E566`). A vítima fica no lugar em vez de ser arremessada (o vitral usa `1`).
+- **Armadilha ("moving head"):** as cabeças que correm no trilho do alto são objetos `$CB` criados só na sala de treino (`State17_Handler`, Estado `17`); os gráficos são o grupo de tiles `$48` (índice `$29` da lista `$7F65A`, comprimido na ROM, modo 28). O Holo não os carrega: o overkill chama `Tile_AllocGroup` (`$E408`) para o grupo `$48`, remapeia em lugar os 26 tiles da cabeça da paleta da sala de treino (`State17_Palette` `$4804`, linha 1) para as cores estáveis mais próximas da linha 1 do Holo e a desenha (topo 3×2 alternando, boca 3×2 fechada / 4×2 aberta ao disparar, prioridade alta), deslizando no trilho (`y = $28`) do lado mais distante até ficar sobre a vítima. No fim o grupo é liberado (`$E340`). Se o grupo não puder ser carregado, o drone flutuante (tiles `$E3`–`$E8` do Holo) entra no lugar.
+- **Sequência (~7 s, inspirada no overkill do RAX):** a vítima fica tonta e parada (36 quadros), a cabeça desliza pelo trilho (90), dispara o raio vermelho com núcleo branco e clarão no chão (140) enquanto a vítima passa a um brilho ciano pulsante, e então ela **desintegra**: some e vira partículas lidas da própria silhueta (sub-sprites `($C)` + tiles na VRAM, grade 8×8, até 56), que caem em cascata de cima para baixo até formar um monte de pó (120); a cabeça volta pelo trilho (80) e o jogo segue (`$16F32`) para a vitória e o menu. As partículas usam só as vagas livres da SAT (reservando as dos objetos visíveis); se faltar, se revezam entre quadros.
+- **Câmera:** `$9C7A`/`$9C76` são os alvos X/Y do overkill (`$1F410`/`$1F4FA`); centraliza na vítima (`x - $96`) e mantém o Y atual.
+- **VRAM:** os 24 tiles do raio, clarão, monte de pó e partículas são reservados no alocador do jogo (`Mem_Alloc` `$D4CC`, liberados com `Mem_Free` `$D5A4`). Sem espaço, não há overkill. Os índices de cor que ciclam no Holo são detectados durante a aproximação e evitados.
+- **Sprites:** hook em `$00E68C` (`Sub_E684` com `d4`/`a2` carregados) grava as entradas no início da SAT em RAM, à frente dos objetos.
+- **Brilho:** interpolação da linha de paleta da vítima para ciano no buffer `$F036` (+ `$EF32`); restaurada no fim do round (`$5818`).
+- **Diagnóstico:** `EC_HOLO_OK_TEST=<n>` arma o efeito `n` quadros após entrar no Holo, inclusive no treino, com o P2 como vítima e sem as chamadas de fim de luta (`EC_HOLO_OK_DRONE=1` força o drone); `EC_HOLO_OK_LOG=1` registra o gatilho em stderr; `EC_HOLO_OK_SFX=<hex>` define o som do disparo (padrão: nenhum).
+- **Validado:** golpe final real no save do usuário (VS no Holo, adversário com 16 de energia, chute forte no centro): cabeça, raio, queima, cinzas e volta ao menu. Prévia: `assets/video_compare/holo_overkill/preview_overkill_holo.png`.
+- **Pendente:** escolher o som do disparo; calibrar a faixa do centro se preciso.

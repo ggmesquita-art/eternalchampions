@@ -48,7 +48,9 @@ std::vector<Page> build_audio(App& app) {
     add_opts(app, out, {"audio.volume", "audio.frequency", "audio.bypass_filter"});
     add_opts(app, rem, {"ec.audio.remaster", "ec.audio.bgm_vol", "ec.audio.sfx_vol", "ec.audio.dsp_reverb", "ec.audio.hot_reload"});
     if (app.cfg.get("ec.audio.remaster") == "ost") add_opts(app, rem, {"args.audio_chip_blend"});
-    rem.rows[0].rebuild = false;
+    /* Trocar o modo remonta a página: a mistura do chip (só em OST) e o texto
+     * "Sobre o modo" dependem dele. Com false, o ajuste sumia ao escolher OST. */
+    rem.rows[0].rebuild = true;
     {   // descricao do modo atual
         std::string m = app.cfg.get("ec.audio.remaster");
         rem.rows.push_back(header_row("Sobre o modo"));

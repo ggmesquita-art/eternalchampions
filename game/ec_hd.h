@@ -41,7 +41,7 @@ int ec_hd_approved_entries(void);
  * H-flip + CRAM palette check) once at the start of a frame. */
 void ec_hd_begin_frame(const GVDP *vdp, uint16_t state_id,
                        int width, int height, int left, int x0,
-                       const uint8_t sat_is_hud[80]);
+                       const uint8_t sat_is_hud[80], const int16_t sat_xadj[80]);
 
 /* Record exact VDP-priority winner and underlying plane coords for one native pixel. */
 void ec_hd_record_pixel(int line, int ox,

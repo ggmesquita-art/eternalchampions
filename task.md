@@ -188,6 +188,16 @@ vidia\*in` no PATH (cudart/cublas/cudnn). Validado: `EC_ONNXRUNTIME_LIB=<venv>\
 
 ---
 
+## 3c. APIs gráficas e geração de quadros (`Trilhas V/X/I`) — *adiado, roadmap pronto*
+
+Roadmap completo em [`docs/FRAMEGEN_ROADMAP.md`](docs/FRAMEGEN_ROADMAP.md). Ordem recomendada: X1 Lossless Scaling → V0 camada de apresentação → V1 D3D11 por interop → X2 Smooth Motion → I0–I3 interpolação nativa (câmera, depois sprites) → V2/V3 D3D12 e Vulkan → I4 vetores de movimento → X4 FSR 3.1 FG / DLSS-G → X3 Optiscaler → V4–V7 ports nativos (librashader, B+ HLSL/SPIR-V, Modo C).
+
+- [ ] **Trilha V** — Direct3D 11, Direct3D 12 e Vulkan (V0–V7)
+- [ ] **Trilha X** — Lossless Scaling, NVIDIA Smooth Motion, Optiscaler e FG nativo (X1–X4)
+- [ ] **Trilha I** — interpolação nativa pelo contrato `interpolate` do runner (I0–I5)
+
+---
+
 ## 4. Trilha F — Finalização, Port Windows e Backlog de Baixa Prioridade
 
 - [x] **F1 — Build Windows Nativo (x64):**

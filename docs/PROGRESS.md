@@ -401,6 +401,17 @@ Ver [docs/offlabel_arenas.md](offlabel_arenas.md). Resumo do estado final:
   `EC_LIMIT_SPRITES=1` restaura o limite original.
 - **Bug restante na fila:** sprites do EC falham nos DOIS ECs só no
   round 1 no Trident (pista: carregamento/timing).
+- **Troca de forma na luta (2026-11-25):** com o EC jogável, `MODE` + `X`
+  (Tubarão) / `Y` (Dragão) / `B` (Tigre) / `A` (Fênix) troca a forma no meio da
+  luta; o botão da forma atual volta à forma neutra (Base). Reaproveita as partes síncronas da transformação original do chefe
+  (`fight_moves1.asm` `$451CE..$453E0`): blob em `($108)` + paleta `$172AE`,
+  ciclos de brilho `$D782`, cadeia de golpes preenchida em lugar `$1822A`,
+  tabela `$5E180`/`$44160`, IA da forma e objeto `$36`; som original `$1D` e
+  clarão só na paleta do lutador (o clarão do cenário do Santuário, `$1DFA6`,
+  fica de fora). Pedido lido do controle selado (`genesis_sim_pad`) em
+  `ec_boss_vblank` e aplicado no laço principal do EC (`$044274`, após o
+  `jsr $DB14` que marca a retomada da tarefa), ou seja, só em neutro. Exige
+  controle de 6 botões (`pad_type = 1`). Diagnóstico: `EC_FORM_TEST`, `EC_FORM_LOG`.
 
 ### 11.5 Arquitetura da máquina de estados mapeada (neste ciclo)
 

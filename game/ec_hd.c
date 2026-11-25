@@ -957,7 +957,8 @@ static void match_live_plane(const GVDP *v, int pi, uint16_t base_addr, EcHdPlan
     s_plane_has_match[pi] = (matches > 0);
 }
 
-static void match_live_sprites(const GVDP *v, int left, int x0, const uint8_t sat_is_hud[80])
+static void match_live_sprites(const GVDP *v, int left, int x0, const uint8_t sat_is_hud[80],
+                               const int16_t sat_xadj[80])
 {
     s_frame_sprite_count = 0;
     for (int i = 0; i < 80; ++i)
@@ -1063,7 +1064,8 @@ static void match_live_sprites(const GVDP *v, int left, int x0, const uint8_t sa
                         sprite_palette_matches_cram(sa, v, pal_id)) {
                         int sx0 = (int)(int16_t)w3 - 128;
                         int sy0 = (int)(w0 & 0x3FFu) - 128;
-                        int base_x = (sat_is_hud && sat_is_hud[link]) ? left : x0;
+                        int base_x = (sat_is_hud && sat_is_hud[link])
+                                         ? left : (x0 - (sat_xadj ? (int)sat_xadj[link] : 0));
                         int fslot = s_frame_sprite_count++;
                         EcHdFrameSprite *fs = &s_frame_sprites[fslot];
                         fs->valid      = 1;
@@ -1089,7 +1091,7 @@ static void match_live_sprites(const GVDP *v, int left, int x0, const uint8_t sa
 
 void ec_hd_begin_frame(const GVDP *vdp, uint16_t state_id,
                        int width, int height, int left, int x0,
-                       const uint8_t sat_is_hud[80])
+                       const uint8_t sat_is_hud[80], const int16_t sat_xadj[80])
 {
     s_frame_armed = 0;
     if (!ec_hd_is_active() || !vdp || width <= 0 || height <= 0 ||
@@ -1126,7 +1128,7 @@ void ec_hd_begin_frame(const GVDP *vdp, uint16_t state_id,
     }
 
     if (ec_hd_get_mode() == EC_HD_MODE_ALL)
-        match_live_sprites(vdp, left, x0, sat_is_hud);
+        match_live_sprites(vdp, left, x0, sat_is_hud, sat_xadj);
     else {
         /* --hd-mode planes: nenhum sprite casado -> record_pixel trata todo sprite
          * vencedor como "unmatched" e deixa a base (B+/nativa) intacta nele. */
@@ -1188,7 +1190,7 @@ static void evaluate_4x3_frame(const GVDP *v, uint16_t state_id, int width, int 
 {
     uint8_t no_hud[80];
     memset(no_hud, 0, sizeof(no_hud));
-    ec_hd_begin_frame(v, state_id, width, height, 0, 0, no_hud);
+    ec_hd_begin_frame(v, state_id, width, height, 0, 0, no_hud, NULL);
     if (!s_frame_armed)
         return;
     if (!s_plane_has_match[0] && !s_plane_has_match[1] && s_frame_sprite_count == 0)

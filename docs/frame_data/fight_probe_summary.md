@@ -8,8 +8,8 @@
 
 | Movie `.ecm` | Quadros | Diff WRAM (bytes) | PNG SHA-256 Run1 == Run2 | `floor_unsafe` | `dispatch_misses` | `interior_label_misses` | `floor_coverage` |
 |---|---:|---:|:---:|---:|---:|---:|---:|
-| `01_attract_boot.ecm` | 1000 | 0/65536 | SIM (`aac9990bc9be`) | 0 | 0 | 0 | 0 |
-| `02_title_to_fight.ecm` | 2900 | 0/65536 | SIM (`9ea36d3b53de`) | 0 | 0 | 0 | 0 |
+| `01_attract_boot.ecm` | 1000 | 0/65536 | SIM (`512bd223eb82`) | 0 | 0 | 0 | 0 |
+| `02_title_to_fight.ecm` | 2900 | 0/65536 | SIM (`ad206ff8c07b`) | 0 | 0 | 0 | 0 |
 
 ## 2. Paridade da Recompilação Estática (`Recomp` × `GENESIS_FORCE_INTERP=1`)
 
@@ -77,5 +77,5 @@
 
 | Captura | Cenário / Estado | Dimensão PNG | Margem Esq. (não-preta / total) | Margem Dir. (não-preta / total) | WRAM Diff vs 320x224 |
 |---|---|---|---:|---:|---:|
-| `assets/captures/title_16_9.png` | Pillarbox Title (Estado 7) | 398x224 | 0/8736 | 0/8736 | 0/65536 |
-| `assets/captures/fight_16_9.png` | Battle Simulator / Training Room (S17) | 398x224 | 8593/8736 | 8461/8736 | 0/65536 |
+| `assets\captures\title_16_9.png` | Pillarbox Title (Estado 7) | 398x224 | 0/8736 | 0/8736 | 0/65536 |
+| `assets\captures\fight_16_9.png` | Battle Simulator / Training Room (S17) | 398x224 | 8593/8736 | 8461/8736 | 0/65536 |

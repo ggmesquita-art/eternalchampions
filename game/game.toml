@@ -124,6 +124,12 @@ kind = "game_hook"
 addr = 0x043F4C
 kind = "game_hook"
 
+# EC jogavel: laco principal ($044274, retomada de cada quadro apos jsr $DB14) aplica a troca de forma pedida com
+# MODE + X/Y/A/B (ec_boss.c, ec_form_apply).
+[[widescreen_site]]
+addr = 0x044274
+kind = "game_hook"
+
 [[widescreen_site]]
 addr = 0x044204
 kind = "game_hook"
@@ -309,11 +315,24 @@ kind = "game_hook"
 
 # Hooks passivos de widescreen (ec_video.c): observam Sub_E684 ($E684), que monta a SAT.
 #   $00E684 = entrada de Sub_E684 (zera a lista de sub-sprites descartados do quadro)
+#   $00E6CE = loc_E6CE: inicio de cada objeto (a0 = objeto, d4 = proximo indice da SAT);
+#             registra a camada ($4E,a0) dos objetos ($18)=8 para compensar o parallax
+#             desses sprites nas bordas 16:9 (tronco do Trident, leoes do RAX, poste do Larcen).
 #   $00E7B0 = loc_E7B0: sub-sprite de objeto fl20&$4000 descartado por estar fora de
 #             [-32,320] x [-32,224]; registrado para ser desenhado so nas margens 16:9.
 # SEMPRE retornam 0 e nunca alteram g_cpu/g_ram/VDP.
 [[widescreen_site]]
 addr = 0x00E684
+kind = "game_hook"
+
+# $00E68C = Sub_E684 com d4/a2 carregados: o overkill do Holo-Trainer (ec_boss.c, so com
+#            --unlock-boss e overkill ativo) injeta ali os sprites do raio e das cinzas.
+[[widescreen_site]]
+addr = 0x00E68C
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x00E6CE
 kind = "game_hook"
 
 [[widescreen_site]]
