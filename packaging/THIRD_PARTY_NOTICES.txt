@@ -1,0 +1,22 @@
+Eternal Champions Recomp - avisos de terceiros
+================================================
+
+Eternal Champions (C) 1993 SEGA. Este pacote NAO contem a ROM; o usuario precisa fornecer
+um dump proprio da versao US (veja README.md). Projeto de fas, sem fins comerciais e sem
+vinculo com a SEGA.
+
+Componentes incluidos nos binarios ou distribuidos junto:
+
+- segagenesisrecomp (runner e recompilador) - Copyright (c) 2026 Matthew Stanley.
+  PolyForm Noncommercial License 1.0.0 + permissoes adicionais.
+  Ver licenses/segagenesisrecomp-LICENSE.md, licenses/segagenesisrecomp-PERMISSIONS.md e
+  licenses/segagenesisrecomp-THIRD-PARTY-LICENSES.md (ymfm, xxHash, minicoro etc.).
+  https://github.com/mstan/segagenesisrecomp
+
+- SDL2 - zlib License. https://www.libsdl.org/
+- libpng - PNG Reference Library License v2. http://www.libpng.org/pub/png/libpng.html
+- zlib - zlib License. https://zlib.net/
+- stb_truetype.h (Linux/macOS) - dominio publico / MIT. https://github.com/nothings/stb
+- TinySoundFont (tsf.h) - MIT. https://github.com/schellingb/TinySoundFont
+- Microsoft Visual C++ Runtime (Windows: msvcp140.dll, vcruntime140*.dll) - distribuido
+  conforme os termos de redistribuicao do Visual Studio.

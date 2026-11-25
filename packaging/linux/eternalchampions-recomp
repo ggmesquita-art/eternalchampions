@@ -1,0 +1,18 @@
+#!/bin/sh
+# Inicia o Eternal Champions Recomp.
+# O jogo e o launcher gravam settings.ini, rom-EC.cfg e saves ao lado dos executaveis; por isso o
+# pacote instalado (somente leitura) e copiado para uma pasta do usuario na primeira execucao e a
+# cada versao nova. Os arquivos do usuario nessa pasta nao sao apagados.
+set -e
+PAYLOAD="@PAYLOAD@"
+DATA="${XDG_DATA_HOME:-$HOME/.local/share}/eternalchampions-recomp"
+APP="$DATA/app"
+mkdir -p "$APP"
+if ! cmp -s "$PAYLOAD/VERSION" "$APP/VERSION" 2>/dev/null; then
+    cp -R "$PAYLOAD/." "$APP/"
+fi
+cd "$APP"
+case "$1" in
+    --game) shift; exec "$APP/EternalChampionsRecomp" "$@" ;;
+    *)      exec "$APP/EternalChampions" "$@" ;;
+esac

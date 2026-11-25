@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Eternal Champions Recomp
+Comment=Eternal Champions (Mega Drive) recompilado para PC
+Exec=@EXEC@
+Icon=applications-games
+Terminal=false
+Categories=Game;ArcadeGame;

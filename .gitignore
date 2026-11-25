@@ -89,3 +89,6 @@ screenshots/
 
 # Desmontagem do codigo da ROM (material de pesquisa, nao usado pelo build): fica so no disco
 /disasm/
+
+# Pacotes gerados por packaging/ (instaladores, .deb, .tar.gz)
+/packaging/out/

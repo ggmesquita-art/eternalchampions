@@ -11,6 +11,24 @@ Recompilação estática de **Eternal Champions** (Sega Genesis / Mega Drive, 19
 
 ---
 
+## Instalação (sem compilar)
+
+Baixe o pacote do seu sistema na página de [Releases](https://github.com/ggmesquita-art/eternalchampions/releases):
+
+| Sistema | Arquivo | Como instalar |
+|---|---|---|
+| Windows 10/11 x64 | `EternalChampionsRecomp-<versão>-windows-x64-setup.exe` | Rode o instalador. Ele não pede administrador e instala em `%LOCALAPPDATA%\Programs\EternalChampionsRecomp`. Uma das telas permite escolher a ROM. |
+| Ubuntu 24.04+ / Debian 13+ | `eternalchampions-recomp_<versão>_amd64.deb` | `sudo apt install ./eternalchampions-recomp_<versão>_amd64.deb`, ou abra o arquivo na loja de aplicativos. |
+| Outras distros x86_64 (glibc ≥ 2.39) | `EternalChampionsRecomp-<versão>-linux-x86_64.tar.gz` | Extraia e rode `./install.sh` (opcional: `--rom caminho/da/rom.gen`). Instala só para o usuário, sem root. Precisa de SDL2 e libpng instalados pelo gerenciador de pacotes. |
+
+Depois abra **Eternal Champions Recomp** no menu Iniciar ou no menu de aplicativos. A ROM não acompanha o pacote. Se ela não foi escolhida na instalação, selecione-a na tela **ROM** do launcher.
+
+No Linux, saves e configurações ficam em `~/.local/share/eternalchampions-recomp/app`.
+
+Os pacotes trazem só o jogo, o launcher, os shaders e os perfis de áudio. O upscale B+ (modelos ONNX), o SoundFont do remaster de áudio e a arte HD são opcionais e não vêm incluídos. A extração da arte da ROM para o tema do launcher precisa de Python 3 com `numpy` e `Pillow`; sem eles o launcher usa um tema procedural.
+
+---
+
 ## ROM suportada
 
 O recompilador gera o C a partir de uma imagem específica. Os endereços de código, hooks e tabelas do projeto (`game/game.toml`, `game/ec_code_addrs.txt`, `game/ec_discovery.toml`) valem só para ela. **Não há garantia de que outras versões funcionem** (Europa, Japão, protótipos, relançamentos em coletâneas, hacks, dumps com cabeçalho de copiadora ou formato `.smd` intercalado). Elas podem falhar no build, travar ou se comportar de forma errada sem aviso.
