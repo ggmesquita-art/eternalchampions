@@ -2,6 +2,20 @@
 
 > Frontend próprio do projeto, separado do executável do jogo, para configurar **todas** as opções, escolher a ROM e iniciar a partida. O visual vem das telas do jogo: menu principal sobre pedra marmorizada turquesa e abertura em roxo crepuscular com os lutadores.
 
+**Estado das fases (2026-11-25)** — guia de uso em [`docs/LAUNCHER.md`](../docs/LAUNCHER.md); detalhe das entregas em `task.md` (seção 3b).
+
+| Fase | Estado |
+|---|---|
+| L0 — Pré-requisitos | feita (lado do jogo no commit `22522ef`; combos, autofire, `pad_hotkeys` e `--load-slot` documentados em `docs/CONFIGURATION_AND_CLI.md`) |
+| L1 — Esqueleto | feita |
+| L2 — Esquema e ini | feita |
+| L3 — Telas | feita |
+| L4 — Controles | feita (tela, combos, autofire, presets, testar entrada) |
+| L5 — Arte extraída | feita |
+| L6 — Pré-visualização | feita |
+| L6b — Estúdio de Remaster | feita |
+| L7 — QA e docs | **pendente**: `docs/LAUNCHER.md` escrito; revisão independente, teste em 1080p/1440p/4K e checklist de acessibilidade em andamento |
+
 ---
 
 ## 1. Objetivos e não-objetivos

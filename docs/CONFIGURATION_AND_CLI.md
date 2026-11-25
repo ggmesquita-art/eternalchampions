@@ -15,6 +15,10 @@ O projeto suporta compilação e execução nativa em dois ambientes principais,
 
 Ambos os binários operam com recompilação estática 100% C do código Motorola 68000 original do cartucho Sega Genesis/Mega Drive (`eternal_champions_us.gen`), acoplados a módulos nativos de vídeo com suporte widescreen em tempo real (`game/ec_video.c`), motor neural B+ v1/v2/v3 (`neural/infer/`), síntese SoundFont em tempo real (`game/ec_audio.c`) e persistência determinística.
 
+### 1.1 Launcher gráfico (`EternalChampions.exe`)
+
+`build/EternalChampions.exe` (Windows, compilado por `build.cmd`; opção CMake `EC_BUILD_LAUNCHER`) é o frontend que edita este mesmo `settings.ini`, escolhe a ROM e inicia o jogo com `--no-launcher`. Guia de uso: [`LAUNCHER.md`](LAUNCHER.md). As opções que não têm chave no ini (`--interlace-display`, `--widescreen`, `--pacing`, `--target-fps`, `--audio-chip-blend`, `--port`, `--fresh-evidence`, `--yield-log`, `--wav`) ficam na seção `[launcher.args]` (ver §4.5) e o launcher as converte em flags ao iniciar a partida.
+
 ---
 
 ## 2. Variáveis de Ambiente
@@ -59,6 +63,7 @@ As variáveis de ambiente permitem configurar drivers de baixo nível da bibliot
 | `EC_SHADER_PRESET` | `<nome \| caminho.glslp \| off>` | Preset de shader RetroArch (`.glslp`) aplicado no fim da apresentação GPU. Vence `settings.ini`; a flag `--shader-preset` vence o env. Ver seção 3.3.1. |
 | `EC_SHADER_PARAMS` | `A=1,B=2` | Sobrescreve `#pragma parameter` do preset (a CLI `--shader-param` vence). |
 | `EC_SHADER_CAPTURE` / `EC_SHADER_CAPTURE_AT` | `<arquivo.png>` / `<n>` | Grava a saída final da cadeia de shaders no frame `n` (padrão 1), para depuração. |
+| `EC_BPLUS_CAPTURE` / `EC_BPLUS_CAPTURE_AT` / `EC_BPLUS_CAPTURE_IN` | `<saida.png>` / `<n>` / `<entrada.png>` | Grava a saída 4x do B+ no frame `n` (padrão 1); `EC_BPLUS_CAPTURE_IN` grava também a entrada nativa. Usado pela pré-visualização e pelo extrator de arte do launcher. |
 | `EC_SHADER_VIEWPORT` | `<L>x<A>` (ex.: `3840x2160`) | Diagnóstico/benchmark: simula um monitor de `L`x`A` pixels para o cálculo do tamanho `viewport` da cadeia de shaders (o SDL redimensiona o resultado para a janela real). |
 
 ---
@@ -302,6 +307,8 @@ skip_launcher = 1
 ```
 
 - **`skip_launcher`**: Quando `1`, o jogo inicia diretamente sem exibir o menu gráfico de configuração a cada boot.
+
+O `EternalChampions.exe` também usa a seção `[launcher.args]` (o jogo não lê essa seção; só o launcher) para guardar as opções que só existem como flag: `interlace`, `widescreen`, `pacing`, `target_fps`, `audio_chip_blend`, `port`, `fresh_evidence`, `yield_log` e `wav`. Ao clicar em JOGAR, cada chave fora do padrão vira a flag correspondente (`--interlace-display`, `--widescreen`, `--pacing`, `--target-fps`, `--audio-chip-blend`, `--port`, `--fresh-evidence`, `--yield-log`, `--wav`). Ver [`LAUNCHER.md`](LAUNCHER.md) §6.
 
 ### 4.6 Seção `[rewind]`
 

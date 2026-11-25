@@ -174,6 +174,20 @@ vidia\*in` no PATH (cudart/cublas/cudnn). Validado: `EC_ONNXRUNTIME_LIB=<venv>\
 
 ---
 
+## 3b. Launcher (`EternalChampions.exe`, L0–L7)
+> Frontend próprio (C++17 + SDL2, só Windows), separado do runner: `launcher/` (plano em [`launcher/PLAN.md`](launcher/PLAN.md), uso em [`docs/LAUNCHER.md`](docs/LAUNCHER.md)). Compilado por `build.cmd` (`EC_BUILD_LAUNCHER`, padrão ON). Edita o mesmo `settings.ini` do jogo e inicia `EternalChampionsRecomp.exe --no-launcher`.
+- [x] **L0 — Pré-requisitos (lado do jogo)** *(`22522ef`)*: chaves `[ec.bplus]`, `[ec.hd]`, `[ec.game]` e `[ec.audio] hot_reload` em `game/ec_spec.c` + hot-reload do `voices.toml`/perfis em `game/ec_audio.c`; doc de `button:N`, combos, autofire, `pad_hotkeys` e `--load-slot` em `docs/CONFIGURATION_AND_CLI.md`. (Combos/autofire/`pad_hotkeys`/`--load-slot` no runner `segagenesisrecomp` são commits do repositório separado.)
+- [x] **L1 — Esqueleto** *(`0d26ea5`)*: alvo `EternalChampions.exe`, janela SDL 1280×720, pilha de telas, entrada unificada (teclado/pad/mouse), splash, menu, ROM (SHA-256 da versão US, `rom-EC.cfg`, recentes), Sobre, JOGAR (`--no-launcher`, log em `build/logs/game_last.log`).
+- [x] **L2 — Esquema e ini** *(`46d9649`)*: `schema.cpp` como fonte única das opções (chaves do ini + flags em `[launcher.args]`); `ini.cpp` preserva comentários, ordem e chaves desconhecidas (`--selftest-ini`: carregar→salvar = byte-idêntico); perfis de qualidade.
+- [x] **L3 — Telas** *(`46d9649`)*: Vídeo, Aprimoramento (perfis com custo medido, B+, Modo C, shader + parâmetros `#pragma`), Áudio, Jogo, Avançado (área de desenvolvedor, restaurar padrões), Saves (grade 3×3, exportar/importar/apagar, `--load-slot`).
+- [x] **L4 — Controles** *(`4afe9ac`)*: P1–P6, binds por captura (5 s), combos (até 8), autofire, presets (Clássico, Arcade, Stick, Teclado), `pad_hotkeys` com detecção de conflito, "Testar entrada".
+- [x] **L5 — Arte extraída** *(`0d26ea5`, `46d9649`, `4afe9ac`)*: `tools/launcher/extract_ui_assets.py` (jogo headless + B+ v3 HQ) → `%APPDATA%\EternalChampionsRecomp\ui`; tema final com pedra, logo, yin-yang e fonte do jogo; fallback procedural.
+- [x] **L6 — Pré-visualização** *(`cca1f6a`)*: Aprimoramento › Pré-visualizar (jogo até a abertura com `EC_SHADER_CAPTURE`/`EC_BPLUS_CAPTURE`, lado a lado com o original, cache por combinação de opções).
+- [x] **L6b — Estúdio de Remaster** *(`4afe9ac`, `cca1f6a`)*: `launcher/remaster/` (catálogo C++ com o hash do `voice_catalog.py`, dumps, prévia TinySoundFont, captura do original em RAM, `voices.toml`/perfis com `.bak`), tela com A/B, solo/mudo, escopo global ou por música, desfazer/refazer e "Testar no jogo"; `--selftest-studio`.
+- [ ] **L7 — QA e docs** *(em andamento)*: `docs/LAUNCHER.md` escrito. Pendente: revisão independente do diff; teste em 1080p/1440p/4K com Xbox, PlayStation, teclado e mouse (navegação por controle físico ainda não testada de ponta a ponta); checklist de acessibilidade (contraste, tamanho de fonte); botão "Abrir o Estúdio de Remaster" da aba Áudio ainda abre o placeholder; Stick de luta e rótulos Nintendo são aproximados; versão exibida (`0.1.0 (L1)`) a atualizar.
+
+---
+
 ## 4. Trilha F — Finalização, Port Windows e Backlog de Baixa Prioridade
 
 - [x] **F1 — Build Windows Nativo (x64):**
