@@ -102,19 +102,25 @@ while :; do
         fi
         install_name_tool -change "$dep" "@executable_path/libs/$name" "$f"
     done
-    # O "SDL2" do Homebrew e o sdl2-compat: ele carrega o SDL3 por dlopen em tempo de execucao, o que
-    # o otool -L nao mostra. Embute o libSDL3.0.dylib em libs/ (o sdl2-compat procura primeiro ao lado
-    # de si mesmo, @loader_path) e entra na fila para ter as dependencias dele tratadas tambem.
-    if [[ "${f##*/}" == libSDL2* ]] && grep -q "libSDL3.0.dylib" "$f" && ! grep -qxF "libSDL3.0.dylib" "$WORK/seen"; then
-        src="$(resolve "@rpath/libSDL3.0.dylib" "$f")" || { echo "sdl2-compat precisa do libSDL3.0.dylib e ele nao foi encontrado (brew install sdl3)" >&2; exit 1; }
-        echo "libSDL3.0.dylib" >> "$WORK/seen"
-        cp -L "$src" "$P/libs/libSDL3.0.dylib"
-        chmod 755 "$P/libs/libSDL3.0.dylib"
-        install_name_tool -id "@executable_path/libs/libSDL3.0.dylib" "$P/libs/libSDL3.0.dylib"
-        echo "$P/libs/libSDL3.0.dylib" >> "$WORK/queue"
-        # o sdl2-compat tambem tenta @executable_path/libSDL3.0.dylib
-        ln -sf libs/libSDL3.0.dylib "$P/libSDL3.0.dylib"
-        echo "  + libs/libSDL3.0.dylib  ($src; carregada por dlopen pelo sdl2-compat)"
+    # O "SDL2" do Homebrew e o sdl2-compat: ele carrega o SDL3 por dlopen em tempo de execucao, o que o
+    # otool -L nao mostra. Ele procura o arquivo "libSDL3.dylib" (sem o .0) em @loader_path (ao lado de
+    # si mesmo, ou seja libs/), depois em @executable_path e nos frameworks. Embute com esse nome e
+    # entra na fila para ter as dependencias tratadas tambem.
+    if [[ "${f##*/}" == libSDL2* ]] && grep -q "libSDL3" "$f" && ! grep -qxF "libSDL3.dylib" "$WORK/seen"; then
+        src="$(resolve "@rpath/libSDL3.dylib" "$f" || resolve "@rpath/libSDL3.0.dylib" "$f")"             || { echo "sdl2-compat precisa do SDL3 e ele nao foi encontrado (brew install sdl3)" >&2; exit 1; }
+        echo "libSDL3.dylib" >> "$WORK/seen"
+        cp -L "$src" "$P/libs/libSDL3.dylib"
+        chmod 755 "$P/libs/libSDL3.dylib"
+        install_name_tool -id "@executable_path/libs/libSDL3.dylib" "$P/libs/libSDL3.dylib"
+        echo "$P/libs/libSDL3.dylib" >> "$WORK/queue"
+        ln -sf libs/libSDL3.dylib "$P/libSDL3.dylib"   # cobre a busca em @executable_path
+        echo "  + libs/libSDL3.dylib  ($src; carregada por dlopen pelo sdl2-compat)"
+    fi
+    # rpaths herdados do Homebrew (p.ex. @loader_path/../../../../opt/sdl3/lib) nao valem dentro do pacote
+    if [[ "$f" == *.dylib ]]; then
+        for r in $(otool -l "$f" | awk '$1=="cmd" && $2=="LC_RPATH" {getline; getline; print $2}'); do
+            install_name_tool -delete_rpath "$r" "$f" 2>/dev/null || true
+        done
     fi
 done
 
