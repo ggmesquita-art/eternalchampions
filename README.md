@@ -1,4 +1,5 @@
 # Eternal Champions Recomp
+<img width="1237" height="863" alt="ec_20261125_021152" src="https://github.com/user-attachments/assets/4a2d387a-17c5-4c6b-ac82-4e41f0e811ff" />
 
 Recompilação estática de **Eternal Champions** (Sega Genesis / Mega Drive, 1993) para PC nativo. O código 68000 do cartucho é traduzido para C no build pelo [segagenesisrecomp](https://github.com/mstan/segagenesisrecomp) e roda sobre um runner SDL2. Não há emulação de CPU no caminho normal. Por cima do jogo original o projeto acrescenta:
 
@@ -6,6 +7,7 @@ Recompilação estática de **Eternal Champions** (Sega Genesis / Mega Drive, 19
 - **upscale neural B+** (ONNX Runtime / OpenGL), **shaders RetroArch** (`.glslp`) e substituição de sprites e planos em HD;
 - **remaster de áudio**, com síntese SoundFont em tempo real, mixagem com o chip FM/PSG original e efeitos (DSP);
 - **launcher gráfico** (`EternalChampions`), com escolha de ROM, opções, controles, saves e o Estúdio de Remaster.
+<img width="2048" height="864" alt="ec_20261125_062627" src="https://github.com/user-attachments/assets/c1124d48-6f70-4772-8b59-cbe1fdc7a1e9" />
 
 > A ROM **não** acompanha o repositório. Você precisa de um dump próprio do cartucho, com exatamente a versão descrita abaixo.
 
@@ -28,6 +30,7 @@ No Linux, saves e configurações ficam em `~/.local/share/eternalchampions-reco
 Os pacotes trazem o jogo, o launcher, os shaders, os perfis de áudio, os modelos do upscale B+ (`assets/models`) e o SoundFont do remaster de áudio (`assets/soundfonts`). A partir da v1.0.2 os pacotes trazem também a arte HD do Modo C (conjunto AnimeSharp: `pipeline/manifest.json`, `assets/hd/` e `assets/catalog/`). A v1.0.0 não trazia os modelos nem o SoundFont, e a v1.0.1 não trazia a arte HD; nessas versões, copie as pastas do repositório para a pasta do jogo. A extração da arte da ROM para o tema do launcher precisa de Python 3 com `numpy` e `Pillow`; sem eles o launcher usa um tema procedural.
 
 ---
+<img width="2048" height="793" alt="ec_20261126_000413" src="https://github.com/user-attachments/assets/b567ff84-a8a2-4e3f-b9ee-e8970c2753ef" />
 
 ## ROM suportada
 
@@ -67,6 +70,7 @@ md5 roms/eternal_champions_us.gen         # macOS
 ```
 
 ---
+![Uploading ec_20261126_000413.png…]()
 
 ## Plataformas
 
