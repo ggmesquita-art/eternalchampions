@@ -75,7 +75,7 @@ Recompilação estática de **Eternal Champions** (Sega Genesis / Mega Drive, 19
 
 - **Instalador Windows:** não pede administrador e permite escolher a ROM durante a instalação.
 - **Linux:** `.deb` e `.tar.gz`.
-- **macOS:** `.app` com as dependências embutidas (em teste).
+- **macOS (Apple Silicon):** `.app` com as dependências embutidas (SDL2, SDL3 e libpng), sem precisar de Homebrew.
 - Os pacotes já trazem os modelos B+, o SoundFont e a arte HD.
 - `./build.sh` compila e gera o pacote da plataforma num passo só.
 
@@ -99,10 +99,11 @@ Baixe o pacote do seu sistema na página de [Releases](https://github.com/ggmesq
 | Windows 10/11 x64 | `EternalChampionsRecomp-<versão>-windows-x64-setup.exe` | Rode o instalador. Ele não pede administrador e instala em `%LOCALAPPDATA%\Programs\EternalChampionsRecomp`. Uma das telas permite escolher a ROM. |
 | Ubuntu 24.04+ / Debian 13+ | `eternalchampions-recomp_<versão>_amd64.deb` | `sudo apt install ./eternalchampions-recomp_<versão>_amd64.deb`, ou abra o arquivo na loja de aplicativos. |
 | Outras distros x86_64 (glibc ≥ 2.39) | `EternalChampionsRecomp-<versão>-linux-x86_64.tar.gz` | Extraia e rode `./install.sh` (opcional: `--rom caminho/da/rom.gen`). Instala só para o usuário, sem root. Precisa de SDL2 e libpng instalados pelo gerenciador de pacotes. |
+| macOS Apple Silicon (arm64) | `EternalChampionsRecomp-<versão>-macos-arm64.zip` | Descompacte e arraste o **Eternal Champions Recomp.app** para Aplicativos. O app não é assinado pela Apple: na primeira vez, clique com o botão direito e escolha **Abrir**. Sem o remaster gráfico por enquanto (veja [Plataformas](#plataformas)). Num Mac Intel, compile a partir do código-fonte. |
 
 Depois abra **Eternal Champions Recomp** no menu Iniciar ou no menu de aplicativos. A ROM não acompanha o pacote. Se ela não foi escolhida na instalação, selecione-a na tela **ROM** do launcher.
 
-No Linux, saves e configurações ficam em `~/.local/share/eternalchampions-recomp/app`.
+No Linux, saves e configurações ficam em `~/.local/share/eternalchampions-recomp/app`; no macOS, em `~/Library/Application Support/EternalChampionsRecomp/app`.
 
 Os pacotes trazem o jogo, o launcher, os shaders, os perfis de áudio, os modelos do upscale B+ (`assets/models`) e o SoundFont do remaster de áudio (`assets/soundfonts`). A partir da v1.0.2 os pacotes trazem também a arte HD do Modo C (conjunto AnimeSharp: `pipeline/manifest.json`, `assets/hd/` e `assets/catalog/`). A v1.0.0 não trazia os modelos nem o SoundFont, e a v1.0.1 não trazia a arte HD; nessas versões, copie as pastas do repositório para a pasta do jogo. A extração da arte da ROM para o tema do launcher precisa de Python 3 com `numpy` e `Pillow`; sem eles o launcher usa um tema procedural.
 
