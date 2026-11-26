@@ -35,7 +35,7 @@ Recompilação estática de **Eternal Champions** (Sega Genesis / Mega Drive, 19
 - **Shaders RetroArch** (`.glslp`): presets `remaster-crisp`, `remaster-hq`, `remaster-smooth`, `lite-scalefx` e `lite-superxbr`, com parâmetros ajustáveis. Combinam com o B+.
 - **Exibição:** entrelaçado `tv`/`raw`, cadência `fiber`/`accurate`, FPS alvo, tela cheia (F11 / Alt+Enter) e screenshot em PNG (F12).
 
-> **macOS:** o render OpenGL ainda **não funciona** no Mac. Por isso também ficam indisponíveis o upscale B+, o Modo C e os shaders, que dependem dele. Todo o resto funciona. Um build com backend **Metal** nativo está a caminho.
+> **macOS:** o render OpenGL ainda **não funciona** no Mac. Por isso também ficam indisponíveis o upscale B+, o Modo C e os shaders, que dependem dele. Todo o resto funciona, inclusive o widescreen, o remaster de áudio e o launcher. O backend **Metal** nativo está em [Recursos futuros](#recursos-futuros).
 
 ### Áudio
 
@@ -69,7 +69,7 @@ Recompilação estática de **Eternal Champions** (Sega Genesis / Mega Drive, 19
 - Confere o SHA-256 da ROM e avisa quando a versão é diferente.
 - Telas de Vídeo, Aprimoramento, Áudio, Controles (com teste ao vivo), Jogo, Saves e Avançado.
 - **Perfis prontos** (Original, Remaster Leve, Remaster Máximo, Sem neural), com o custo de cada um medido em ms por quadro e prévia da imagem.
-- Roda em Windows e Linux. O macOS está em teste.
+- Roda em Windows, Linux e macOS.
 
 ### Distribuição
 
@@ -78,6 +78,15 @@ Recompilação estática de **Eternal Champions** (Sega Genesis / Mega Drive, 19
 - **macOS:** `.app` com as dependências embutidas (em teste).
 - Os pacotes já trazem os modelos B+, o SoundFont e a arte HD.
 - `./build.sh` compila e gera o pacote da plataforma num passo só.
+
+---
+
+## Recursos futuros
+
+- **Backend Metal nativo no macOS:** leva ao Mac o remaster gráfico (upscale B+, Modo C e shaders), que hoje depende do render OpenGL e não funciona lá.
+- **Lossless Upscale:** compatibilidade com o [Lossless Scaling](https://store.steampowered.com/app/993090/Lossless_Scaling/) (LSFG), para geração de quadros e upscale a 120/144 Hz sem mudar a lógica do jogo, que continua a ~60 ticks/s. Está previsto um perfil "Compatível com Lossless Scaling" no launcher (janela sem borda, sem interpolação nativa somada e sem o overlay do runner) e um guia de configuração com a latência medida.
+
+Outros itens planejados, como Direct3D 11/12 e Vulkan, geração de quadros via OptiScaler, FSR 3 e DLSS, e interpolação nativa, estão em [docs/FRAMEGEN_ROADMAP.md](docs/FRAMEGEN_ROADMAP.md).
 
 ---
 
@@ -145,11 +154,11 @@ md5 roms/eternal_champions_us.gen         # macOS
 |---|---|---|---|
 | Windows 10/11 x64 (MSVC 2022) | ✅ | ✅ | Plataforma principal de desenvolvimento. Harness de regressão (`harness/ec_harness.py`). |
 | Linux x86_64 (GCC 13, Ubuntu 24.04) | ✅ | ✅ | Build completo e execução headless de 1200 frames com hashes de framebuffer **idênticos** aos do Windows. |
-| macOS (Apple Silicon / Intel, Clang) | ⚠️ sem remaster gráfico | ⚠️ em teste | Tudo funciona, exceto o render OpenGL e, por consequência, o B+, o Modo C e os shaders `.glslp`, que dependem dele. Um build com backend **Metal** nativo está a caminho. |
+| macOS (Apple Silicon / Intel, Clang) | ⚠️ sem remaster gráfico | ✅ | Tudo funciona, exceto o render OpenGL e, por consequência, o B+, o Modo C e os shaders `.glslp`, que dependem dele. Um build com backend **Metal** nativo está a caminho. |
 
 Limitações fora do Windows:
 
-- **macOS:** o render OpenGL **ainda não funciona**. Por consequência, ficam indisponíveis o upscale B+, o Modo C (HD) e os shaders `.glslp`, que dependem dele. O restante, incluindo widescreen e remaster de áudio, funciona. Um build com backend **Metal** nativo está a caminho.
+- **macOS:** o render OpenGL **ainda não funciona**. Por consequência, ficam indisponíveis o upscale B+, o Modo C (HD) e os shaders `.glslp`, que dependem dele. O restante funciona, incluindo widescreen, remaster de áudio e launcher. Um build com backend **Metal** nativo está a caminho ([Recursos futuros](#recursos-futuros)).
 - **Linux:** os diálogos de arquivo do launcher usam `zenity` ou, na falta dele, `kdialog`. Sem nenhum dos dois, o launcher avisa e os diálogos ficam indisponíveis. A ROM colocada em `roms/` continua aparecendo na lista da tela ROM.
 - **Linux e macOS:** a interface do launcher usa fontes TTF do sistema (DejaVu, Liberation, Noto, Ubuntu, FreeSans, Georgia, Arial…). Para escolher outra, use `EC_LAUNCHER_FONT=/caminho/fonte.ttf`. Sem nenhuma dessas fontes o launcher não abre. Configurações, arte extraída e caches ficam em `~/.config/EternalChampionsRecomp` (Linux, respeita `XDG_CONFIG_HOME`) ou em `~/Library/Application Support/EternalChampionsRecomp` (macOS), em vez de `%APPDATA%`.
 - **macOS:** se o launcher morrer por crash ou `SIGKILL`, o jogo e a extração iniciados por ele não são encerrados junto. No Windows (Job Object) e no Linux (`PR_SET_PDEATHSIG`) eles são.
