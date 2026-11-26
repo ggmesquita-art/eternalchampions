@@ -35,6 +35,8 @@ Recompilação estática de **Eternal Champions** (Sega Genesis / Mega Drive, 19
 - **Shaders RetroArch** (`.glslp`): presets `remaster-crisp`, `remaster-hq`, `remaster-smooth`, `lite-scalefx` e `lite-superxbr`, com parâmetros ajustáveis. Combinam com o B+.
 - **Exibição:** entrelaçado `tv`/`raw`, cadência `fiber`/`accurate`, FPS alvo, tela cheia (F11 / Alt+Enter) e screenshot em PNG (F12).
 
+> **macOS:** o remaster gráfico (upscale B+, Modo C e shaders) ainda **não é suportado**, porque hoje depende de OpenGL. Um build com backend **Metal** nativo está a caminho. No Mac já funcionam o jogo base, o widescreen e o remaster de áudio.
+
 ### Áudio
 
 - **Remaster em tempo real**, em três modos:
@@ -143,11 +145,11 @@ md5 roms/eternal_champions_us.gen         # macOS
 |---|---|---|---|
 | Windows 10/11 x64 (MSVC 2022) | ✅ | ✅ | Plataforma principal de desenvolvimento. Harness de regressão (`harness/ec_harness.py`). |
 | Linux x86_64 (GCC 13, Ubuntu 24.04) | ✅ | ✅ | Build completo e execução headless de 1200 frames com hashes de framebuffer **idênticos** aos do Windows. |
-| macOS (Apple Silicon / Intel, Clang) | ⚠️ não testado | ⚠️ não testado | O runner do segagenesisrecomp suporta macOS, e o código do projeto evita APIs exclusivas de Windows/Linux. Ainda não foi compilado num Mac. |
+| macOS (Apple Silicon / Intel, Clang) | ⚠️ sem remaster gráfico | ⚠️ em teste | Compila e roda o jogo base, o widescreen e o remaster de áudio. O remaster gráfico (B+, Modo C e shaders `.glslp`), que usa OpenGL, ainda não é suportado. Um build com backend **Metal** nativo está a caminho. |
 
 Limitações fora do Windows:
 
-- **macOS:** o OpenGL do sistema para na versão 4.1 core (e está obsoleto). Shaders `.glslp` e o B+ por GL que exijam versões maiores podem não funcionar. O jogo base e o widescreen não dependem deles. O ONNX Runtime é opcional (carregado por `dlopen`).
+- **macOS:** o remaster gráfico (upscale B+, Modo C/HD e shaders `.glslp`) **ainda não é suportado**. Hoje ele usa OpenGL, que no macOS está obsoleto e parado na versão 4.1. Um build com backend **Metal** nativo está a caminho. O jogo base, o widescreen e o remaster de áudio não dependem dele.
 - **Linux:** os diálogos de arquivo do launcher usam `zenity` ou, na falta dele, `kdialog`. Sem nenhum dos dois, o launcher avisa e os diálogos ficam indisponíveis. A ROM colocada em `roms/` continua aparecendo na lista da tela ROM.
 - **Linux e macOS:** a interface do launcher usa fontes TTF do sistema (DejaVu, Liberation, Noto, Ubuntu, FreeSans, Georgia, Arial…). Para escolher outra, use `EC_LAUNCHER_FONT=/caminho/fonte.ttf`. Sem nenhuma dessas fontes o launcher não abre. Configurações, arte extraída e caches ficam em `~/.config/EternalChampionsRecomp` (Linux, respeita `XDG_CONFIG_HOME`) ou em `~/Library/Application Support/EternalChampionsRecomp` (macOS), em vez de `%APPDATA%`.
 - **macOS:** se o launcher morrer por crash ou `SIGKILL`, o jogo e a extração iniciados por ele não são encerrados junto. No Windows (Job Object) e no Linux (`PR_SET_PDEATHSIG`) eles são.
