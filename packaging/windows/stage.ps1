@@ -41,6 +41,16 @@ New-Item -ItemType Directory -Force $md | Out-Null
 Get-ChildItem (Join-Path $root 'assets\models') -File | Where-Object { $_.Extension -in '.bin','.onnx' } | Copy-Item -Destination $md
 Copy-Item -Recurse (Join-Path $root 'assets\soundfonts') (Join-Path $stage 'assets\soundfonts')
 
+# Modo C (HD): manifest AnimeSharp + arte aprovada e originais versionados (o Flux nao e distribuido)
+New-Item -ItemType Directory -Force (Join-Path $stage 'pipeline') | Out-Null
+Copy-Item (Join-Path $root 'pipeline\manifest.json') (Join-Path $stage 'pipeline')
+git -C $root ls-files -- assets/hd assets/catalog | ForEach-Object {
+    $dst = Join-Path $stage $_
+    $dir = Split-Path $dst
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force $dir | Out-Null }
+    Copy-Item (Join-Path $root $_) $dst
+}
+
 # Extrator da arte da ROM usado pelo launcher (opcional: precisa de Python 3 + numpy + Pillow)
 New-Item -ItemType Directory -Force (Join-Path $stage 'tools\launcher') | Out-Null
 Copy-Item (Join-Path $root 'tools\launcher\extract_ui_assets.py') (Join-Path $stage 'tools\launcher')

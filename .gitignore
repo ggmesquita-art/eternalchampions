@@ -7,6 +7,17 @@ assets/*
 !assets/models/
 # SoundFont do remaster de audio (TimGM6mb, GPL-2.0)
 !assets/soundfonts/
+# Modo C (HD): arte 4x AnimeSharp aprovada + originais que o jogo usa para reconhecer sprites/planos
+# (o conjunto do pipeline/manifest.json). Planos Flux (assets/hd/planes) e tiles ficam de fora.
+!assets/hd/
+assets/hd/*
+!assets/hd/sprites/
+!assets/hd/planes_v3/
+!assets/catalog/
+assets/catalog/*
+!assets/catalog/sprites/
+!assets/catalog/indices/
+!assets/catalog/planes/
 # Remaster de áudio: versiona só os .toml (perfis, voices.toml); os MIDIs são
 # derivados da ROM e ficam de fora. O .sf2 (assets/soundfonts/) segue ignorado.
 !assets/audio_remaster/

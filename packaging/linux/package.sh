@@ -29,6 +29,10 @@ git_ ls-files -- 'assets/audio_remaster/*.toml' | while read -r f; do
     cp "$ROOT/$f" "$P/assets/audio_remaster/$rel"
 done
 cp "$ROOT/tools/launcher/extract_ui_assets.py" "$P/tools/launcher/"
+# Modo C (HD): manifest AnimeSharp + arte aprovada e originais versionados (o Flux nao e distribuido)
+mkdir -p "$P/pipeline"
+cp "$ROOT/pipeline/manifest.json" "$P/pipeline/"
+git -c safe.directory='*' -C "$ROOT" ls-files -z -- assets/hd assets/catalog | (cd "$ROOT" && tar --null -T - -cf -) | tar -C "$P" -xf -
 # modelos do upscale B+ (so os de runtime: .bin/.onnx; sem checkpoints .pt) e SoundFont
 mkdir -p "$P/assets/models"
 find "$ROOT/assets/models" -maxdepth 1 -type f \( -name '*.bin' -o -name '*.onnx' \) -exec cp {} "$P/assets/models/" \;

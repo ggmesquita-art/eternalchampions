@@ -25,7 +25,7 @@ Depois abra **Eternal Champions Recomp** no menu Iniciar ou no menu de aplicativ
 
 No Linux, saves e configurações ficam em `~/.local/share/eternalchampions-recomp/app`.
 
-Os pacotes trazem o jogo, o launcher, os shaders, os perfis de áudio, os modelos do upscale B+ (`assets/models`) e o SoundFont do remaster de áudio (`assets/soundfonts`). A v1.0.0 ainda não trazia os modelos nem o SoundFont; nela, copie essas duas pastas do repositório para dentro de `assets/`, na pasta do jogo. A arte HD não vem incluída. A extração da arte da ROM para o tema do launcher precisa de Python 3 com `numpy` e `Pillow`; sem eles o launcher usa um tema procedural.
+Os pacotes trazem o jogo, o launcher, os shaders, os perfis de áudio, os modelos do upscale B+ (`assets/models`) e o SoundFont do remaster de áudio (`assets/soundfonts`). A partir da v1.0.2 os pacotes trazem também a arte HD do Modo C (conjunto AnimeSharp: `pipeline/manifest.json`, `assets/hd/` e `assets/catalog/`). A v1.0.0 não trazia os modelos nem o SoundFont, e a v1.0.1 não trazia a arte HD; nessas versões, copie as pastas do repositório para a pasta do jogo. A extração da arte da ROM para o tema do launcher precisa de Python 3 com `numpy` e `Pillow`; sem eles o launcher usa um tema procedural.
 
 ---
 
@@ -151,7 +151,6 @@ O build gera os executáveis em `build/`: o jogo (`EternalChampionsRecomp`, com 
   cmake --build build
   ```
 
-- Ao terminar, o `build.cmd` **abre o jogo** com o perfil de desenvolvimento (widescreen, B+, HD, remaster de áudio). Esse perfil depende de arquivos em `assets/` que não são versionados. Para só compilar, use `cmake --build build`.
 
 ### Linux e macOS
 
@@ -228,7 +227,7 @@ No Windows use `SDL_VIDEODRIVER=dummy` e `SDL_RENDER_DRIVER=software`.
 | `game/` | Integração do jogo com o runner: `CMakeLists.txt` principal, `game.toml` (configuração do recompilador), vídeo/widescreen, áudio, HD, shaders. |
 | `launcher/` | Launcher SDL2 em C++ (`src/`) e o núcleo do Estúdio de Remaster (`remaster/`). |
 | `neural/` | Inferência do upscale B+ (`infer/`) e treino dos modelos. |
-| `assets/` | Versionados: `shaders/`, `models/` (pesos do upscale B+ e checkpoints de treino), `soundfonts/` (TimGM6mb, GPL-2.0) e os `.toml` de `audio_remaster/`. Arte HD, capturas, datasets e MIDIs derivados da ROM ficam fora do git. |
+| `assets/` | Versionados: `shaders/`, `models/` (pesos do upscale B+ e checkpoints de treino), `soundfonts/` (TimGM6mb, GPL-2.0), os `.toml` de `audio_remaster/` e a arte do Modo C (`hd/sprites`, `hd/planes_v3` e os originais em `catalog/`, o conjunto AnimeSharp do `pipeline/manifest.json`). Os planos Flux, as capturas, os datasets e os MIDIs derivados da ROM ficam fora do git. |
 | `pipeline/` | Manifests e workflows do pipeline de arte HD. |
 | `harness/` | Harness de regressão determinística (`ec_harness.py`). |
 | `disasm/`, `reference/`, `tools/` | Desmontagem, material de referência e ferramentas de análise. |
