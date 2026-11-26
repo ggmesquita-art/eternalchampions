@@ -13,6 +13,72 @@ Recompilação estática de **Eternal Champions** (Sega Genesis / Mega Drive, 19
 
 ---
 
+## Recursos
+
+### Fidelidade ao original
+
+- **Recompilação estática:** o código 68000 do cartucho vira C nativo. Não há emulador de CPU interpretando instruções no caminho normal.
+- **Determinismo:** a mesma entrada produz a mesma imagem. Windows e Linux geram hashes de framebuffer idênticos.
+- **Harness de regressão** (`harness/ec_harness.py`): compara a memória do jogo (WRAM) entre execuções e com o Genesis Plus GX. Garante que widescreen e melhorias visuais não mudam a lógica: **0 bytes divergentes**.
+
+### Vídeo
+
+- **Widescreen** 16:9, 21:9, 32:9 ou adaptativo à janela, sem distorcer a imagem:
+  - nas arenas, no Holo-Trainer, nas Dexterity Spheres e no Santuário, as margens são reconstruídas a partir da VRAM e da ROM, com parallax nas bordas, incluindo os overkills do Santuário e do Holo-Trainer;
+  - o HUD fica no centro e a lógica do jogo continua vendo 320 px;
+  - menus e telas de história usam pillarbox.
+- **Upscale neural B+ 4×:**
+  - redes próprias, treinadas para a arte do jogo: v3 fast, v3 HQ e v3 HQ JaNai, além das v2;
+  - roda em OpenGL ou em CUDA (via ONNX Runtime);
+  - tem orçamento por quadro com queda suave para bilinear, intensidade ajustável e remoção do pontilhado (de-dither) do Mega Drive.
+- **Modo C (HD):** troca sprites e cenários por arte 4× pré-renderizada (AnimeSharp), reconhecendo cada elemento na tela. Cobre 437 sprites e planos aprovados. Pode valer só para os planos ou para tudo.
+- **Shaders RetroArch** (`.glslp`): presets `remaster-crisp`, `remaster-hq`, `remaster-smooth`, `lite-scalefx` e `lite-superxbr`, com parâmetros ajustáveis. Combinam com o B+.
+- **Exibição:** entrelaçado `tv`/`raw`, cadência `fiber`/`accurate`, FPS alvo, tela cheia (F11 / Alt+Enter) e screenshot em PNG (F12).
+
+### Áudio
+
+- **Remaster em tempo real**, em três modos:
+  - `dsp`: o som original do chip com tratamento de estúdio;
+  - `hybrid`: troca canal a canal os instrumentos FM do YM2612 por instrumentos de SoundFont;
+  - `ost`: mistura a versão SoundFont com o chip original.
+- **Mapeamento por instrumento:** cada patch FM é identificado por hash (`voices.toml`) e cada música tem um perfil próprio. O SoundFont TimGM6mb vem incluído.
+- **Ajustes:** reverb, volume da música e do chip, mistura chip/SoundFont e recarga ao vivo do mapeamento (`hot_reload`).
+- **Estúdio de Remaster** no launcher:
+  - edita o mapeamento dos 52 instrumentos FM e dos canais PSG/ruído/DAC de cada uma das 17 músicas;
+  - compara A/B (original × remaster) e abre o jogo direto no Music Test para ouvir.
+- **Gravação da sessão em WAV** (`--wav`).
+
+### Jogabilidade e controles
+
+- **Eternal Champion jogável** (`--unlock-boss`), com troca de forma durante a luta: MODE + X/Y/B/A no controle de 6 botões.
+- **Até 6 jogadores configuráveis:** teclado e/ou controle, padrão de 3 ou 6 botões e zona morta.
+  - Controles Xbox, PlayStation e Nintendo são reconhecidos.
+  - Combos: um botão físico aciona vários botões do Mega Drive, até 8 por jogador.
+  - Autofire de até 30 Hz.
+  - Atalhos no próprio controle.
+- **Savestates** em 9 slots com miniatura: Shift+F1–F9 salva, segurar F1–F9 carrega.
+- **Gerenciador de saves** no jogo (F7) e no launcher, onde dá para exportar e importar.
+- **Rebobinar** (F8), com profundidade e intervalo configuráveis.
+- **Turbo** (Tab) e início direto de um save (`--load-slot`).
+
+### Launcher
+
+- Interface no estilo do jogo, com a arte extraída da **sua** ROM.
+- Confere o SHA-256 da ROM e avisa quando a versão é diferente.
+- Telas de Vídeo, Aprimoramento, Áudio, Controles (com teste ao vivo), Jogo, Saves e Avançado.
+- **Perfis prontos** (Original, Remaster Leve, Remaster Máximo, Sem neural), com o custo de cada um medido em ms por quadro e prévia da imagem.
+- Roda em Windows e Linux. O macOS está em teste.
+
+### Distribuição
+
+- **Instalador Windows:** não pede administrador e permite escolher a ROM durante a instalação.
+- **Linux:** `.deb` e `.tar.gz`.
+- **macOS:** `.app` com as dependências embutidas (em teste).
+- Os pacotes já trazem os modelos B+, o SoundFont e a arte HD.
+- `./build.sh` compila e gera o pacote da plataforma num passo só.
+
+---
+
 ## Instalação (sem compilar)
 
 Baixe o pacote do seu sistema na página de [Releases](https://github.com/ggmesquita-art/eternalchampions/releases):
