@@ -17,8 +17,11 @@ if [[ ! -f roms/eternal_champions_us.gen ]]; then
     echo "[build.sh] ROM ausente: roms/eternal_champions_us.gen (veja README.md, secao ROM)" >&2
     exit 1
 fi
-if [[ ! -f segagenesisrecomp/cmake/GenesisRecompGenerated.cmake ]]; then
-    echo "[build.sh] segagenesisrecomp/ ausente (veja README.md, secao Dependencias)" >&2
+if [[ ! -f segagenesisrecomp/cmake/GenesisRecompGenerated.cmake \
+   || ! -f segagenesisrecomp/external/m68k-recomp-core/common/m68k_timing.c \
+   || ! -f segagenesisrecomp/external/rbengine/CMakeLists.txt ]]; then
+    echo "[build.sh] segagenesisrecomp/ ou os submodulos dele estao ausentes." >&2
+    echo "           Rode: git submodule update --init --recursive   (veja README.md, secao Dependencias)" >&2
     exit 1
 fi
 

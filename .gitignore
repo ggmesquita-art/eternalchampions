@@ -45,7 +45,6 @@ tools/vendor/gpgx_runner/gpgx_runner_dbg
 
 # Projetos de referência: ferramentas externas, não fazem parte do repo (DESIGN §5.1)
 ares/
-segagenesisrecomp/
 StreetsOfRageProject/
 sonic3air-*/
 RGen-*/

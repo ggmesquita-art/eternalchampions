@@ -17,6 +17,11 @@ rem mantendo os pacotes ja instalados (libpng/zlib) via VCPKG_INSTALLED_DIR
 set "VCPKG_TOOLCHAIN=%VCPKG_ROOT_DIR%\scripts\buildsystems\vcpkg.cmake"
 if not exist "%VCPKG_TOOLCHAIN%" set "VCPKG_TOOLCHAIN=%VSINSTALLDIR%VC\vcpkg\scripts\buildsystems\vcpkg.cmake"
 cd /d "%ROOT%" || exit /b 1
+if not exist "segagenesisrecomp\external\m68k-recomp-core\common\m68k_timing.c" (
+  echo [build.cmd] segagenesisrecomp\ ou os submodulos dele estao ausentes.
+  echo            Rode: git submodule update --init --recursive   ^(veja README.md^)
+  exit /b 1
+)
 
 set "DO_CONFIGURE="
 if not exist "build\build.ninja" set "DO_CONFIGURE=1"

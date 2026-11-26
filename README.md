@@ -92,13 +92,19 @@ Todas as plataformas precisam de:
 
 - **CMake ≥ 3.16** e um compilador **C11 / C++17**. Ninja é recomendado (opcional no Linux e no macOS).
 - **SDL2** (testado com 2.28.5 no Windows e 2.30 no Linux) e **libpng** (com zlib).
-- **segagenesisrecomp** clonado em `./segagenesisrecomp/`, na raiz deste repositório. É um repositório separado, ignorado pelo git daqui e **não** um submódulo:
+- **segagenesisrecomp**, que é um submódulo git em `./segagenesisrecomp/` e tem os seus próprios submódulos. Clone **sempre com `--recursive`**:
 
   ```bash
-  git clone https://github.com/mstan/segagenesisrecomp.git segagenesisrecomp
+  git clone --recursive https://github.com/ggmesquita-art/eternalchampions.git
   ```
 
-  > ⚠️ **Atenção:** este projeto usa o branch **`eternalchampions`** do segagenesisrecomp. Ele tem 9 commits próprios sobre o `master` upstream (`4b2247d`). Entre eles estão: carga de savegame portátil V2, hotkey de screenshot F12, observador de escrita no chip para o remaster de áudio, combos/autofire de input, `--load-slot` e salvamento atômico do `settings.ini`. Esse branch ainda **não está publicado**, e o build com o `master` upstream não foi testado. Para reproduzir o build em outra máquina, publique o branch num fork e ajuste o `git clone` acima.
+  Se o repositório já foi clonado sem `--recursive`, ou se o `git pull` trouxe uma versão nova do submódulo, rode:
+
+  ```bash
+  git submodule update --init --recursive
+  ```
+
+  O submódulo aponta para o fork [ggmesquita-art/segagenesisrecomp](https://github.com/ggmesquita-art/segagenesisrecomp), branch `eternalchampions`. Esse branch tem commits próprios sobre o [upstream](https://github.com/mstan/segagenesisrecomp): carga de savegame portátil V2, screenshot no F12, observador de escrita no chip de som (usado pelo remaster de áudio), combos e autofire de input, `--load-slot` e gravação atômica do `settings.ini`. O fork também puxa os forks de `m68k-recomp-core` (com ajustes no gerador de código) e `z80-recomp-core`. **O `master` do upstream não serve**: sem esses commits faltam APIs de áudio e de input que o jogo usa. O download em ZIP do GitHub também não serve, porque não traz os submódulos.
 
 ### Windows
 

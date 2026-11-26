@@ -1,0 +1,4 @@
+[submodule "segagenesisrecomp"]
+	path = segagenesisrecomp
+	url = https://github.com/ggmesquita-art/segagenesisrecomp.git
+	branch = eternalchampions
