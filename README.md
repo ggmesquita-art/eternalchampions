@@ -136,7 +136,6 @@ md5 roms/eternal_champions_us.gen         # macOS
 ```
 
 ---
-![Uploading ec_20261126_000413.png…]()
 
 ## Plataformas
 
