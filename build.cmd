@@ -16,6 +16,9 @@ rem toolchain do vcpkg: o clone em %TEMP% pode ser podado pela limpeza do Window
 rem mantendo os pacotes ja instalados (libpng/zlib) via VCPKG_INSTALLED_DIR
 set "VCPKG_TOOLCHAIN=%VCPKG_ROOT_DIR%\scripts\buildsystems\vcpkg.cmake"
 if not exist "%VCPKG_TOOLCHAIN%" set "VCPKG_TOOLCHAIN=%VSINSTALLDIR%VC\vcpkg\scripts\buildsystems\vcpkg.cmake"
+rem pacotes libpng/zlib: copia duravel fora do %TEMP% (restaurada do cache binario do vcpkg), se existir
+set "VCPKG_INSTALLED=%VCPKG_ROOT_DIR%\installed"
+if exist "%LOCALAPPDATA%\eternalchampions-vcpkg\installed\x64-windows\include\png.h" set "VCPKG_INSTALLED=%LOCALAPPDATA%\eternalchampions-vcpkg\installed"
 cd /d "%ROOT%" || exit /b 1
 if not exist "segagenesisrecomp\external\m68k-recomp-core\common\m68k_timing.c" (
   echo [build.cmd] segagenesisrecomp\ ou os submodulos dele estao ausentes.
@@ -32,7 +35,7 @@ if defined DO_CONFIGURE (
   "%CMAKE%" -S game -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ^
     -DCMAKE_PREFIX_PATH="%ROOT%/segagenesisrecomp/runner/external/SDL2/SDL2-2.28.5" ^
     -DCMAKE_TOOLCHAIN_FILE="%VCPKG_TOOLCHAIN%" ^
-    -DVCPKG_INSTALLED_DIR="%VCPKG_ROOT_DIR%/installed" -DVCPKG_MANIFEST_MODE=OFF ^
+    -DVCPKG_INSTALLED_DIR="%VCPKG_INSTALLED%" -DVCPKG_MANIFEST_MODE=OFF ^
     -DVCPKG_TARGET_TRIPLET=x64-windows %1 %2 %3 %4 %5 %6 %7 %8 %9
   if errorlevel 1 exit /b 1
 )
