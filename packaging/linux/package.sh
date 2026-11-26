@@ -54,6 +54,11 @@ install -m644 "$HERE/eternalchampions-recomp.desktop" "$T/eternalchampions-recom
 tar -C "$WORK" --owner=0 --group=0 -czf "$OUT/$(basename "$T").tar.gz" "$(basename "$T")"
 
 # ---- .deb ------------------------------------------------------------------------------------
+if ! command -v dpkg-deb >/dev/null 2>&1 || ! command -v fakeroot >/dev/null 2>&1; then
+    echo "dpkg-deb/fakeroot ausentes: .deb nao gerado (so o .tar.gz)"
+    ls -la "$OUT"/*"$VERSION"*
+    exit 0
+fi
 D="$WORK/deb"
 mkdir -p "$D/DEBIAN" "$D/opt" "$D/usr/bin" "$D/usr/share/applications" "$D/usr/share/doc/eternalchampions-recomp"
 cp -R "$P" "$D/opt/eternalchampions-recomp"

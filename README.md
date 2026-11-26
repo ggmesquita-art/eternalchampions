@@ -159,10 +159,16 @@ O build gera os executáveis em `build/`: o jogo (`EternalChampionsRecomp`, com 
 ./build.sh
 ```
 
+- Depois de compilar, o script **gera o pacote da plataforma** em `packaging/out/`:
+  - no macOS, `EternalChampionsRecomp-<versão>-macos-<arm64|x86_64>.zip`, com o `.app` e o SDL2 e o libpng embutidos;
+  - no Linux, o `.tar.gz` e, se houver `dpkg-deb` e `fakeroot`, o `.deb`.
+
+  A versão vem do `git describe`: a tag `v1.0.1` vira `1.0.1`, e fora de uma tag sai algo como `1.0.1-3-gabc1234`. Também dá para definir com `VERSION=...`. Se o empacotamento falhar, o build continua válido e o script só avisa.
+- `./build.sh --no-package` (ou `NO_PACKAGE=1`) só compila.
 - `./build.sh reconfigure [-Dopção=valor ...]` reconfigura o CMake.
 - As variáveis `BUILD_DIR`, `BUILD_TYPE` e `JOBS` mudam a pasta, o tipo de build e o paralelismo.
 - No macOS o script passa `CMAKE_PREFIX_PATH=$(brew --prefix)` automaticamente.
-- Equivale a:
+- A parte de compilação equivale a:
 
   ```bash
   cmake -S game -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
