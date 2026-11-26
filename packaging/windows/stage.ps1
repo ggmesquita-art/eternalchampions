@@ -35,13 +35,19 @@ git -C $root ls-files -- 'assets/audio_remaster/*.toml' | ForEach-Object {
 }
 Pop-Location
 
+# Modelos do upscale B+ (so os de runtime: pesos .bin e .onnx; sem checkpoints .pt) e SoundFont
+$md = Join-Path $stage 'assets\models'
+New-Item -ItemType Directory -Force $md | Out-Null
+Get-ChildItem (Join-Path $root 'assets\models') -File | Where-Object { $_.Extension -in '.bin','.onnx' } | Copy-Item -Destination $md
+Copy-Item -Recurse (Join-Path $root 'assets\soundfonts') (Join-Path $stage 'assets\soundfonts')
+
 # Extrator da arte da ROM usado pelo launcher (opcional: precisa de Python 3 + numpy + Pillow)
 New-Item -ItemType Directory -Force (Join-Path $stage 'tools\launcher') | Out-Null
 Copy-Item (Join-Path $root 'tools\launcher\extract_ui_assets.py') (Join-Path $stage 'tools\launcher')
 New-Item -ItemType Directory -Force (Join-Path $stage 'roms') | Out-Null
 
 # Documentacao e licencas
-Copy-Item (Join-Path $root 'README.md') $stage
+Copy-Item (Join-Path $root 'README.md'), (Join-Path $root 'LICENSE.md') $stage
 New-Item -ItemType Directory -Force (Join-Path $stage 'docs') | Out-Null
 Copy-Item (Join-Path $root 'docs\LAUNCHER.md'), (Join-Path $root 'docs\CONFIGURATION_AND_CLI.md') (Join-Path $stage 'docs')
 $lic = Join-Path $stage 'licenses'

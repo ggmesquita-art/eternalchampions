@@ -25,7 +25,7 @@ Depois abra **Eternal Champions Recomp** no menu Iniciar ou no menu de aplicativ
 
 No Linux, saves e configurações ficam em `~/.local/share/eternalchampions-recomp/app`.
 
-Os pacotes trazem só o jogo, o launcher, os shaders e os perfis de áudio. O upscale B+ (modelos ONNX), o SoundFont do remaster de áudio e a arte HD são opcionais e não vêm incluídos. A extração da arte da ROM para o tema do launcher precisa de Python 3 com `numpy` e `Pillow`; sem eles o launcher usa um tema procedural.
+Os pacotes trazem o jogo, o launcher, os shaders, os perfis de áudio, os modelos do upscale B+ (`assets/models`) e o SoundFont do remaster de áudio (`assets/soundfonts`). A v1.0.0 ainda não trazia os modelos nem o SoundFont; nela, copie essas duas pastas do repositório para dentro de `assets/`, na pasta do jogo. A arte HD não vem incluída. A extração da arte da ROM para o tema do launcher precisa de Python 3 com `numpy` e `Pillow`; sem eles o launcher usa um tema procedural.
 
 ---
 
@@ -222,8 +222,16 @@ No Windows use `SDL_VIDEODRIVER=dummy` e `SDL_RENDER_DRIVER=software`.
 | `game/` | Integração do jogo com o runner: `CMakeLists.txt` principal, `game.toml` (configuração do recompilador), vídeo/widescreen, áudio, HD, shaders. |
 | `launcher/` | Launcher SDL2 em C++ (`src/`) e o núcleo do Estúdio de Remaster (`remaster/`). |
 | `neural/` | Inferência do upscale B+ (`infer/`) e treino dos modelos. |
-| `assets/` | Só `shaders/` e os `.toml` de `audio_remaster/` são versionados. Modelos, SoundFonts e arte HD ficam fora do git. |
+| `assets/` | Versionados: `shaders/`, `models/` (pesos do upscale B+ e checkpoints de treino), `soundfonts/` (TimGM6mb, GPL-2.0) e os `.toml` de `audio_remaster/`. Arte HD, capturas, datasets e MIDIs derivados da ROM ficam fora do git. |
 | `pipeline/` | Manifests e workflows do pipeline de arte HD. |
 | `harness/` | Harness de regressão determinística (`ec_harness.py`). |
 | `disasm/`, `reference/`, `tools/` | Desmontagem, material de referência e ferramentas de análise. |
 | `docs/` | Documentação de projeto. |
+
+---
+
+## Licença
+
+O código e os arquivos próprios deste repositório estão sob a [PolyForm Noncommercial 1.0.0](LICENSE.md), a mesma licença do [segagenesisrecomp](https://github.com/mstan/segagenesisrecomp). Uso, modificação e distribuição são livres para fins não comerciais. Componentes de terceiros mantêm as próprias licenças ([packaging/THIRD_PARTY_NOTICES.txt](packaging/THIRD_PARTY_NOTICES.txt)): por exemplo, o SoundFont TimGM6mb é GPL-2.0 e os shaders libretro trazem a licença no cabeçalho de cada arquivo.
+
+Eternal Champions © 1993 SEGA. Este é um projeto de fã, sem vínculo com a SEGA, e **não inclui a ROM**.

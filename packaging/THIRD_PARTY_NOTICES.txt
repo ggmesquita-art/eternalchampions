@@ -18,5 +18,7 @@ Componentes incluidos nos binarios ou distribuidos junto:
 - zlib - zlib License. https://zlib.net/
 - stb_truetype.h (Linux/macOS) - dominio publico / MIT. https://github.com/nothings/stb
 - TinySoundFont (tsf.h) - MIT. https://github.com/schellingb/TinySoundFont
+- TimGM6mb.sf2 (SoundFont General MIDI, assets/soundfonts) - Copyright Tim Brechbill,
+  GNU General Public License v2. Texto da licenca: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 - Microsoft Visual C++ Runtime (Windows: msvcp140.dll, vcruntime140*.dll) - distribuido
   conforme os termos de redistribuicao do Visual Studio.

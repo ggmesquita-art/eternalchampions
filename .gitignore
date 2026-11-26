@@ -3,6 +3,10 @@
 roms/
 assets/*
 !assets/shaders/
+# Modelos do upscale B+ (pesos .bin/.onnx usados em runtime + checkpoints .pt do treino; arquivos pequenos)
+!assets/models/
+# SoundFont do remaster de audio (TimGM6mb, GPL-2.0)
+!assets/soundfonts/
 # Remaster de áudio: versiona só os .toml (perfis, voices.toml); os MIDIs são
 # derivados da ROM e ficam de fora. O .sf2 (assets/soundfonts/) segue ignorado.
 !assets/audio_remaster/

@@ -29,7 +29,11 @@ git_ ls-files -- 'assets/audio_remaster/*.toml' | while read -r f; do
     cp "$ROOT/$f" "$P/assets/audio_remaster/$rel"
 done
 cp "$ROOT/tools/launcher/extract_ui_assets.py" "$P/tools/launcher/"
-cp "$ROOT/README.md" "$ROOT/packaging/THIRD_PARTY_NOTICES.txt" "$P/"
+# modelos do upscale B+ (so os de runtime: .bin/.onnx; sem checkpoints .pt) e SoundFont
+mkdir -p "$P/assets/models"
+find "$ROOT/assets/models" -maxdepth 1 -type f \( -name '*.bin' -o -name '*.onnx' \) -exec cp {} "$P/assets/models/" \;
+cp -R "$ROOT/assets/soundfonts" "$P/assets/soundfonts"
+cp "$ROOT/README.md" "$ROOT/LICENSE.md" "$ROOT/packaging/THIRD_PARTY_NOTICES.txt" "$P/"
 cp "$ROOT/docs/LAUNCHER.md" "$ROOT/docs/CONFIGURATION_AND_CLI.md" "$P/docs/"
 for f in LICENSE.md PERMISSIONS.md THIRD-PARTY-LICENSES.md; do
     cp "$ROOT/segagenesisrecomp/$f" "$P/licenses/segagenesisrecomp-$f"
