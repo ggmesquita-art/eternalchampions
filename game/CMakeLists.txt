@@ -74,6 +74,10 @@ if(WIN32)
 endif()
 
 genesisrecomp_runner_target(EternalChampionsRecomp)
+if(APPLE)
+    # espaco no cabecalho Mach-O para o packaging/macos/package.sh reescrever os caminhos das dylibs
+    target_link_options(EternalChampionsRecomp PRIVATE -Wl,-headerpad_max_install_names)
+endif()
 
 # Launcher (EternalChampions.exe): frontend proprio, SDL2 + libpng, sem tocar no jogo.
 option(EC_BUILD_LAUNCHER "Compila o EternalChampions.exe (launcher)" ON)

@@ -82,6 +82,9 @@ else()
         target_compile_options(EternalChampions PRIVATE -Wall)
     endif()
 endif()
+if(APPLE)
+    target_link_options(EternalChampions PRIVATE -Wl,-headerpad_max_install_names)   # ver packaging/macos/package.sh
+endif()
 set_target_properties(EternalChampions PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
     RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}
