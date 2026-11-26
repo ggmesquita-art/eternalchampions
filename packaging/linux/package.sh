@@ -42,7 +42,8 @@ cp "$ROOT/docs/LAUNCHER.md" "$ROOT/docs/CONFIGURATION_AND_CLI.md" "$P/docs/"
 for f in LICENSE.md PERMISSIONS.md THIRD-PARTY-LICENSES.md; do
     cp "$ROOT/segagenesisrecomp/$f" "$P/licenses/segagenesisrecomp-$f"
 done
-printf '%s\n' "$VERSION" > "$P/VERSION"
+# versao + carimbo do empacotamento: o script de entrada recopia o jogo quando isto muda
+printf '%s\n%s\n' "$VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$P/VERSION"
 # arquivos vindos de /mnt/c (WSL) chegam com modo 777: normaliza
 chmod -R u=rwX,go=rX "$P"
 chmod 755 "$P/EternalChampions" "$P/EternalChampionsRecomp"
