@@ -51,6 +51,16 @@ Estratégia em duas camadas:
 - **V1–V3 (interop):** o jogo **apresenta** por DXGI/Vulkan, mas continua **renderizando** em GL. É barato e já destrava o Smooth Motion e a apresentação *flip-model*.
 - **V4–V7 (nativo):** cada módulo de GPU é portado para rodar sem GL. Fica para quando a camada de interop não bastar: FG nativo em DX12/Vulkan, ou máquinas sem GL bom.
 
+> **Alternativa a avaliar antes de começar (registrada em 2026-11-26): SDL3 GPU API.** O SDL3 tem uma API de GPU própria (`SDL_gpu`) com backends **Vulkan, Metal e Direct3D 12** sob uma única interface. Portar o render uma vez para ela poderia substituir V1–V7 e, de quebra, levar o remaster gráfico ao **macOS via Metal**. Hoje o B+, o Modo C e os shaders não rodam no Mac porque o OpenGL de lá parou na 4.1 e não tem `glBindImageTexture` nem GLSL 130.
+>
+> Pontos a decidir num plano próprio (`docs/SDL3_GPU_PLAN.md`, ainda não escrito):
+> - migrar runner e launcher de SDL2 para SDL3, e o custo de divergir do upstream `mstan/segagenesisrecomp` (no Mac, o "SDL2" do Homebrew já é o `sdl2-compat` sobre SDL3);
+> - shaders: o `SDL_gpu` não compila GLSL em tempo de execução. Usar `SDL_shadercross` (HLSL/SPIR-V → MSL/DXIL) e trocar os presets `.glslp` pelos `.slangp` da libretro;
+> - portar o B+ para compute shader do `SDL_gpu` e o compositor do Modo C;
+> - critério de pronto: hashes de framebuffer iguais aos atuais e o B+ funcionando no Mac Apple Silicon.
+>
+> **Quando:** junto com a X1 (Lossless Scaling), por decisão do usuário.
+
 ### V0 — Camada de apresentação abstrata (pré-requisito)
 - Criar `segagenesisrecomp/runner/video/present_backend.{h,c}` com uma interface mínima: `init(window, api)`, `acquire_target(w, h)`, `submit(texture, src_rect, dst_rect)`, `present(vsync, tearing)`, `resize`, `shutdown`, `query_caps`.
 - O backend `sdl_renderer` empacota o caminho atual sem mudar comportamento.
