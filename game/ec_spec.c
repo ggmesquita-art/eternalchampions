@@ -559,7 +559,14 @@ static int ec_handle_arg(const char *key, const char *val)
     else if (strcmp(key, "--hd-manifest") == 0) s_enh_cli_bits |= EC_CLI_HD_MANIFEST;
     else if (strcmp(key, "--hd-mode") == 0) s_enh_cli_bits |= EC_CLI_HD_MODE;
     if (strcmp(key, "--hd-manifest") == 0 && val && *val) {
-        (void)ec_video_load_hd_manifest(val);
+        /* mesmos apelidos do [ec.hd] manifest do settings.ini */
+        const char *rel = val;
+        char path[1024];
+        if (!_stricmp(val, "animesharp")) rel = "pipeline/manifest.json";
+        else if (!_stricmp(val, "flux")) rel = "pipeline/manifest_flux.json";
+        if (rel != val) ec_resolve_repo_path(rel, path, sizeof(path));
+        else snprintf(path, sizeof(path), "%s", val);
+        (void)ec_video_load_hd_manifest(path);
         return 2;
     }
     if (strcmp(key, "--hd-mode") == 0 && val && *val) {
